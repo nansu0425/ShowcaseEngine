@@ -1,6 +1,7 @@
 #include <showcase/core/Application.h>
 #include <showcase/core/Log.h>
 #include <showcase/demo/ShowcaseRegistry.h>
+#include <imgui_internal.h>
 
 namespace showcase {
 
@@ -12,6 +13,8 @@ bool Application::Init(const ApplicationDesc& desc) {
     if (!m_renderContext.Init(m_window.GetHandle(), m_window.GetWidth(), m_window.GetHeight())) {
         return false;
     }
+
+    m_logConsole.Init();
 
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext)) return false;
 
@@ -103,6 +106,31 @@ int Application::Run() {
 
         // Render ImGui
         m_imguiLayer.BeginFrame();
+
+        // DockBuilder must run BEFORE DockSpaceOverViewport
+        ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");
+        static bool s_dockLayoutChecked = false;
+        if (!s_dockLayoutChecked) {
+            s_dockLayoutChecked = true;
+            ImGuiDockNode* node = ImGui::DockBuilderGetNode(dockspaceId);
+            if (!node || !node->IsSplitNode()) {
+                ImGui::DockBuilderRemoveNode(dockspaceId);
+                ImGui::DockBuilderAddNode(dockspaceId,
+                    ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);
+                const ImGuiViewport* vp = ImGui::GetMainViewport();
+                ImGui::DockBuilderSetNodeSize(dockspaceId, vp->Size);
+
+                ImGuiID dockBottom;
+                ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, &dockBottom, nullptr);
+                ImGui::DockBuilderDockWindow("Log Console", dockBottom);
+                ImGui::DockBuilderFinish(dockspaceId);
+            }
+        }
+
+        // Create full-screen DockSpace (uses pre-built node if DockBuilder ran)
+        ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport(),
+            ImGuiDockNodeFlags_PassthruCentralNode);
+
         m_overlay.RenderFPSCounter(m_timer.FPS(), m_timer.DeltaTime());
         if (m_showcaseManager.GetActive()) {
             m_overlay.RenderShowcaseInfo(
@@ -110,6 +138,7 @@ int Application::Run() {
                 m_showcaseManager.GetActive()->GetDescription());
         }
         m_showcaseManager.RenderUI();
+        m_logConsole.Render();
         m_imguiLayer.EndFrame(cmdList);
 
         // Transition back buffer to present

@@ -22,4 +22,8 @@ void Log::Init() {
     SE_LOG_INFO("Logger initialized");
 }
 
+void Log::AddSink(spdlog::sink_ptr sink) {
+    s_logger->sinks().push_back(std::move(sink));
+}
+
 } // namespace showcase

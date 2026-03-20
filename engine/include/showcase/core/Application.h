@@ -6,6 +6,7 @@
 #include <showcase/graphics/RenderContext.h>
 #include <showcase/ui/ImGuiLayer.h>
 #include <showcase/ui/OverlaySystem.h>
+#include <showcase/ui/LogConsole.h>
 #include <showcase/demo/ShowcaseManager.h>
 
 namespace showcase {
@@ -33,6 +34,7 @@ private:
     RenderContext m_renderContext;
     ImGuiLayer m_imguiLayer;
     OverlaySystem m_overlay;
+    LogConsole m_logConsole;
     ShowcaseManager m_showcaseManager;
 
     bool m_resizePending = false;

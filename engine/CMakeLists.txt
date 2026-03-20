@@ -23,6 +23,7 @@ add_library(showcase_engine STATIC
     # UI
     src/ui/ImGuiLayer.cpp
     src/ui/OverlaySystem.cpp
+    src/ui/LogConsole.cpp
 
     # Demo
     src/demo/ShowcaseRegistry.cpp

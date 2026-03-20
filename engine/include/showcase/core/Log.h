@@ -8,6 +8,7 @@ namespace showcase {
 class Log {
 public:
     static void Init();
+    static void AddSink(spdlog::sink_ptr sink);
     static std::shared_ptr<spdlog::logger>& GetLogger() { return s_logger; }
 
 private:
