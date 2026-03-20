@@ -132,11 +132,6 @@ int Application::Run() {
             ImGuiDockNodeFlags_PassthruCentralNode);
 
         m_overlay.RenderFPSCounter(m_timer.FPS(), m_timer.DeltaTime());
-        if (m_showcaseManager.GetActive()) {
-            m_overlay.RenderShowcaseInfo(
-                m_showcaseManager.GetActive()->GetName(),
-                m_showcaseManager.GetActive()->GetDescription());
-        }
         m_showcaseManager.RenderUI();
         m_logConsole.Render();
         m_imguiLayer.EndFrame(cmdList);
