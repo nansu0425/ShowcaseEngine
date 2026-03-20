@@ -4,6 +4,8 @@ add_library(showcase_hello_triangle STATIC
 
 target_link_libraries(showcase_hello_triangle PUBLIC ShowcaseEngine::Core)
 
+target_precompile_headers(showcase_hello_triangle REUSE_FROM showcase_engine)
+
 target_include_directories(showcase_hello_triangle PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )

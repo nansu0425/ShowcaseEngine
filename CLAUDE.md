@@ -28,6 +28,7 @@ Follow the structure of `showcases/01_hello_triangle/` (h/cpp/CMakeLists.txt/sha
 - `REGISTER_SHOWCASE(ClassName)` macro required in cpp
 - Must link with `$<LINK_LIBRARY:WHOLE_ARCHIVE,...>` in `app/CMakeLists.txt` — otherwise MSVC linker strips the static initializer and the showcase won't register
 - Compile shaders via `target_compile_shaders()` (`cmake/ShaderCompilation.cmake`)
+- Reuse precompiled headers via `target_precompile_headers(<target> REUSE_FROM showcase_engine)` in showcase CMakeLists.txt
 
 ## Shader Pipeline
 

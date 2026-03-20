@@ -5,6 +5,8 @@ target_link_libraries(ShowcaseApp PRIVATE
     $<LINK_LIBRARY:WHOLE_ARCHIVE,showcase_hello_triangle>
 )
 
+target_precompile_headers(ShowcaseApp REUSE_FROM showcase_engine)
+
 # Copy shaders to output directory
 add_custom_command(TARGET ShowcaseApp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory

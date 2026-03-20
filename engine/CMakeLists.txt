@@ -49,5 +49,27 @@ target_link_libraries(showcase_engine
 
 target_compile_features(showcase_engine PUBLIC cxx_std_20)
 
+# Precompiled headers
+target_precompile_headers(showcase_engine PRIVATE
+    # Windows / COM
+    <wrl/client.h>
+
+    # DirectX 12
+    <d3d12.h>
+    <dxgi1_6.h>
+    <D3D12MemAlloc.h>
+
+    # Standard Library
+    <memory>
+    <string>
+    <vector>
+    <stdexcept>
+    <cstdint>
+    <functional>
+
+    # Third-party
+    <spdlog/spdlog.h>
+)
+
 # Enable Unicode for Win32
 target_compile_definitions(showcase_engine PUBLIC UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
