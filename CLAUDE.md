@@ -2,6 +2,10 @@
 
 A game engine for demonstrating game tech concepts and principles in YouTube content — C++20 / DirectX 12 / ImGui / CMake
 
+## Target Audience
+
+The YouTube content targets **non-developers** — viewers who have never written code. Showcases and explanations should prioritize visual clarity and intuitive understanding over technical depth. Think "revealing the hidden tricks behind what gamers already experience" rather than "teaching graphics programming."
+
 ## Build
 
 ```batch
