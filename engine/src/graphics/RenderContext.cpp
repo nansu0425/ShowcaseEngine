@@ -20,6 +20,8 @@ bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
     // Shader-visible SRV heap (for ImGui and general use)
     if (!m_srvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 256, true)) return false;
 
+    if (!m_depthBuffer.Init(device, m_device.GetAllocator(), width, height)) return false;
+
     if (!m_frameResource.Init(device)) return false;
     if (!m_commandList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT)) return false;
 
@@ -31,6 +33,7 @@ bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
 
 void RenderContext::Shutdown() {
     m_directQueue.Flush();
+    m_depthBuffer.Shutdown();
     m_shaderManager.Clear();
     m_commandList.Shutdown();
     m_frameResource.Shutdown();
@@ -68,6 +71,7 @@ void RenderContext::Resize(uint32_t width, uint32_t height) {
 
     m_directQueue.Flush();
     m_swapChain.Resize(m_device.GetDevice(), width, height);
+    m_depthBuffer.Resize(m_device.GetDevice(), m_device.GetAllocator(), width, height);
 }
 
 } // namespace showcase

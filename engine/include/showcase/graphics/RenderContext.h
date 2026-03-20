@@ -7,6 +7,7 @@
 #include <showcase/graphics/FrameResource.h>
 #include <showcase/graphics/ShaderManager.h>
 #include <showcase/graphics/CommandList.h>
+#include <showcase/graphics/DepthBuffer.h>
 
 namespace showcase {
 
@@ -26,6 +27,7 @@ public:
     FrameResource& GetFrameResource() { return m_frameResource; }
     ShaderManager& GetShaderManager() { return m_shaderManager; }
     CommandList& GetCommandList() { return m_commandList; }
+    DepthBuffer& GetDepthBuffer() { return m_depthBuffer; }
     uint32_t GetCurrentFrameIndex() const { return m_currentFrameIndex; }
 
 private:
@@ -36,6 +38,7 @@ private:
     FrameResource m_frameResource;
     ShaderManager m_shaderManager;
     CommandList m_commandList;
+    DepthBuffer m_depthBuffer;
 
     uint32_t m_currentFrameIndex = 0;
 };

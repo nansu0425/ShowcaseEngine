@@ -73,11 +73,13 @@ int Application::Run() {
         m_renderContext.GetCommandList().TransitionBarrier(backBuffer,
             D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-        // Clear render target
+        // Clear render target and depth buffer
         auto rtv = m_renderContext.GetSwapChain().GetCurrentRTV();
+        auto dsv = m_renderContext.GetDepthBuffer().GetDSV();
         float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
         cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
-        cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+        cmdList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        cmdList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
         // Set viewport and scissor
         D3D12_VIEWPORT viewport = {};

@@ -18,6 +18,7 @@ add_library(showcase_engine STATIC
     src/graphics/FrameResource.cpp
     src/graphics/RenderContext.cpp
     src/graphics/ShaderManager.cpp
+    src/graphics/DepthBuffer.cpp
 
     # UI
     src/ui/ImGuiLayer.cpp
