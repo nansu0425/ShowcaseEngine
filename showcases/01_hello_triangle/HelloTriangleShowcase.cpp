@@ -1,29 +1,29 @@
 #include "HelloTriangleShowcase.h"
+#include <imgui.h>
+#include <showcase/core/Log.h>
+#include <showcase/demo/ShowcaseRegistry.h>
+#include <showcase/graphics/PipelineState.h>
 #include <showcase/graphics/RenderContext.h>
 #include <showcase/graphics/RootSignature.h>
-#include <showcase/graphics/PipelineState.h>
-#include <showcase/demo/ShowcaseRegistry.h>
-#include <showcase/core/Log.h>
-#include <imgui.h>
-#include <DirectXMath.h>
-#include <cmath>
 
 namespace showcase {
+
+using namespace DirectX::SimpleMath;
 
 REGISTER_SHOWCASE(HelloTriangleShowcase)
 
 struct Vertex {
-    DirectX::XMFLOAT3 position;
-    DirectX::XMFLOAT4 color;
+    Vector3 position;
+    Vector4 color;
 };
 
-void HelloTriangleShowcase::OnLoad(RenderContext& ctx) {
-    auto* device = ctx.GetDevice().GetDevice();
+void HelloTriangleShowcase::OnLoad(RenderContext &ctx) {
+    auto *device = ctx.GetDevice().GetDevice();
 
     // Create empty root signature (no resources needed)
     m_rootSignature = RootSignatureBuilder()
-        .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
-        .Build(device);
+                          .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
+                          .Build(device);
 
     // Load shaders
     auto vs = ctx.GetShaderManager().LoadShader("shaders/triangle_vs_vs.cso");
@@ -49,13 +49,13 @@ void HelloTriangleShowcase::OnLoad(RenderContext& ctx) {
 
     // Create vertex buffer
     Vertex vertices[] = {
-        {{0.0f,  0.5f, 0.0f}, {1.0f, 0.2f, 0.2f, 1.0f}},  // Top - Red
-        {{0.43f, -0.25f, 0.0f}, {0.2f, 1.0f, 0.2f, 1.0f}}, // Bottom Right - Green
+        {{0.0f, 0.5f, 0.0f}, {1.0f, 0.2f, 0.2f, 1.0f}},     // Top - Red
+        {{0.43f, -0.25f, 0.0f}, {0.2f, 1.0f, 0.2f, 1.0f}},  // Bottom Right - Green
         {{-0.43f, -0.25f, 0.0f}, {0.2f, 0.2f, 1.0f, 1.0f}}, // Bottom Left - Blue
     };
 
-    m_vertexBuffer.InitAsVertexBuffer(device, ctx.GetDevice().GetAllocator(),
-                                       vertices, sizeof(vertices), sizeof(Vertex));
+    m_vertexBuffer.InitAsVertexBuffer(device, ctx.GetDevice().GetAllocator(), vertices,
+                                      sizeof(vertices), sizeof(Vertex));
 
     SE_LOG_INFO("HelloTriangle showcase loaded");
 }
@@ -79,14 +79,14 @@ void HelloTriangleShowcase::OnUpdate(float deltaTime) {
         float sin_a = std::sin(m_currentAngle);
 
         // Original positions
-        DirectX::XMFLOAT3 origPositions[] = {
-            {0.0f,  0.5f, 0.0f},
+        Vector3 origPositions[] = {
+            {0.0f, 0.5f, 0.0f},
             {0.43f, -0.25f, 0.0f},
             {-0.43f, -0.25f, 0.0f},
         };
 
         Vertex vertices[3];
-        DirectX::XMFLOAT4 colors[] = {
+        Vector4 colors[] = {
             {1.0f, 0.2f, 0.2f, 1.0f},
             {0.2f, 1.0f, 0.2f, 1.0f},
             {0.2f, 0.2f, 1.0f, 1.0f},
@@ -103,8 +103,8 @@ void HelloTriangleShowcase::OnUpdate(float deltaTime) {
     }
 }
 
-void HelloTriangleShowcase::OnRender(RenderContext& ctx) {
-    auto* cmdList = ctx.GetCommandList().Get();
+void HelloTriangleShowcase::OnRender(RenderContext &ctx) {
+    auto *cmdList = ctx.GetCommandList().Get();
 
     cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
     cmdList->SetPipelineState(m_pipelineState.Get());

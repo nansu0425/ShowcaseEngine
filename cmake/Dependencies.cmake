@@ -18,13 +18,13 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
-# DirectXTK12 — deferred to Milestone 2 (texture loading, SimpleMath)
-# FetchContent_Declare(
-#     directxtk12
-#     GIT_REPOSITORY https://github.com/microsoft/DirectXTK12.git
-#     GIT_TAG        oct2025
-#     GIT_SHALLOW    TRUE
-# )
+# DirectXTK12 (SimpleMath, SpriteBatch, etc.)
+FetchContent_Declare(
+    directxtk12
+    GIT_REPOSITORY https://github.com/microsoft/DirectXTK12.git
+    GIT_TAG        oct2025
+    GIT_SHALLOW    TRUE
+)
 
 # spdlog
 FetchContent_Declare(
@@ -44,6 +44,14 @@ FetchContent_Declare(
 
 # Make available: D3D12MA, spdlog, json
 FetchContent_MakeAvailable(D3D12MemoryAllocator spdlog nlohmann_json)
+
+# DirectXTK12 — fetch source only (SimpleMath is header-only)
+FetchContent_GetProperties(directxtk12)
+if(NOT directxtk12_POPULATED)
+    FetchContent_Populate(directxtk12)
+endif()
+add_library(directxtk12_headers INTERFACE)
+target_include_directories(directxtk12_headers INTERFACE ${directxtk12_SOURCE_DIR}/Inc)
 
 # D3D12MA doesn't set its include directory, add it manually
 target_include_directories(D3D12MemoryAllocator PUBLIC

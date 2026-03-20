@@ -44,6 +44,7 @@ target_link_libraries(showcase_engine
         imgui::imgui
         spdlog::spdlog
         nlohmann_json::nlohmann_json
+        directxtk12_headers
         ShowcaseEngine::Warnings
 )
 
@@ -69,6 +70,7 @@ target_precompile_headers(showcase_engine PRIVATE
 
     # Third-party
     <spdlog/spdlog.h>
+    <SimpleMath.h>
 )
 
 # Enable Unicode for Win32
