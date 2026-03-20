@@ -1,0 +1,69 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/build.bat",
+            "args": ["build", "${command:cmake.buildType}"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always",
+                "clear": true
+            }
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/build.bat",
+            "args": ["clean", "${command:cmake.buildType}"],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Clean Rebuild",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/build.bat",
+            "args": ["rebuild", "${command:cmake.buildType}"],
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always",
+                "clear": true
+            }
+        },
+        {
+            "label": "Configure",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/build.bat",
+            "args": ["configure"],
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Debug",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/build.bat",
+            "args": ["build", "Debug"],
+            "group": "build",
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always",
+                "clear": true
+            }
+        },
+        {
+            "label": "Build Release",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/build.bat",
+            "args": ["build", "Release"],
+            "group": "build",
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always",
+                "clear": true
+            }
+        }
+    ]
+}

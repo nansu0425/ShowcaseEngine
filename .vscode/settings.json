@@ -1,0 +1,18 @@
+{
+    "cmake.generator": "Visual Studio 17 2022",
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.debugConfig": {
+        "name": "ShowcaseApp",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${command:cmake.launchTargetPath}",
+        "cwd": "${workspaceFolder}"
+    },
+    "files.associations": {
+        "*.hlsl": "hlsl",
+        "*.hlsli": "hlsl"
+    },
+    "editor.formatOnSave": true,
+    "C_Cpp.default.cppStandard": "c++20",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
+}
