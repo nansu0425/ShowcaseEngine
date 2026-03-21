@@ -132,25 +132,14 @@ void EditorController::RenderUI(Scene& scene, Camera& camera,
                 selected->RecomputeWorldTransform();
                 selected->UpdateAABB();
             }
-
-            ImGui::Separator();
-            ImGui::Text("Camera: (%.1f, %.1f, %.1f)",
-                camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-            ImGui::SliderFloat("Move Speed", &cameraCtrl.moveSpeed, 1.0f, 50.0f);
-            ImGui::SliderFloat("Look Sensitivity", &cameraCtrl.lookSpeed, 0.001f, 0.01f);
         } else {
             ImGui::TextDisabled("No object selected");
-            ImGui::Separator();
-            ImGui::Text("Camera: (%.1f, %.1f, %.1f)",
-                camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-            ImGui::SliderFloat("Move Speed", &cameraCtrl.moveSpeed, 1.0f, 50.0f);
-            ImGui::SliderFloat("Look Sensitivity", &cameraCtrl.lookSpeed, 0.001f, 0.01f);
         }
     }
     ImGui::End();
 }
 
-void EditorController::RenderToolbar() {
+void EditorController::RenderToolbar(Camera& camera, FPSCameraController& cameraCtrl) {
     if (ImGui::RadioButton("Translate", m_gizmoOperation == ImGuizmo::TRANSLATE))
         m_gizmoOperation = ImGuizmo::TRANSLATE;
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Move objects along axes (W)");
@@ -190,6 +179,21 @@ void EditorController::RenderToolbar() {
             ImGui::DragFloat("##SnapVal", &m_snapRotate, 1.0f, 1.0f, 90.0f);
         else
             ImGui::DragFloat("##SnapVal", &m_snapScale, 0.01f, 0.01f, 1.0f);
+    }
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    if (ImGui::Button("Camera"))
+        ImGui::OpenPopup("CameraSettings");
+
+    if (ImGui::BeginPopup("CameraSettings")) {
+        ImGui::Text("Position: (%.1f, %.1f, %.1f)",
+            camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
+        ImGui::SliderFloat("Move Speed", &cameraCtrl.moveSpeed, 1.0f, 50.0f);
+        ImGui::SliderFloat("Look Sensitivity", &cameraCtrl.lookSpeed, 0.001f, 0.01f);
+        ImGui::EndPopup();
     }
 }
 

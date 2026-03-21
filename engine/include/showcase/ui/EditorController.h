@@ -16,7 +16,7 @@ class EditorController {
 public:
     void Update(const Input& input, Scene& scene, SceneRenderer& renderer, Camera& camera, Viewport* viewport);
     void RenderUI(Scene& scene, Camera& camera, FPSCameraController& cameraCtrl, Viewport* viewport);
-    void RenderToolbar();
+    void RenderToolbar(Camera& camera, FPSCameraController& cameraCtrl);
 
     int GetSelectedObjectId() const { return m_selectedObjectId; }
 

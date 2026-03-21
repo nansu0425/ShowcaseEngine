@@ -40,7 +40,7 @@ bool Application::Init(const ApplicationDesc& desc) {
     });
 
     m_viewport.SetToolbarCallback([this]() {
-        m_editorController.RenderToolbar();
+        m_editorController.RenderToolbar(m_camera, m_cameraController);
     });
 
     m_renderContext.SetViewport(&m_viewport);
