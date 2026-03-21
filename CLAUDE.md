@@ -51,3 +51,6 @@ Follow the structure of `showcases/01_hello_triangle/` (h/cpp/CMakeLists.txt/sha
 - `ShowcaseRegistry::Register()` runs during static initialization — do not use `SE_LOG_*` (logger not yet initialized)
 - Shader paths resolve relative to exe directory, not CWD (`GetExecutableDir()` in `ShaderManager.cpp`)
 - SwapChain triple-buffering (BUFFER_COUNT=3), FrameResource also 3-frame buffering
+- HLSL `cbuffer` matrices default to column-major, but SimpleMath stores row-major — always declare `row_major float4x4` in HLSL, or transpose on CPU before upload
+- A single upload-heap constant buffer rewritten per draw call causes GPU aliasing (flickering) — use offset-based writes (`UpdateDataAtOffset`) so each object occupies its own 256-byte-aligned slot
+- SimpleMath `Matrix::CreateLookAt` / `CreatePerspectiveFieldOfView` produce RH matrices — use `XMMatrixLookAtLH` / `XMMatrixPerspectiveFovLH` directly for LH pipelines
