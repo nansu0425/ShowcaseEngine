@@ -70,7 +70,7 @@ void Viewport::EndRender(CommandList& cmdList) {
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
-void Viewport::OnImGui() {
+void Viewport::OnImGui(float fps, float deltaTime) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
     if (ImGui::Begin("Viewport")) {
@@ -92,6 +92,20 @@ void Viewport::OnImGui() {
         // Display render target
         auto gpuHandle = m_renderTarget.GetSRVHandle().gpu;
         ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(static_cast<float>(m_width), static_cast<float>(m_height)));
+
+        // FPS overlay drawn directly on the viewport's draw list
+        ImVec2 imageMin = ImGui::GetItemRectMin();
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImVec2 textPos(imageMin.x + 10, imageMin.y + 10);
+        char fpsText[64];
+        snprintf(fpsText, sizeof(fpsText), "FPS: %.1f\nFrame: %.2f ms", fps, deltaTime * 1000.0f);
+        ImVec2 textSize = ImGui::CalcTextSize(fpsText);
+        ImVec2 padding(6, 4);
+        drawList->AddRectFilled(
+            ImVec2(textPos.x - padding.x, textPos.y - padding.y),
+            ImVec2(textPos.x + textSize.x + padding.x, textPos.y + textSize.y + padding.y),
+            IM_COL32(0, 0, 0, 128), 4.0f);
+        drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), fpsText);
     }
 
     ImGui::End();

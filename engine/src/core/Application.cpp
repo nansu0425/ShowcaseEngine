@@ -143,8 +143,7 @@ int Application::Run() {
         // Create full-screen DockSpace
         ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
 
-        m_viewport.OnImGui();
-        m_overlay.RenderFPSCounter(m_timer.FPS(), m_timer.DeltaTime());
+        m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
         m_showcaseManager.RenderUI();
         m_logConsole.Render();
         m_imguiLayer.EndFrame(cmdList);

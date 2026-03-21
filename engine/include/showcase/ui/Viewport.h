@@ -20,7 +20,7 @@ public:
 
     void BeginRender(CommandList& cmdList);
     void EndRender(CommandList& cmdList);
-    void OnImGui();
+    void OnImGui(float fps, float deltaTime);
 
     void SetResizeCallback(ViewportResizeCallback callback) { m_resizeCallback = std::move(callback); }
 
