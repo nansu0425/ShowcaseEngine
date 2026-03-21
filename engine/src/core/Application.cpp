@@ -14,7 +14,12 @@ bool Application::Init(const ApplicationDesc& desc) {
         return false;
     }
 
-    m_logConsole.Init();
+    m_console.Init();
+
+    m_console.RegisterCommand("fps", [this](const std::string&) -> std::string {
+        m_viewport.ToggleShowFPS();
+        return m_viewport.GetShowFPS() ? "FPS overlay enabled" : "FPS overlay disabled";
+    });
 
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext)) return false;
 
@@ -134,7 +139,7 @@ int Application::Run() {
                 ImGuiID dockBottom;
                 ImGuiID dockCenter;
                 ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, &dockBottom, &dockCenter);
-                ImGui::DockBuilderDockWindow("Log Console", dockBottom);
+                ImGui::DockBuilderDockWindow("Console", dockBottom);
                 ImGui::DockBuilderDockWindow("Viewport", dockCenter);
                 ImGui::DockBuilderFinish(dockspaceId);
             }
@@ -145,7 +150,7 @@ int Application::Run() {
 
         m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
         m_showcaseManager.RenderUI();
-        m_logConsole.Render();
+        m_console.Render();
         m_imguiLayer.EndFrame(cmdList);
 
         // Transition back buffer to present

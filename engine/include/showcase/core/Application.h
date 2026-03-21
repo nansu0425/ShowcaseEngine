@@ -5,7 +5,7 @@
 #include <showcase/core/Input.h>
 #include <showcase/graphics/RenderContext.h>
 #include <showcase/ui/ImGuiLayer.h>
-#include <showcase/ui/LogConsole.h>
+#include <showcase/ui/Console.h>
 #include <showcase/ui/Viewport.h>
 #include <showcase/demo/ShowcaseManager.h>
 
@@ -33,7 +33,7 @@ private:
     Input m_input;
     RenderContext m_renderContext;
     ImGuiLayer m_imguiLayer;
-    LogConsole m_logConsole;
+    Console m_console;
     Viewport m_viewport;
     ShowcaseManager m_showcaseManager;
 

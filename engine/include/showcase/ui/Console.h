@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <functional>
+#include <unordered_map>
 
 namespace showcase {
 
@@ -15,17 +17,21 @@ struct LogEntry {
     std::string message;
 };
 
-class LogConsole {
+using CommandHandler = std::function<std::string(const std::string&)>;
+
+class Console {
 public:
     void Init();
     void Render();
     void Clear();
 
     void AddEntry(spdlog::level::level_enum level, const std::string& timestamp, const std::string& message);
+    void RegisterCommand(const std::string& name, CommandHandler handler);
 
 private:
     static ImVec4 GetLevelColor(spdlog::level::level_enum level);
     static const char* GetLevelLabel(spdlog::level::level_enum level);
+    void ExecuteCommand(const std::string& input);
 
     std::vector<LogEntry> m_entries;
     std::mutex m_mutex;
@@ -34,6 +40,9 @@ private:
     int m_levelFilter = 0; // index into spdlog::level (0=trace)
     ImGuiTextFilter m_textFilter;
     static constexpr size_t MAX_ENTRIES = 2048;
+
+    char m_inputBuf[256] = {};
+    std::unordered_map<std::string, CommandHandler> m_commands;
 };
 
 } // namespace showcase

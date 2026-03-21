@@ -24,6 +24,9 @@ public:
 
     void SetResizeCallback(ViewportResizeCallback callback) { m_resizeCallback = std::move(callback); }
 
+    void ToggleShowFPS() { m_showFPS = !m_showFPS; }
+    bool GetShowFPS() const { return m_showFPS; }
+
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
     float GetAspectRatio() const { return m_height > 0 ? static_cast<float>(m_width) / m_height : 1.0f; }
@@ -45,6 +48,7 @@ private:
     uint32_t m_pendingWidth = 0;
     uint32_t m_pendingHeight = 0;
 
+    bool m_showFPS = true;
     ViewportResizeCallback m_resizeCallback;
 };
 
