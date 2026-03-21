@@ -42,6 +42,14 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
+# tinygltf (header-only glTF loader)
+FetchContent_Declare(
+    tinygltf
+    GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+    GIT_TAG        v2.9.5
+    GIT_SHALLOW    TRUE
+)
+
 # Make available: D3D12MA, spdlog, json
 FetchContent_MakeAvailable(D3D12MemoryAllocator spdlog nlohmann_json)
 
@@ -52,6 +60,15 @@ if(NOT directxtk12_POPULATED)
 endif()
 add_library(directxtk12_headers INTERFACE)
 target_include_directories(directxtk12_headers INTERFACE ${directxtk12_SOURCE_DIR}/Inc)
+
+# tinygltf — fetch source only (header-only library)
+FetchContent_GetProperties(tinygltf)
+if(NOT tinygltf_POPULATED)
+    FetchContent_Populate(tinygltf)
+endif()
+add_library(tinygltf_headers INTERFACE)
+target_include_directories(tinygltf_headers INTERFACE ${tinygltf_SOURCE_DIR})
+target_compile_definitions(tinygltf_headers INTERFACE TINYGLTF_NO_INCLUDE_JSON)
 
 # D3D12MA doesn't set its include directory, add it manually
 target_include_directories(D3D12MemoryAllocator PUBLIC

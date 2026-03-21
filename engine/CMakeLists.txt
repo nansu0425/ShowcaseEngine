@@ -21,6 +21,7 @@ add_library(showcase_engine STATIC
     src/graphics/DepthBuffer.cpp
     src/graphics/Camera.cpp
     src/graphics/Texture.cpp
+    src/graphics/Model.cpp
     src/graphics/RenderTarget.cpp
 
     # UI
@@ -50,6 +51,7 @@ target_link_libraries(showcase_engine
         spdlog::spdlog
         nlohmann_json::nlohmann_json
         directxtk12_headers
+        tinygltf_headers
         ShowcaseEngine::Warnings
 )
 
