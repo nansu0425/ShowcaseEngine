@@ -177,10 +177,22 @@ int CullingShowcase::PickObject(int mouseX, int mouseY) const {
     float closestDist = FLT_MAX;
 
     for (const auto& obj : m_scene.GetObjects()) {
+        if (!obj.model) continue;
+
+        // Transform ray into object local space for accurate rotated picking
+        Matrix invWorld = obj.worldTransform.Invert();
+        XMVECTOR localOrigin = XMVector3TransformCoord(rayOrigin, invWorld);
+        XMVECTOR localDir = XMVector3Normalize(XMVector3TransformNormal(rayDir, invWorld));
+
         float dist = 0.0f;
-        if (obj.worldAABB.Intersects(rayOrigin, rayDir, dist)) {
-            if (dist < closestDist) {
-                closestDist = dist;
+        if (obj.model->localAABB.Intersects(localOrigin, localDir, dist)) {
+            // Convert local-space hit point back to world-space distance
+            XMVECTOR localHit = XMVectorAdd(localOrigin, XMVectorScale(localDir, dist));
+            XMVECTOR worldHit = XMVector3TransformCoord(localHit, obj.worldTransform);
+            float worldDist = XMVectorGetX(XMVector3Length(XMVectorSubtract(worldHit, rayOrigin)));
+
+            if (worldDist < closestDist) {
+                closestDist = worldDist;
                 closestId = static_cast<int>(obj.id);
             }
         }
