@@ -15,3 +15,11 @@ add_custom_command(TARGET ShowcaseApp POST_BUILD
         $<TARGET_FILE_DIR:ShowcaseApp>/shaders
     COMMENT "Copying compiled shaders to output directory"
 )
+
+# Copy assets to output directory
+add_custom_command(TARGET ShowcaseApp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:ShowcaseApp>/assets
+    COMMENT "Copying assets to output directory"
+)

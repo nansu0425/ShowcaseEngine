@@ -16,7 +16,7 @@
 - [x] tinygltf integration (Dependencies.cmake)
 - [x] Texture system
 - [x] ModelLoader (glTF → GPU buffers)
-- [ ] Textured mesh shader
+- [x] Textured mesh shader
 
 ## Milestone 3: Scene
 

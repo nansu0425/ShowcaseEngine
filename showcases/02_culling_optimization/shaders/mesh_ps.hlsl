@@ -1,7 +1,17 @@
+Texture2D    baseColorTex    : register(t0);
+SamplerState linearSampler   : register(s0);
+
+cbuffer PerMaterial : register(b2) {
+    float4 baseColorFactor;
+    int    hasTexture;
+    float3 _pad1;
+};
+
 struct PSInput {
     float4 position  : SV_POSITION;
     float3 worldNorm : NORMAL;
     float3 worldPos  : TEXCOORD0;
+    float2 texCoord  : TEXCOORD1;
 };
 
 static const float3 LIGHT_DIR = normalize(float3(0.4, -0.8, 0.3));
@@ -13,8 +23,12 @@ float4 main(PSInput input) : SV_TARGET {
     float ndl = saturate(dot(normal, -LIGHT_DIR));
     float3 diffuse = LIGHT_COLOR * ndl;
 
-    float3 baseColor = float3(0.7, 0.7, 0.7);
-    float3 color = baseColor * (diffuse + AMBIENT);
+    float4 baseColor = baseColorFactor;
+    if (hasTexture) {
+        baseColor *= baseColorTex.Sample(linearSampler, input.texCoord);
+    }
 
-    return float4(color, 1.0);
+    float3 color = baseColor.rgb * (diffuse + AMBIENT);
+
+    return float4(color, baseColor.a);
 }

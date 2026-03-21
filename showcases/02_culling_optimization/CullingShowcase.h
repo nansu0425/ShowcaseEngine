@@ -3,6 +3,7 @@
 #include <showcase/demo/IShowcase.h>
 #include <showcase/graphics/Buffer.h>
 #include <showcase/graphics/Camera.h>
+#include <showcase/graphics/Model.h>
 #include "FPSCameraController.h"
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -60,6 +61,15 @@ private:
         DirectX::SimpleMath::Matrix world;
     };
     std::vector<CubeInstance> m_cubes;
+
+    // glTF model
+    Model m_testModel;
+    bool m_modelLoaded = false;
+    Buffer m_perMaterialCB;
+    DescriptorHeap* m_srvHeap = nullptr;
+
+    // Default white texture for untextured geometry
+    Texture m_defaultWhiteTex;
 };
 
 } // namespace showcase
