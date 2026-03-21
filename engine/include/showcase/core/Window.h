@@ -23,6 +23,9 @@ public:
     bool Init(const WindowDesc& desc);
     void Shutdown();
 
+    void SavePlacement() const;
+    void RestorePlacement();
+
     bool ProcessMessages();
 
     HWND GetHandle() const { return m_hwnd; }

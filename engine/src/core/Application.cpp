@@ -43,6 +43,8 @@ bool Application::Init(const ApplicationDesc& desc) {
         m_pendingHeight = h;
     });
 
+    m_window.RestorePlacement();
+
     m_timer.Reset();
 
     // Auto-load first available showcase

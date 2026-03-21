@@ -1,8 +1,21 @@
 #include <showcase/core/Window.h>
 #include <showcase/core/Log.h>
+#include <nlohmann/json.hpp>
+#include <fstream>
 
 // Forward declaration for ImGui Win32 handler
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+namespace {
+
+std::string GetConfigPath() {
+    char path[MAX_PATH];
+    GetModuleFileNameA(nullptr, path, MAX_PATH);
+    std::string exePath(path);
+    return exePath.substr(0, exePath.find_last_of("\\/") + 1) + "engine_config.json";
+}
+
+} // anonymous namespace
 
 namespace showcase {
 
@@ -62,6 +75,57 @@ void Window::Shutdown() {
     }
 }
 
+void Window::SavePlacement() const {
+    if (!m_hwnd) return;
+
+    WINDOWPLACEMENT wp = {};
+    wp.length = sizeof(WINDOWPLACEMENT);
+    if (!GetWindowPlacement(m_hwnd, &wp)) return;
+
+    nlohmann::json j;
+    j["showCmd"] = wp.showCmd;
+    j["normalPosition"] = {
+        {"left",   wp.rcNormalPosition.left},
+        {"top",    wp.rcNormalPosition.top},
+        {"right",  wp.rcNormalPosition.right},
+        {"bottom", wp.rcNormalPosition.bottom}
+    };
+
+    std::ofstream file(GetConfigPath());
+    if (file.is_open()) {
+        file << j.dump(2);
+        SE_LOG_INFO("Window placement saved");
+    }
+}
+
+void Window::RestorePlacement() {
+    if (!m_hwnd) return;
+
+    std::ifstream file(GetConfigPath());
+    if (!file.is_open()) return;
+
+    nlohmann::json j;
+    try {
+        file >> j;
+    } catch (const nlohmann::json::exception&) {
+        SE_LOG_WARN("Failed to parse window config");
+        return;
+    }
+
+    WINDOWPLACEMENT wp = {};
+    wp.length = sizeof(WINDOWPLACEMENT);
+
+    auto& np = j["normalPosition"];
+    wp.rcNormalPosition.left   = np["left"].get<LONG>();
+    wp.rcNormalPosition.top    = np["top"].get<LONG>();
+    wp.rcNormalPosition.right  = np["right"].get<LONG>();
+    wp.rcNormalPosition.bottom = np["bottom"].get<LONG>();
+    wp.showCmd = j["showCmd"].get<UINT>();
+
+    SetWindowPlacement(m_hwnd, &wp);
+    SE_LOG_INFO("Window placement restored");
+}
+
 bool Window::ProcessMessages() {
     MSG msg = {};
     while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -116,6 +180,10 @@ LRESULT Window::HandleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
         }
         return 0;
     }
+    case WM_CLOSE:
+        SavePlacement();
+        DestroyWindow(m_hwnd);
+        return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
