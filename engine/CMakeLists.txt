@@ -21,9 +21,11 @@ add_library(showcase_engine STATIC
     src/graphics/DepthBuffer.cpp
     src/graphics/Camera.cpp
     src/graphics/Texture.cpp
+    src/graphics/RenderTarget.cpp
 
     # UI
     src/ui/ImGuiLayer.cpp
+    src/ui/Viewport.cpp
     src/ui/OverlaySystem.cpp
     src/ui/LogConsole.cpp
 

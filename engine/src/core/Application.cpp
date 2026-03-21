@@ -18,6 +18,19 @@ bool Application::Init(const ApplicationDesc& desc) {
 
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext)) return false;
 
+    if (!m_viewport.Init(
+        m_renderContext.GetDevice().GetDevice(),
+        m_renderContext.GetDevice().GetAllocator(),
+        m_renderContext.GetSrvHeap(),
+        m_renderContext.GetDirectQueue(),
+        m_window.GetWidth(), m_window.GetHeight())) {
+        return false;
+    }
+
+    m_viewport.SetResizeCallback([this](uint32_t w, uint32_t h) {
+        m_showcaseManager.OnResize(w, h);
+    });
+
     // Set resize callback
     m_window.SetResizeCallback([this](uint32_t w, uint32_t h) {
         m_resizePending = true;
@@ -40,6 +53,7 @@ bool Application::Init(const ApplicationDesc& desc) {
 void Application::Shutdown() {
     m_renderContext.GetDirectQueue().Flush();
     m_showcaseManager.UnloadCurrent();
+    m_viewport.Shutdown(m_renderContext.GetSrvHeap());
     m_imguiLayer.Shutdown();
     m_renderContext.Shutdown();
     m_window.Shutdown();
@@ -71,20 +85,25 @@ int Application::Run() {
         m_renderContext.BeginFrame();
         auto* cmdList = m_renderContext.GetCommandList().Get();
 
-        // Transition back buffer to render target
+        // Set SRV heap for showcase and ImGui rendering
+        ID3D12DescriptorHeap* heaps[] = {m_renderContext.GetSrvHeap().GetHeap()};
+        cmdList->SetDescriptorHeaps(1, heaps);
+
+        // Phase 1: Render showcase to off-screen viewport render target
+        m_viewport.BeginRender(m_renderContext.GetCommandList());
+        m_showcaseManager.Render(m_renderContext);
+        m_viewport.EndRender(m_renderContext.GetCommandList());
+
+        // Phase 2: Render ImGui to back buffer
         auto* backBuffer = m_renderContext.GetSwapChain().GetCurrentBackBuffer();
         m_renderContext.GetCommandList().TransitionBarrier(backBuffer,
             D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-        // Clear render target and depth buffer
         auto rtv = m_renderContext.GetSwapChain().GetCurrentRTV();
-        auto dsv = m_renderContext.GetDepthBuffer().GetDSV();
         float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
         cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
-        cmdList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-        cmdList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+        cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
 
-        // Set viewport and scissor
         D3D12_VIEWPORT viewport = {};
         viewport.Width = static_cast<float>(m_window.GetWidth());
         viewport.Height = static_cast<float>(m_window.GetHeight());
@@ -97,13 +116,6 @@ int Application::Run() {
             static_cast<LONG>(m_window.GetHeight())};
         cmdList->RSSetScissorRects(1, &scissor);
 
-        // Set SRV heap for ImGui and showcase rendering
-        ID3D12DescriptorHeap* heaps[] = {m_renderContext.GetSrvHeap().GetHeap()};
-        cmdList->SetDescriptorHeaps(1, heaps);
-
-        // Render active showcase
-        m_showcaseManager.Render(m_renderContext);
-
         // Render ImGui
         m_imguiLayer.BeginFrame();
 
@@ -115,22 +127,23 @@ int Application::Run() {
             ImGuiDockNode* node = ImGui::DockBuilderGetNode(dockspaceId);
             if (!node || !node->IsSplitNode()) {
                 ImGui::DockBuilderRemoveNode(dockspaceId);
-                ImGui::DockBuilderAddNode(dockspaceId,
-                    ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);
+                ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
                 const ImGuiViewport* vp = ImGui::GetMainViewport();
                 ImGui::DockBuilderSetNodeSize(dockspaceId, vp->Size);
 
                 ImGuiID dockBottom;
-                ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, &dockBottom, nullptr);
+                ImGuiID dockCenter;
+                ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, &dockBottom, &dockCenter);
                 ImGui::DockBuilderDockWindow("Log Console", dockBottom);
+                ImGui::DockBuilderDockWindow("Viewport", dockCenter);
                 ImGui::DockBuilderFinish(dockspaceId);
             }
         }
 
-        // Create full-screen DockSpace (uses pre-built node if DockBuilder ran)
-        ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport(),
-            ImGuiDockNodeFlags_PassthruCentralNode);
+        // Create full-screen DockSpace
+        ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
 
+        m_viewport.OnImGui();
         m_overlay.RenderFPSCounter(m_timer.FPS(), m_timer.DeltaTime());
         m_showcaseManager.RenderUI();
         m_logConsole.Render();
@@ -149,7 +162,6 @@ int Application::Run() {
 
 void Application::OnResize(uint32_t width, uint32_t height) {
     m_renderContext.Resize(width, height);
-    m_showcaseManager.OnResize(width, height);
     SE_LOG_INFO("Application resized: {}x{}", width, height);
 }
 
