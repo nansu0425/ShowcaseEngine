@@ -1,4 +1,5 @@
-#include <showcase/ui/Viewport.h>
+#include <showcase/editor/ViewportPanel.h>
+#include <showcase/graphics/RenderContext.h>
 #include <showcase/core/Input.h>
 #include <showcase/core/Log.h>
 #include <imgui.h>
@@ -7,73 +8,30 @@
 
 namespace showcase {
 
-bool Viewport::Init(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                     DescriptorHeap& srvHeap, CommandQueue& directQueue,
-                     uint32_t initialWidth, uint32_t initialHeight) {
-    m_device = device;
-    m_allocator = allocator;
-    m_srvHeap = &srvHeap;
-    m_directQueue = &directQueue;
+bool ViewportPanel::Init(RenderContext& ctx, uint32_t initialWidth, uint32_t initialHeight) {
+    // Set up camera aspect ratio update on resize
+    m_offscreenTarget.SetResizeCallback([this](uint32_t w, uint32_t h) {
+        float aspect = h > 0 ? static_cast<float>(w) / h : 1.0f;
+        m_camera.SetPerspective(m_camera.GetFovY(), aspect,
+                                m_camera.GetNearZ(), m_camera.GetFarZ());
+    });
 
-    if (!m_renderTarget.Init(device, allocator, srvHeap, initialWidth, initialHeight)) {
-        return false;
-    }
-
-    if (!m_depthBuffer.Init(device, allocator, initialWidth, initialHeight)) {
-        return false;
-    }
-
-    m_width = initialWidth;
-    m_height = initialHeight;
-
-    SE_LOG_INFO("Viewport initialized ({}x{})", initialWidth, initialHeight);
-    return true;
+    return m_offscreenTarget.Init(ctx, initialWidth, initialHeight);
 }
 
-void Viewport::Shutdown(DescriptorHeap& srvHeap) {
-    m_renderTarget.Shutdown(srvHeap);
-    m_depthBuffer.Shutdown();
+void ViewportPanel::Shutdown(RenderContext& ctx) {
+    m_offscreenTarget.Shutdown(ctx);
 }
 
-void Viewport::BeginRender(CommandList& cmdList) {
-    // Apply deferred resize
-    if (m_resizePending) {
-        m_resizePending = false;
-        Resize(m_pendingWidth, m_pendingHeight);
-    }
-
-    // Transition render target: SRV -> RT
-    cmdList.TransitionBarrier(m_renderTarget.GetResource(),
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-    auto rtv = m_renderTarget.GetRTV();
-    auto dsv = m_depthBuffer.GetDSV();
-    float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
-    auto* cmd = cmdList.Get();
-    cmd->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
-    cmd->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-    cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
-
-    D3D12_VIEWPORT vp = {};
-    vp.Width = static_cast<float>(m_width);
-    vp.Height = static_cast<float>(m_height);
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    cmd->RSSetViewports(1, &vp);
-
-    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
-    cmd->RSSetScissorRects(1, &scissor);
+void ViewportPanel::BeginRender(CommandList& cmdList) {
+    m_offscreenTarget.BeginRender(cmdList);
 }
 
-void Viewport::EndRender(CommandList& cmdList) {
-    // Transition render target: RT -> SRV
-    cmdList.TransitionBarrier(m_renderTarget.GetResource(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+void ViewportPanel::EndRender(CommandList& cmdList) {
+    m_offscreenTarget.EndRender(cmdList);
 }
 
-void Viewport::OnImGui(float fps, float deltaTime) {
+void ViewportPanel::OnImGui(float fps, float deltaTime) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
     if (ImGui::Begin("Viewport")) {
@@ -95,15 +53,11 @@ void Viewport::OnImGui(float fps, float deltaTime) {
         h = (h < 1) ? 1 : h;
 
         // Detect resize
-        if (w != m_width || h != m_height) {
-            m_pendingWidth = w;
-            m_pendingHeight = h;
-            m_resizePending = true;
-        }
+        m_offscreenTarget.RequestResize(w, h);
 
         // Display render target
-        auto gpuHandle = m_renderTarget.GetSRVHandle().gpu;
-        ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(static_cast<float>(m_width), static_cast<float>(m_height)));
+        auto gpuHandle = m_offscreenTarget.GetRenderTarget().GetSRVHandle().gpu;
+        ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(static_cast<float>(GetWidth()), static_cast<float>(GetHeight())));
 
         // Store image rect for external use (gizmo, hover detection)
         m_imageMin = ImGui::GetItemRectMin();
@@ -130,9 +84,9 @@ void Viewport::OnImGui(float fps, float deltaTime) {
     ImGui::PopStyleVar();
 }
 
-void Viewport::InitCamera(const DirectX::SimpleMath::Vector3& position,
-                          const DirectX::SimpleMath::Vector3& lookAt,
-                          float fovY, float nearZ, float farZ) {
+void ViewportPanel::InitCamera(const DirectX::SimpleMath::Vector3& position,
+                               const DirectX::SimpleMath::Vector3& lookAt,
+                               float fovY, float nearZ, float farZ) {
     m_camera.SetPosition(position);
     m_camera.SetLookAt(lookAt);
     m_camera.SetPerspective(fovY, GetAspectRatio(), nearZ, farZ);
@@ -140,7 +94,7 @@ void Viewport::InitCamera(const DirectX::SimpleMath::Vector3& position,
     m_firstCameraUpdate = true;
 }
 
-void Viewport::UpdateCamera(const Input& input, float deltaTime) {
+void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
     using namespace DirectX::SimpleMath;
 
     // Initialize yaw/pitch from current camera direction on first update
@@ -192,19 +146,17 @@ void Viewport::UpdateCamera(const Input& input, float deltaTime) {
     m_camera.UpdateViewMatrix();
 }
 
-void Viewport::Resize(uint32_t width, uint32_t height) {
-    m_directQueue->Flush();
-    m_renderTarget.Resize(m_device, m_allocator, *m_srvHeap, width, height);
-    m_depthBuffer.Resize(m_device, m_allocator, width, height);
-    m_width = width;
-    m_height = height;
-
-    m_camera.SetPerspective(m_camera.GetFovY(), GetAspectRatio(),
-                            m_camera.GetNearZ(), m_camera.GetFarZ());
-
-    if (m_resizeCallback) {
-        m_resizeCallback(width, height);
-    }
+void ViewportPanel::SetResizeCallback(ResizeCallback callback) {
+    // Chain with existing internal resize callback (camera update)
+    auto existingCallback = [this, externalCb = std::move(callback)](uint32_t w, uint32_t h) {
+        float aspect = h > 0 ? static_cast<float>(w) / h : 1.0f;
+        m_camera.SetPerspective(m_camera.GetFovY(), aspect,
+                                m_camera.GetNearZ(), m_camera.GetFarZ());
+        if (externalCb) {
+            externalCb(w, h);
+        }
+    };
+    m_offscreenTarget.SetResizeCallback(existingCallback);
 }
 
 } // namespace showcase

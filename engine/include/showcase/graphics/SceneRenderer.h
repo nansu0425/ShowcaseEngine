@@ -24,8 +24,8 @@ public:
                    float vpMinX, float vpMinY, float vpMaxX, float vpMaxY) const;
 
     // Procedural geometry helpers
-    void CreateGridModel(ID3D12Device* device, D3D12MA::Allocator* allocator, Model& outModel);
-    void CreateCubeModel(ID3D12Device* device, D3D12MA::Allocator* allocator, Model& outModel);
+    void CreateGridModel(RenderContext& ctx, Model& outModel);
+    void CreateCubeModel(RenderContext& ctx, Model& outModel);
 
     Texture& GetDefaultWhiteTexture() { return m_defaultWhiteTex; }
 

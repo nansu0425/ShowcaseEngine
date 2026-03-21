@@ -25,6 +25,8 @@ bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
     if (!m_frameResource.Init(device)) return false;
     if (!m_commandList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT)) return false;
 
+    m_width = width;
+    m_height = height;
     m_currentFrameIndex = m_swapChain.GetCurrentBackBufferIndex();
 
     SE_LOG_INFO("Render context initialized");
@@ -54,6 +56,10 @@ void RenderContext::BeginFrame() {
     m_frameResource.BeginFrame(m_currentFrameIndex);
     auto* allocator = m_frameResource.GetAllocator(m_currentFrameIndex);
     m_commandList.Get()->Reset(allocator, nullptr);
+
+    // Bind SRV heap once per frame so all passes can use descriptor tables
+    ID3D12DescriptorHeap* heaps[] = { m_srvHeap.GetHeap() };
+    m_commandList.Get()->SetDescriptorHeaps(1, heaps);
 }
 
 void RenderContext::EndFrame() {
@@ -69,9 +75,43 @@ void RenderContext::EndFrame() {
 void RenderContext::Resize(uint32_t width, uint32_t height) {
     if (width == 0 || height == 0) return;
 
+    m_width = width;
+    m_height = height;
     m_directQueue.Flush();
     m_swapChain.Resize(m_device.GetDevice(), width, height);
     m_depthBuffer.Resize(m_device.GetDevice(), m_device.GetAllocator(), width, height);
+}
+
+void RenderContext::BeginBackBufferPass(const float clearColor[4]) {
+    auto* cmdList = m_commandList.Get();
+
+    // Transition back buffer to render target
+    auto* backBuffer = m_swapChain.GetCurrentBackBuffer();
+    m_commandList.TransitionBarrier(backBuffer,
+        D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+    // Clear and bind render target
+    auto rtv = m_swapChain.GetCurrentRTV();
+    cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    // Set viewport
+    D3D12_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(m_width);
+    viewport.Height = static_cast<float>(m_height);
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    cmdList->RSSetViewports(1, &viewport);
+
+    // Set scissor rect
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    cmdList->RSSetScissorRects(1, &scissor);
+}
+
+void RenderContext::EndBackBufferPass() {
+    auto* backBuffer = m_swapChain.GetCurrentBackBuffer();
+    m_commandList.TransitionBarrier(backBuffer,
+        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 }
 
 } // namespace showcase

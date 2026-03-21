@@ -17,11 +17,13 @@ scripts/build.bat build Release      # Release build
 ## Directory Structure
 
 ```
-engine/          Engine core (STATIC lib, alias ShowcaseEngine::Core)
-  include/showcase/{core,graphics,ui}/   Public headers
+engine/          Engine core (STATIC lib, alias ShowcaseEngine::Core — no ImGui dependency)
+  include/showcase/{core,graphics}/      Public headers
   src/                                   Implementations
   shaders/                               HLSL shaders
-app/             ShowcaseApp executable (WinMain entry point)
+editor/          ShowcaseEditor executable (links engine + ImGui/ImGuizmo)
+  include/showcase/editor/              Editor headers (EditorApp, ViewportPanel, Console, etc.)
+  src/                                  Editor implementations + WinMain entry point
 docs/            Planning documents (content plans, tech specs, progress)
 cmake/           Dependencies.cmake, ShaderCompilation.cmake
 ```

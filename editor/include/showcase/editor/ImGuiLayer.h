@@ -1,6 +1,5 @@
 #pragma once
 
-#include <d3d12.h>
 #include <cstdint>
 
 struct HWND__;
@@ -9,6 +8,7 @@ typedef HWND__* HWND;
 namespace showcase {
 
 class RenderContext;
+class CommandList;
 
 class ImGuiLayer {
 public:
@@ -16,7 +16,7 @@ public:
     void Shutdown();
 
     void BeginFrame();
-    void EndFrame(ID3D12GraphicsCommandList* commandList);
+    void EndFrame(CommandList& cmdList);
 
 private:
     uint32_t m_srvDescriptorIndex = 0;

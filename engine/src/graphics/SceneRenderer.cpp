@@ -30,7 +30,9 @@ struct alignas(256) PerMaterialData {
 
 // ── Procedural geometry ──────────────────────────────────────────────
 
-void SceneRenderer::CreateGridModel(ID3D12Device* device, D3D12MA::Allocator* allocator, Model& outModel) {
+void SceneRenderer::CreateGridModel(RenderContext& ctx, Model& outModel) {
+    auto* device = ctx.GetDevice().GetDevice();
+    auto* allocator = ctx.GetDevice().GetAllocator();
     const int gridSize = 20;
     const float cellSize = 2.0f;
     const float halfExtent = gridSize * cellSize * 0.5f;
@@ -82,7 +84,9 @@ void SceneRenderer::CreateGridModel(ID3D12Device* device, D3D12MA::Allocator* al
     outModel.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(halfExtent, 0.01f, halfExtent));
 }
 
-void SceneRenderer::CreateCubeModel(ID3D12Device* device, D3D12MA::Allocator* allocator, Model& outModel) {
+void SceneRenderer::CreateCubeModel(RenderContext& ctx, Model& outModel) {
+    auto* device = ctx.GetDevice().GetDevice();
+    auto* allocator = ctx.GetDevice().GetAllocator();
     ModelVertex vertices[] = {
         // Front face (z = +0.5)
         {{-0.5f, -0.5f,  0.5f}, { 0, 0, 1}, {0, 1}},

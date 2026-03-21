@@ -1,10 +1,7 @@
 #pragma once
 
-#include <showcase/graphics/RenderTarget.h>
-#include <showcase/graphics/DepthBuffer.h>
+#include <showcase/graphics/OffscreenTarget.h>
 #include <showcase/graphics/Camera.h>
-#include <showcase/graphics/CommandList.h>
-#include <showcase/graphics/CommandQueue.h>
 #include <cstdint>
 #include <functional>
 #include <imgui.h>
@@ -12,16 +9,14 @@
 namespace showcase {
 
 class Input;
+class RenderContext;
 
-using ViewportResizeCallback = std::function<void(uint32_t, uint32_t)>;
 using ToolbarCallback = std::function<void()>;
 
-class Viewport {
+class ViewportPanel {
 public:
-    bool Init(ID3D12Device* device, D3D12MA::Allocator* allocator,
-              DescriptorHeap& srvHeap, CommandQueue& directQueue,
-              uint32_t initialWidth, uint32_t initialHeight);
-    void Shutdown(DescriptorHeap& srvHeap);
+    bool Init(RenderContext& ctx, uint32_t initialWidth, uint32_t initialHeight);
+    void Shutdown(RenderContext& ctx);
 
     void BeginRender(CommandList& cmdList);
     void EndRender(CommandList& cmdList);
@@ -35,7 +30,9 @@ public:
     Camera& GetCamera() { return m_camera; }
     const Camera& GetCamera() const { return m_camera; }
 
-    void SetResizeCallback(ViewportResizeCallback callback) { m_resizeCallback = std::move(callback); }
+    OffscreenTarget& GetOffscreenTarget() { return m_offscreenTarget; }
+
+    void SetResizeCallback(ResizeCallback callback);
     void SetToolbarCallback(ToolbarCallback callback) { m_toolbarCallback = std::move(callback); }
 
     void ToggleShowFPS() { m_showFPS = !m_showFPS; }
@@ -44,32 +41,17 @@ public:
     ImVec2 GetImageMin() const { return m_imageMin; }
     ImVec2 GetImageMax() const { return m_imageMax; }
 
-    uint32_t GetWidth() const { return m_width; }
-    uint32_t GetHeight() const { return m_height; }
-    float GetAspectRatio() const { return m_height > 0 ? static_cast<float>(m_width) / m_height : 1.0f; }
+    uint32_t GetWidth() const { return m_offscreenTarget.GetWidth(); }
+    uint32_t GetHeight() const { return m_offscreenTarget.GetHeight(); }
+    float GetAspectRatio() const { return m_offscreenTarget.GetAspectRatio(); }
 
     float cameraMoveSpeed = 10.0f;
     float cameraLookSpeed = 0.003f;
 
 private:
-    void Resize(uint32_t width, uint32_t height);
-
-    ID3D12Device* m_device = nullptr;
-    D3D12MA::Allocator* m_allocator = nullptr;
-    DescriptorHeap* m_srvHeap = nullptr;
-    CommandQueue* m_directQueue = nullptr;
-
-    RenderTarget m_renderTarget;
-    DepthBuffer m_depthBuffer;
-    uint32_t m_width = 0;
-    uint32_t m_height = 0;
-
-    bool m_resizePending = false;
-    uint32_t m_pendingWidth = 0;
-    uint32_t m_pendingHeight = 0;
+    OffscreenTarget m_offscreenTarget;
 
     bool m_showFPS = true;
-    ViewportResizeCallback m_resizeCallback;
     ToolbarCallback m_toolbarCallback;
 
     ImVec2 m_imageMin = {};

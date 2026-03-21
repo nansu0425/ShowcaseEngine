@@ -4,7 +4,6 @@ add_library(showcase_engine STATIC
     src/core/Window.cpp
     src/core/Timer.cpp
     src/core/Input.cpp
-    src/core/Application.cpp
 
     # Graphics
     src/graphics/Device.cpp
@@ -25,12 +24,7 @@ add_library(showcase_engine STATIC
     src/graphics/Scene.cpp
     src/graphics/RenderTarget.cpp
     src/graphics/SceneRenderer.cpp
-
-    # UI
-    src/ui/ImGuiLayer.cpp
-    src/ui/Viewport.cpp
-    src/ui/Console.cpp
-    src/ui/EditorController.cpp
+    src/graphics/OffscreenTarget.cpp
 )
 
 add_library(ShowcaseEngine::Core ALIAS showcase_engine)
@@ -46,8 +40,6 @@ target_link_libraries(showcase_engine
         dxguid
         d3dcompiler
         D3D12MemoryAllocator
-        imgui::imgui
-        imguizmo_lib
         spdlog::spdlog
         nlohmann_json::nlohmann_json
         directxtk12_headers

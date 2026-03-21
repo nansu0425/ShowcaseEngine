@@ -8,13 +8,13 @@
 namespace showcase {
 
 class Input;
-class Viewport;
+class ViewportPanel;
 
 class EditorController {
 public:
-    void Update(const Input& input, Scene& scene, SceneRenderer& renderer, Viewport* viewport);
-    void RenderUI(Scene& scene, Viewport* viewport);
-    void RenderToolbar(Viewport& viewport);
+    void Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel* viewport);
+    void RenderUI(Scene& scene, ViewportPanel* viewport);
+    void RenderToolbar(ViewportPanel& viewport);
 
     int GetSelectedObjectId() const { return m_selectedObjectId; }
 

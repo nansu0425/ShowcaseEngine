@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "ShowcaseApp (Debug)",
+            "name": "ShowcaseEditor (Debug)",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/bin/Debug/ShowcaseApp.exe",
+            "program": "${workspaceFolder}/build/bin/Debug/ShowcaseEditor.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -14,10 +14,10 @@
             "preLaunchTask": "Build Debug"
         },
         {
-            "name": "ShowcaseApp (Release)",
+            "name": "ShowcaseEditor (Release)",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/bin/Release/ShowcaseApp.exe",
+            "program": "${workspaceFolder}/build/bin/Release/ShowcaseEditor.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

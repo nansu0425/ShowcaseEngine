@@ -11,8 +11,6 @@
 
 namespace showcase {
 
-class Viewport;
-
 class RenderContext {
 public:
     bool Init(HWND hwnd, uint32_t width, uint32_t height);
@@ -21,6 +19,9 @@ public:
     void BeginFrame();
     void EndFrame();
     void Resize(uint32_t width, uint32_t height);
+
+    void BeginBackBufferPass(const float clearColor[4]);
+    void EndBackBufferPass();
 
     Device& GetDevice() { return m_device; }
     CommandQueue& GetDirectQueue() { return m_directQueue; }
@@ -32,9 +33,6 @@ public:
     DepthBuffer& GetDepthBuffer() { return m_depthBuffer; }
     uint32_t GetCurrentFrameIndex() const { return m_currentFrameIndex; }
 
-    void SetViewport(Viewport* vp) { m_viewport = vp; }
-    Viewport* GetViewport() const { return m_viewport; }
-
 private:
     Device m_device;
     CommandQueue m_directQueue;
@@ -45,8 +43,9 @@ private:
     CommandList m_commandList;
     DepthBuffer m_depthBuffer;
 
+    uint32_t m_width = 0;
+    uint32_t m_height = 0;
     uint32_t m_currentFrameIndex = 0;
-    Viewport* m_viewport = nullptr;
 };
 
 } // namespace showcase

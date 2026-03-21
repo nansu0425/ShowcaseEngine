@@ -1,5 +1,6 @@
-#include <showcase/ui/ImGuiLayer.h>
+#include <showcase/editor/ImGuiLayer.h>
 #include <showcase/graphics/RenderContext.h>
+#include <showcase/graphics/CommandList.h>
 #include <showcase/core/Log.h>
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -53,9 +54,9 @@ void ImGuiLayer::BeginFrame() {
     ImGui::NewFrame();
 }
 
-void ImGuiLayer::EndFrame(ID3D12GraphicsCommandList* commandList) {
+void ImGuiLayer::EndFrame(CommandList& cmdList) {
     ImGui::Render();
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList.Get());
 }
 
 } // namespace showcase

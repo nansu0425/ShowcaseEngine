@@ -1,4 +1,4 @@
-#include <showcase/core/Application.h>
+#include <showcase/editor/EditorApp.h>
 #include <showcase/core/Log.h>
 #include <imgui_internal.h>
 #include <filesystem>
@@ -8,7 +8,7 @@ namespace showcase {
 using namespace DirectX::SimpleMath;
 using namespace DirectX;
 
-bool Application::Init(const ApplicationDesc& desc) {
+bool EditorApp::Init(const EditorAppDesc& desc) {
     Log::Init();
 
     if (!m_window.Init(desc.window)) return false;
@@ -26,12 +26,7 @@ bool Application::Init(const ApplicationDesc& desc) {
 
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext)) return false;
 
-    if (!m_viewport.Init(
-        m_renderContext.GetDevice().GetDevice(),
-        m_renderContext.GetDevice().GetAllocator(),
-        m_renderContext.GetSrvHeap(),
-        m_renderContext.GetDirectQueue(),
-        m_window.GetWidth(), m_window.GetHeight())) {
+    if (!m_viewport.Init(m_renderContext, m_window.GetWidth(), m_window.GetHeight())) {
         return false;
     }
 
@@ -42,8 +37,6 @@ bool Application::Init(const ApplicationDesc& desc) {
     m_viewport.SetToolbarCallback([this]() {
         m_editorController.RenderToolbar(m_viewport);
     });
-
-    m_renderContext.SetViewport(&m_viewport);
 
     // Set resize callback
     m_window.SetResizeCallback([this](uint32_t w, uint32_t h) {
@@ -68,16 +61,13 @@ bool Application::Init(const ApplicationDesc& desc) {
 
     m_timer.Reset();
 
-    SE_LOG_INFO("Application initialized");
+    SE_LOG_INFO("Editor initialized");
     return true;
 }
 
-void Application::BuildDefaultScene() {
-    auto* device = m_renderContext.GetDevice().GetDevice();
-    auto* allocator = m_renderContext.GetDevice().GetAllocator();
-
-    m_sceneRenderer.CreateGridModel(device, allocator, m_gridModel);
-    m_sceneRenderer.CreateCubeModel(device, allocator, m_cubeModel);
+void EditorApp::BuildDefaultScene() {
+    m_sceneRenderer.CreateGridModel(m_renderContext, m_gridModel);
+    m_sceneRenderer.CreateCubeModel(m_renderContext, m_cubeModel);
 
     m_scene.Clear();
     m_scene.AddObject(&m_gridModel, "Ground Grid", Vector3(0, 0, 0));
@@ -98,8 +88,7 @@ void Application::BuildDefaultScene() {
                 auto ext = entry.path().extension().string();
                 if (ext == ".gltf" || ext == ".glb") {
                     m_modelLoaded = ModelLoader::LoadGLTF(
-                        entry.path().string(), device, allocator,
-                        m_renderContext.GetDirectQueue(), m_renderContext.GetSrvHeap(), m_testModel);
+                        entry.path().string(), m_renderContext, m_testModel);
                     if (m_modelLoaded) {
                         SE_LOG_INFO("Loaded test model: {}", entry.path().filename().string());
                         m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0));
@@ -115,11 +104,11 @@ void Application::BuildDefaultScene() {
     }
 }
 
-void Application::Shutdown() {
+void EditorApp::Shutdown() {
     m_renderContext.GetDirectQueue().Flush();
 
     if (m_modelLoaded) {
-        m_testModel.Shutdown(m_renderContext.GetSrvHeap());
+        m_testModel.Shutdown(m_renderContext);
         m_modelLoaded = false;
     }
 
@@ -139,14 +128,14 @@ void Application::Shutdown() {
 
     m_scene.Clear();
     m_sceneRenderer.Shutdown();
-    m_viewport.Shutdown(m_renderContext.GetSrvHeap());
+    m_viewport.Shutdown(m_renderContext);
     m_imguiLayer.Shutdown();
     m_renderContext.Shutdown();
     m_window.Shutdown();
-    SE_LOG_INFO("Application shutdown");
+    SE_LOG_INFO("Editor shutdown");
 }
 
-int Application::Run() {
+int EditorApp::Run() {
     while (m_window.ProcessMessages()) {
         m_timer.Tick();
         m_input.Update(m_window.GetHandle());
@@ -170,11 +159,6 @@ int Application::Run() {
 
         // Begin render frame
         m_renderContext.BeginFrame();
-        auto* cmdList = m_renderContext.GetCommandList().Get();
-
-        // Set SRV heap for rendering
-        ID3D12DescriptorHeap* heaps[] = {m_renderContext.GetSrvHeap().GetHeap()};
-        cmdList->SetDescriptorHeaps(1, heaps);
 
         // Phase 1: Render scene to off-screen viewport render target
         m_viewport.BeginRender(m_renderContext.GetCommandList());
@@ -182,28 +166,9 @@ int Application::Run() {
         m_viewport.EndRender(m_renderContext.GetCommandList());
 
         // Phase 2: Render ImGui to back buffer
-        auto* backBuffer = m_renderContext.GetSwapChain().GetCurrentBackBuffer();
-        m_renderContext.GetCommandList().TransitionBarrier(backBuffer,
-            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-        auto rtv = m_renderContext.GetSwapChain().GetCurrentRTV();
         float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
-        cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
-        cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+        m_renderContext.BeginBackBufferPass(clearColor);
 
-        D3D12_VIEWPORT viewport = {};
-        viewport.Width = static_cast<float>(m_window.GetWidth());
-        viewport.Height = static_cast<float>(m_window.GetHeight());
-        viewport.MinDepth = 0.0f;
-        viewport.MaxDepth = 1.0f;
-        cmdList->RSSetViewports(1, &viewport);
-
-        D3D12_RECT scissor = {0, 0,
-            static_cast<LONG>(m_window.GetWidth()),
-            static_cast<LONG>(m_window.GetHeight())};
-        cmdList->RSSetScissorRects(1, &scissor);
-
-        // Render ImGui
         m_imguiLayer.BeginFrame();
 
         // DockBuilder must run BEFORE DockSpaceOverViewport
@@ -241,11 +206,9 @@ int Application::Run() {
         m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
         m_editorController.RenderUI(m_scene, &m_viewport);
         m_console.Render();
-        m_imguiLayer.EndFrame(cmdList);
+        m_imguiLayer.EndFrame(m_renderContext.GetCommandList());
 
-        // Transition back buffer to present
-        m_renderContext.GetCommandList().TransitionBarrier(backBuffer,
-            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+        m_renderContext.EndBackBufferPass();
 
         // End frame
         m_renderContext.EndFrame();
@@ -254,9 +217,9 @@ int Application::Run() {
     return 0;
 }
 
-void Application::OnResize(uint32_t width, uint32_t height) {
+void EditorApp::OnResize(uint32_t width, uint32_t height) {
     m_renderContext.Resize(width, height);
-    SE_LOG_INFO("Application resized: {}x{}", width, height);
+    SE_LOG_INFO("Editor resized: {}x{}", width, height);
 }
 
 } // namespace showcase

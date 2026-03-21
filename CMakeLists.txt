@@ -16,5 +16,5 @@ include(cmake/ShaderCompilation.cmake)
 # Engine static library
 add_subdirectory(engine)
 
-# Application executable
-add_subdirectory(app)
+# Editor executable
+add_subdirectory(editor)

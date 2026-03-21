@@ -1,6 +1,6 @@
-#include <showcase/ui/EditorController.h>
+#include <showcase/editor/EditorController.h>
+#include <showcase/editor/ViewportPanel.h>
 #include <showcase/core/Input.h>
-#include <showcase/ui/Viewport.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -10,7 +10,7 @@ using namespace DirectX::SimpleMath;
 using namespace DirectX;
 
 void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& renderer,
-                              Viewport* viewport) {
+                              ViewportPanel* viewport) {
     Camera& camera = viewport->GetCamera();
 
     // Left-click picking (not during right-click camera rotation, not when using gizmo)
@@ -30,7 +30,7 @@ void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& r
     }
 }
 
-void EditorController::RenderUI(Scene& scene, Viewport* viewport) {
+void EditorController::RenderUI(Scene& scene, ViewportPanel* viewport) {
     Camera& camera = viewport->GetCamera();
 
     ImGuizmo::BeginFrame();
@@ -140,7 +140,7 @@ void EditorController::RenderUI(Scene& scene, Viewport* viewport) {
     ImGui::End();
 }
 
-void EditorController::RenderToolbar(Viewport& viewport) {
+void EditorController::RenderToolbar(ViewportPanel& viewport) {
     Camera& camera = viewport.GetCamera();
 
     if (ImGui::RadioButton("Translate", m_gizmoOperation == ImGuizmo::TRANSLATE))

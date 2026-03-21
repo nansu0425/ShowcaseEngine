@@ -7,20 +7,20 @@
 #include <showcase/graphics/Model.h>
 #include <showcase/graphics/Scene.h>
 #include <showcase/graphics/SceneRenderer.h>
-#include <showcase/ui/ImGuiLayer.h>
-#include <showcase/ui/Console.h>
-#include <showcase/ui/Viewport.h>
-#include <showcase/ui/EditorController.h>
+#include <showcase/editor/ImGuiLayer.h>
+#include <showcase/editor/Console.h>
+#include <showcase/editor/ViewportPanel.h>
+#include <showcase/editor/EditorController.h>
 
 namespace showcase {
 
-struct ApplicationDesc {
+struct EditorAppDesc {
     WindowDesc window;
 };
 
-class Application {
+class EditorApp {
 public:
-    bool Init(const ApplicationDesc& desc);
+    bool Init(const EditorAppDesc& desc);
     void Shutdown();
     int Run();
 
@@ -37,7 +37,7 @@ private:
     RenderContext m_renderContext;
     ImGuiLayer m_imguiLayer;
     Console m_console;
-    Viewport m_viewport;
+    ViewportPanel m_viewport;
 
     // Scene rendering
     SceneRenderer m_sceneRenderer;

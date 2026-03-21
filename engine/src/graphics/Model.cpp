@@ -6,12 +6,12 @@
 #include <tiny_gltf.h>
 
 #include <showcase/graphics/Model.h>
-#include <showcase/graphics/CommandList.h>
+#include <showcase/graphics/RenderContext.h>
 #include <showcase/core/Log.h>
 
 namespace showcase {
 
-void Model::Shutdown(DescriptorHeap& srvHeap) {
+void Model::Shutdown(RenderContext& ctx) {
     for (auto& mesh : meshes) {
         for (auto& prim : mesh.primitives) {
             prim.vertexBuffer.Shutdown();
@@ -19,7 +19,7 @@ void Model::Shutdown(DescriptorHeap& srvHeap) {
         }
     }
     for (auto& tex : textures) {
-        tex.Shutdown(srvHeap);
+        tex.Shutdown(ctx.GetSrvHeap());
     }
     meshes.clear();
     materials.clear();
@@ -27,10 +27,12 @@ void Model::Shutdown(DescriptorHeap& srvHeap) {
 }
 
 static bool LoadTextures(const tinygltf::Model& gltfModel,
-                         ID3D12Device* device, D3D12MA::Allocator* allocator,
-                         CommandQueue& cmdQueue, DescriptorHeap& srvHeap,
+                         RenderContext& ctx,
                          std::vector<Texture>& outTextures) {
     if (gltfModel.images.empty()) return true;
+
+    auto* device = ctx.GetDevice().GetDevice();
+    auto* allocator = ctx.GetDevice().GetAllocator();
 
     CommandList cmdList;
     if (!cmdList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT)) {
@@ -50,7 +52,7 @@ static bool LoadTextures(const tinygltf::Model& gltfModel,
         }
 
         if (!outTextures[i].InitFromMemory(
-                device, allocator, cmdList.Get(), srvHeap,
+                device, allocator, cmdList.Get(), ctx.GetSrvHeap(),
                 image.image.data(),
                 static_cast<uint32_t>(image.width),
                 static_cast<uint32_t>(image.height),
@@ -61,8 +63,8 @@ static bool LoadTextures(const tinygltf::Model& gltfModel,
     }
 
     cmdList.Close();
-    cmdQueue.ExecuteCommandList(cmdList.Get());
-    cmdQueue.Flush();
+    ctx.GetDirectQueue().ExecuteCommandList(cmdList.Get());
+    ctx.GetDirectQueue().Flush();
 
     for (auto& tex : outTextures) {
         tex.ReleaseUploadResources();
@@ -207,9 +209,10 @@ static DirectX::BoundingBox ComputeAABB(const std::vector<ModelVertex>& vertices
 }
 
 bool ModelLoader::LoadGLTF(const std::string& filepath,
-                           ID3D12Device* device, D3D12MA::Allocator* allocator,
-                           CommandQueue& cmdQueue, DescriptorHeap& srvHeap,
+                           RenderContext& ctx,
                            Model& outModel) {
+    auto* device = ctx.GetDevice().GetDevice();
+    auto* allocator = ctx.GetDevice().GetAllocator();
     tinygltf::Model gltfModel;
     tinygltf::TinyGLTF loader;
     std::string err, warn;
@@ -229,7 +232,7 @@ bool ModelLoader::LoadGLTF(const std::string& filepath,
     }
 
     // Load textures
-    if (!LoadTextures(gltfModel, device, allocator, cmdQueue, srvHeap, outModel.textures)) {
+    if (!LoadTextures(gltfModel, ctx, outModel.textures)) {
         return false;
     }
 
