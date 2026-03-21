@@ -70,7 +70,7 @@ void HelloTriangleShowcase::OnResize(uint32_t width, uint32_t height) {
     // Nothing to do for this simple demo
 }
 
-void HelloTriangleShowcase::OnUpdate(float deltaTime) {
+void HelloTriangleShowcase::OnUpdate(float deltaTime, const Input& /*input*/) {
     m_currentAngle += m_rotationSpeed * deltaTime;
 
     if (m_rotationSpeed != 0.0f) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <showcase/demo/IShowcase.h>
+#include <showcase/core/Input.h>
 #include <memory>
 #include <string>
 
@@ -13,7 +14,7 @@ public:
     void LoadShowcase(const std::string& name, RenderContext& ctx);
     void UnloadCurrent();
 
-    void Update(float deltaTime);
+    void Update(float deltaTime, const Input& input, RenderContext& ctx);
     void Render(RenderContext& ctx);
     void RenderUI();
     void OnResize(uint32_t width, uint32_t height);
@@ -24,6 +25,7 @@ public:
 private:
     std::unique_ptr<IShowcase> m_active;
     std::string m_activeName;
+    std::string m_pendingName;
 };
 
 } // namespace showcase

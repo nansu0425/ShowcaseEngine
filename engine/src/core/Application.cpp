@@ -70,7 +70,7 @@ void Application::Shutdown() {
 int Application::Run() {
     while (m_window.ProcessMessages()) {
         m_timer.Tick();
-        m_input.Update();
+        m_input.Update(m_window.GetHandle());
 
         if (m_window.IsMinimized()) {
             Sleep(10);
@@ -86,7 +86,7 @@ int Application::Run() {
         float dt = m_timer.DeltaTime();
 
         // Update
-        m_showcaseManager.Update(dt);
+        m_showcaseManager.Update(dt, m_input, m_renderContext);
 
         // Begin render frame
         m_renderContext.BeginFrame();

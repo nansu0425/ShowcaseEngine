@@ -19,6 +19,7 @@ public:
     void Shutdown();
 
     void UpdateData(const void* data, uint32_t size);
+    void UpdateDataAtOffset(const void* data, uint32_t size, uint32_t offset);
 
     D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const { return m_vbView; }
     D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() const { return m_ibView; }

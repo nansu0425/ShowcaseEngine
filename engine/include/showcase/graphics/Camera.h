@@ -29,13 +29,13 @@ public:
     DirectX::BoundingFrustum GetBoundingFrustum() const;
 
 private:
-    DirectX::SimpleMath::Vector3 m_position = DirectX::SimpleMath::Vector3::Zero;
-    DirectX::SimpleMath::Vector3 m_forward = DirectX::SimpleMath::Vector3::Forward;
-    DirectX::SimpleMath::Vector3 m_up = DirectX::SimpleMath::Vector3::Up;
-    DirectX::SimpleMath::Vector3 m_right = DirectX::SimpleMath::Vector3::Right;
+    DirectX::SimpleMath::Vector3 m_position = {0.0f, 0.0f, 0.0f};
+    DirectX::SimpleMath::Vector3 m_forward = {0.0f, 0.0f, 1.0f};
+    DirectX::SimpleMath::Vector3 m_up = {0.0f, 1.0f, 0.0f};
+    DirectX::SimpleMath::Vector3 m_right = {1.0f, 0.0f, 0.0f};
 
-    DirectX::SimpleMath::Matrix m_viewMatrix = DirectX::SimpleMath::Matrix::Identity;
-    DirectX::SimpleMath::Matrix m_projMatrix = DirectX::SimpleMath::Matrix::Identity;
+    DirectX::SimpleMath::Matrix m_viewMatrix = {};
+    DirectX::SimpleMath::Matrix m_projMatrix = {};
 
     float m_fovY = DirectX::XM_PIDIV4;
     float m_aspectRatio = 16.0f / 9.0f;

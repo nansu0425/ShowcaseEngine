@@ -6,6 +6,7 @@
 namespace showcase {
 
 class RenderContext;
+class Input;
 
 class IShowcase {
 public:
@@ -22,7 +23,7 @@ public:
     virtual void OnResize(uint32_t width, uint32_t height) = 0;
 
     // Per-frame
-    virtual void OnUpdate(float deltaTime) = 0;
+    virtual void OnUpdate(float deltaTime, const Input& input) = 0;
     virtual void OnRender(RenderContext& ctx) = 0;
 
     // UI

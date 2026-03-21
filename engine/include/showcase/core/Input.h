@@ -8,7 +8,7 @@ namespace showcase {
 
 class Input {
 public:
-    void Update();
+    void Update(HWND hwnd);
 
     bool IsKeyDown(int key) const { return m_keysCurrent[key]; }
     bool IsKeyPressed(int key) const { return m_keysCurrent[key] && !m_keysPrevious[key]; }

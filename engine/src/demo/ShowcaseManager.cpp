@@ -1,11 +1,13 @@
 #include <showcase/demo/ShowcaseManager.h>
 #include <showcase/demo/ShowcaseRegistry.h>
+#include <showcase/graphics/RenderContext.h>
 #include <showcase/core/Log.h>
 #include <imgui.h>
 
 namespace showcase {
 
 void ShowcaseManager::LoadShowcase(const std::string& name, RenderContext& ctx) {
+    ctx.GetDirectQueue().Flush();
     UnloadCurrent();
 
     m_active = ShowcaseRegistry::Instance().Create(name);
@@ -25,9 +27,13 @@ void ShowcaseManager::UnloadCurrent() {
     }
 }
 
-void ShowcaseManager::Update(float deltaTime) {
+void ShowcaseManager::Update(float deltaTime, const Input& input, RenderContext& ctx) {
+    if (!m_pendingName.empty()) {
+        LoadShowcase(m_pendingName, ctx);
+        m_pendingName.clear();
+    }
     if (m_active) {
-        m_active->OnUpdate(deltaTime);
+        m_active->OnUpdate(deltaTime, input);
     }
 }
 
@@ -51,8 +57,7 @@ void ShowcaseManager::RenderUI() {
                 std::string label = entry.name + " [" + entry.category + "]";
                 if (ImGui::Selectable(label.c_str(), isSelected)) {
                     if (!isSelected) {
-                        // Will be loaded next frame to avoid mid-render issues
-                        m_activeName = entry.name;
+                        m_pendingName = entry.name;
                     }
                 }
                 if (isSelected) {

@@ -21,7 +21,7 @@ public:
     void OnLoad(RenderContext& ctx) override;
     void OnUnload() override;
     void OnResize(uint32_t width, uint32_t height) override;
-    void OnUpdate(float deltaTime) override;
+    void OnUpdate(float deltaTime, const Input& input) override;
     void OnRender(RenderContext& ctx) override;
     void OnImGui() override;
 
