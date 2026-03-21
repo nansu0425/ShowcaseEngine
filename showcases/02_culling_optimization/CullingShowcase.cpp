@@ -7,6 +7,7 @@
 #include <showcase/graphics/RootSignature.h>
 #include <showcase/graphics/Model.h>
 #include <showcase/graphics/CommandList.h>
+#include <showcase/ui/Viewport.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <filesystem>
@@ -191,6 +192,7 @@ int CullingShowcase::PickObject(int mouseX, int mouseY) const {
 // ── Lifecycle ────────────────────────────────────────────────────────
 
 void CullingShowcase::OnLoad(RenderContext& ctx) {
+    m_viewportPtr = ctx.GetViewport();
     auto* device = ctx.GetDevice().GetDevice();
     auto* allocator = ctx.GetDevice().GetAllocator();
 
@@ -449,15 +451,15 @@ void CullingShowcase::OnImGui() {
         ImGui::TextDisabled("No glTF model loaded");
     }
 
-    // -- Viewport hover detection (uses previous frame's ImGui state) --
-    auto* vpWindow = ImGui::FindWindowByName("Viewport");
-    if (vpWindow && !vpWindow->Hidden) {
-        m_viewportMin = vpWindow->ContentRegionRect.Min;
-        m_viewportMax = vpWindow->ContentRegionRect.Max;
+    // -- Viewport hover detection (uses previous frame's image rect) --
+    if (m_viewportPtr) {
+        m_viewportMin = m_viewportPtr->GetImageMin();
+        m_viewportMax = m_viewportPtr->GetImageMax();
         m_viewportHovered = ImGui::IsMouseHoveringRect(m_viewportMin, m_viewportMax, false);
     }
 
     // -- Gizmo rendering --
+    auto* vpWindow = ImGui::FindWindowByName("Viewport");
     if (vpWindow && !vpWindow->Hidden && m_selectedObjectId > 0) {
         SceneObject* selected = m_scene.FindById(static_cast<uint32_t>(m_selectedObjectId));
         if (selected) {
@@ -550,37 +552,55 @@ void CullingShowcase::OnImGui() {
                 selected->UpdateAABB();
             }
 
-            ImGui::Separator();
-            ImGui::Text("Gizmo");
-            if (ImGui::RadioButton("Translate (Ctrl+T)", m_gizmoOperation == ImGuizmo::TRANSLATE))
-                m_gizmoOperation = ImGuizmo::TRANSLATE;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("Rotate (Ctrl+R)", m_gizmoOperation == ImGuizmo::ROTATE))
-                m_gizmoOperation = ImGuizmo::ROTATE;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("Scale (Ctrl+S)", m_gizmoOperation == ImGuizmo::SCALE))
-                m_gizmoOperation = ImGuizmo::SCALE;
-
-            if (ImGui::RadioButton("Local", m_gizmoMode == ImGuizmo::LOCAL))
-                m_gizmoMode = ImGuizmo::LOCAL;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("World", m_gizmoMode == ImGuizmo::WORLD))
-                m_gizmoMode = ImGuizmo::WORLD;
-
-            ImGui::Checkbox("Snap", &m_useSnap);
-            if (m_useSnap) {
-                if (m_gizmoOperation == ImGuizmo::TRANSLATE)
-                    ImGui::DragFloat("Snap Unit", &m_snapTranslate, 0.1f, 0.1f, 10.0f);
-                else if (m_gizmoOperation == ImGuizmo::ROTATE)
-                    ImGui::DragFloat("Snap Angle", &m_snapRotate, 1.0f, 1.0f, 90.0f);
-                else
-                    ImGui::DragFloat("Snap Scale", &m_snapScale, 0.01f, 0.01f, 1.0f);
-            }
         } else {
             ImGui::TextDisabled("No object selected");
         }
     }
     ImGui::End();
+
+}
+
+void CullingShowcase::OnViewportToolbar() {
+    if (ImGui::RadioButton("Translate", m_gizmoOperation == ImGuizmo::TRANSLATE))
+        m_gizmoOperation = ImGuizmo::TRANSLATE;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Move objects along axes (Ctrl+T)");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Rotate", m_gizmoOperation == ImGuizmo::ROTATE))
+        m_gizmoOperation = ImGuizmo::ROTATE;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rotate objects around axes (Ctrl+R)");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Scale", m_gizmoOperation == ImGuizmo::SCALE))
+        m_gizmoOperation = ImGuizmo::SCALE;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Scale objects along axes (Ctrl+S)");
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    if (ImGui::RadioButton("Local", m_gizmoMode == ImGuizmo::LOCAL))
+        m_gizmoMode = ImGuizmo::LOCAL;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Transform relative to object's own axes");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("World", m_gizmoMode == ImGuizmo::WORLD))
+        m_gizmoMode = ImGuizmo::WORLD;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Transform relative to world axes");
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    ImGui::Checkbox("Snap", &m_useSnap);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Snap transform values to fixed increments");
+    if (m_useSnap) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80);
+        if (m_gizmoOperation == ImGuizmo::TRANSLATE)
+            ImGui::DragFloat("##SnapVal", &m_snapTranslate, 0.1f, 0.1f, 10.0f);
+        else if (m_gizmoOperation == ImGuizmo::ROTATE)
+            ImGui::DragFloat("##SnapVal", &m_snapRotate, 1.0f, 1.0f, 90.0f);
+        else
+            ImGui::DragFloat("##SnapVal", &m_snapScale, 0.01f, 0.01f, 1.0f);
+    }
 }
 
 } // namespace showcase

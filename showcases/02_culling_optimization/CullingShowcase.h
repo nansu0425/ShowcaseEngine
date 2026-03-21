@@ -15,6 +15,8 @@ using Microsoft::WRL::ComPtr;
 
 namespace showcase {
 
+class Viewport;
+
 class CullingShowcase : public IShowcase {
 public:
     std::string GetName() const override { return "Culling Optimization"; }
@@ -30,6 +32,7 @@ public:
     void OnUpdate(float deltaTime, const Input& input) override;
     void OnRender(RenderContext& ctx) override;
     void OnImGui() override;
+    void OnViewportToolbar() override;
 
 private:
     void CreateGridModel(ID3D12Device* device, D3D12MA::Allocator* allocator);
@@ -72,6 +75,9 @@ private:
 
     // Default white texture for untextured geometry
     Texture m_defaultWhiteTex;
+
+    // Viewport reference (for image rect)
+    Viewport* m_viewportPtr = nullptr;
 
     // Gizmo
     ImGuizmo::OPERATION m_gizmoOperation = ImGuizmo::TRANSLATE;

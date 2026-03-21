@@ -11,6 +11,8 @@
 
 namespace showcase {
 
+class Viewport;
+
 class RenderContext {
 public:
     bool Init(HWND hwnd, uint32_t width, uint32_t height);
@@ -30,6 +32,9 @@ public:
     DepthBuffer& GetDepthBuffer() { return m_depthBuffer; }
     uint32_t GetCurrentFrameIndex() const { return m_currentFrameIndex; }
 
+    void SetViewport(Viewport* vp) { m_viewport = vp; }
+    Viewport* GetViewport() const { return m_viewport; }
+
 private:
     Device m_device;
     CommandQueue m_directQueue;
@@ -41,6 +46,7 @@ private:
     DepthBuffer m_depthBuffer;
 
     uint32_t m_currentFrameIndex = 0;
+    Viewport* m_viewport = nullptr;
 };
 
 } // namespace showcase

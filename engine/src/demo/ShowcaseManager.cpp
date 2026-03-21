@@ -77,6 +77,12 @@ void ShowcaseManager::RenderUI() {
     ImGui::End();
 }
 
+void ShowcaseManager::RenderToolbar() {
+    if (m_active) {
+        m_active->OnViewportToolbar();
+    }
+}
+
 void ShowcaseManager::OnResize(uint32_t width, uint32_t height) {
     if (m_active) {
         m_active->OnResize(width, height);

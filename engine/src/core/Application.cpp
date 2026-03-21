@@ -36,6 +36,12 @@ bool Application::Init(const ApplicationDesc& desc) {
         m_showcaseManager.OnResize(w, h);
     });
 
+    m_viewport.SetToolbarCallback([this]() {
+        m_showcaseManager.RenderToolbar();
+    });
+
+    m_renderContext.SetViewport(&m_viewport);
+
     // Set resize callback
     m_window.SetResizeCallback([this](uint32_t w, uint32_t h) {
         m_resizePending = true;

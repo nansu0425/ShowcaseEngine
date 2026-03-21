@@ -74,6 +74,15 @@ void Viewport::OnImGui(float fps, float deltaTime) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
     if (ImGui::Begin("Viewport")) {
+        // Render toolbar (fixed bar at top, before scene image)
+        if (m_toolbarCallback) {
+            float pad = 6.0f;
+            ImGui::SetCursorPos(ImVec2(pad, ImGui::GetCursorPosY() + pad));
+            m_toolbarCallback();
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
+            ImGui::Separator();
+        }
+
         ImVec2 size = ImGui::GetContentRegionAvail();
         uint32_t w = static_cast<uint32_t>(size.x);
         uint32_t h = static_cast<uint32_t>(size.y);
@@ -93,9 +102,13 @@ void Viewport::OnImGui(float fps, float deltaTime) {
         auto gpuHandle = m_renderTarget.GetSRVHandle().gpu;
         ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(static_cast<float>(m_width), static_cast<float>(m_height)));
 
+        // Store image rect for external use (gizmo, hover detection)
+        m_imageMin = ImGui::GetItemRectMin();
+        m_imageMax = ImGui::GetItemRectMax();
+
         // FPS overlay drawn directly on the viewport's draw list
         if (m_showFPS) {
-            ImVec2 imageMin = ImGui::GetItemRectMin();
+            ImVec2 imageMin = m_imageMin;
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             ImVec2 textPos(imageMin.x + 10, imageMin.y + 10);
             char fpsText[64];

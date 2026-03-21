@@ -28,6 +28,7 @@ public:
 
     // UI
     virtual void OnImGui() = 0;
+    virtual void OnViewportToolbar() {}
 };
 
 } // namespace showcase

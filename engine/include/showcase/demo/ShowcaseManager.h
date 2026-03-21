@@ -17,6 +17,7 @@ public:
     void Update(float deltaTime, const Input& input, RenderContext& ctx);
     void Render(RenderContext& ctx);
     void RenderUI();
+    void RenderToolbar();
     void OnResize(uint32_t width, uint32_t height);
 
     IShowcase* GetActive() const { return m_active.get(); }

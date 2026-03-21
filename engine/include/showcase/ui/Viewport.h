@@ -6,10 +6,12 @@
 #include <showcase/graphics/CommandQueue.h>
 #include <cstdint>
 #include <functional>
+#include <imgui.h>
 
 namespace showcase {
 
 using ViewportResizeCallback = std::function<void(uint32_t, uint32_t)>;
+using ToolbarCallback = std::function<void()>;
 
 class Viewport {
 public:
@@ -23,9 +25,13 @@ public:
     void OnImGui(float fps, float deltaTime);
 
     void SetResizeCallback(ViewportResizeCallback callback) { m_resizeCallback = std::move(callback); }
+    void SetToolbarCallback(ToolbarCallback callback) { m_toolbarCallback = std::move(callback); }
 
     void ToggleShowFPS() { m_showFPS = !m_showFPS; }
     bool GetShowFPS() const { return m_showFPS; }
+
+    ImVec2 GetImageMin() const { return m_imageMin; }
+    ImVec2 GetImageMax() const { return m_imageMax; }
 
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
@@ -50,6 +56,10 @@ private:
 
     bool m_showFPS = true;
     ViewportResizeCallback m_resizeCallback;
+    ToolbarCallback m_toolbarCallback;
+
+    ImVec2 m_imageMin = {};
+    ImVec2 m_imageMax = {};
 };
 
 } // namespace showcase
