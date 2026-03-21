@@ -2,8 +2,6 @@ add_executable(ShowcaseApp WIN32 main.cpp)
 
 target_link_libraries(ShowcaseApp PRIVATE
     ShowcaseEngine::Core
-    $<LINK_LIBRARY:WHOLE_ARCHIVE,showcase_hello_triangle>
-    $<LINK_LIBRARY:WHOLE_ARCHIVE,showcase_culling_optimization>
 )
 
 target_precompile_headers(ShowcaseApp REUSE_FROM showcase_engine)

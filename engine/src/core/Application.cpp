@@ -1,9 +1,12 @@
 #include <showcase/core/Application.h>
 #include <showcase/core/Log.h>
-#include <showcase/demo/ShowcaseRegistry.h>
 #include <imgui_internal.h>
+#include <filesystem>
 
 namespace showcase {
+
+using namespace DirectX::SimpleMath;
+using namespace DirectX;
 
 bool Application::Init(const ApplicationDesc& desc) {
     Log::Init();
@@ -33,11 +36,11 @@ bool Application::Init(const ApplicationDesc& desc) {
     }
 
     m_viewport.SetResizeCallback([this](uint32_t w, uint32_t h) {
-        m_showcaseManager.OnResize(w, h);
+        m_sceneRenderer.OnResize(w, h, m_camera);
     });
 
     m_viewport.SetToolbarCallback([this]() {
-        m_showcaseManager.RenderToolbar();
+        m_editorController.RenderToolbar();
     });
 
     m_renderContext.SetViewport(&m_viewport);
@@ -51,21 +54,93 @@ bool Application::Init(const ApplicationDesc& desc) {
 
     m_window.RestorePlacement();
 
-    m_timer.Reset();
+    // Initialize scene renderer
+    m_sceneRenderer.Init(m_renderContext);
 
-    // Auto-load first available showcase
-    const auto& entries = ShowcaseRegistry::Instance().GetAll();
-    if (!entries.empty()) {
-        m_showcaseManager.LoadShowcase(entries[0].name, m_renderContext);
-    }
+    // Build scene
+    BuildDefaultScene();
+
+    // Camera initial position
+    m_camera.SetPosition(Vector3(0.0f, 5.0f, -15.0f));
+    m_camera.SetLookAt(Vector3(0.0f, 0.0f, 0.0f));
+    float aspectRatio = m_window.GetHeight() > 0
+        ? static_cast<float>(m_window.GetWidth()) / m_window.GetHeight() : 16.0f / 9.0f;
+    m_camera.SetPerspective(XM_PIDIV4, aspectRatio, 0.1f, 1000.0f);
+    m_camera.UpdateViewMatrix();
+
+    m_timer.Reset();
 
     SE_LOG_INFO("Application initialized");
     return true;
 }
 
+void Application::BuildDefaultScene() {
+    auto* device = m_renderContext.GetDevice().GetDevice();
+    auto* allocator = m_renderContext.GetDevice().GetAllocator();
+
+    m_sceneRenderer.CreateGridModel(device, allocator, m_gridModel);
+    m_sceneRenderer.CreateCubeModel(device, allocator, m_cubeModel);
+
+    m_scene.Clear();
+    m_scene.AddObject(&m_gridModel, "Ground Grid", Vector3(0, 0, 0));
+    m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2));
+    m_scene.AddObject(&m_cubeModel, "Cube 2", Vector3(5, 0.75f, 3), Vector3(0, 0, 0), Vector3(1.5f, 1.5f, 1.5f));
+    m_scene.AddObject(&m_cubeModel, "Cube 3", Vector3(-6, 2, -4), Vector3(0, 0, 0), Vector3(3, 4, 3));
+    m_scene.AddObject(&m_cubeModel, "Cube 4", Vector3(8, 0.5f, -7), Vector3(0, 0, 0), Vector3(1, 1, 1));
+    m_scene.AddObject(&m_cubeModel, "Cube 5", Vector3(-3, 0.5f, 8), Vector3(0, 0, 0), Vector3(2, 1, 2));
+
+    // Try loading a glTF model from assets/models/
+    {
+        char exePath[MAX_PATH];
+        GetModuleFileNameA(nullptr, exePath, MAX_PATH);
+        std::filesystem::path modelDir = std::filesystem::path(exePath).parent_path() / "assets" / "models";
+
+        if (std::filesystem::exists(modelDir)) {
+            for (const auto& entry : std::filesystem::directory_iterator(modelDir)) {
+                auto ext = entry.path().extension().string();
+                if (ext == ".gltf" || ext == ".glb") {
+                    m_modelLoaded = ModelLoader::LoadGLTF(
+                        entry.path().string(), device, allocator,
+                        m_renderContext.GetDirectQueue(), m_renderContext.GetSrvHeap(), m_testModel);
+                    if (m_modelLoaded) {
+                        SE_LOG_INFO("Loaded test model: {}", entry.path().filename().string());
+                        m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0));
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (!m_modelLoaded) {
+            SE_LOG_INFO("No glTF model found in assets/models/ — rendering procedural geometry only");
+        }
+    }
+}
+
 void Application::Shutdown() {
     m_renderContext.GetDirectQueue().Flush();
-    m_showcaseManager.UnloadCurrent();
+
+    if (m_modelLoaded) {
+        m_testModel.Shutdown(m_renderContext.GetSrvHeap());
+        m_modelLoaded = false;
+    }
+
+    // Shutdown procedural model buffers
+    for (auto& mesh : m_gridModel.meshes)
+        for (auto& prim : mesh.primitives) {
+            prim.vertexBuffer.Shutdown();
+            prim.indexBuffer.Shutdown();
+        }
+    for (auto& mesh : m_cubeModel.meshes)
+        for (auto& prim : mesh.primitives) {
+            prim.vertexBuffer.Shutdown();
+            prim.indexBuffer.Shutdown();
+        }
+    m_gridModel.meshes.clear();
+    m_cubeModel.meshes.clear();
+
+    m_scene.Clear();
+    m_sceneRenderer.Shutdown();
     m_viewport.Shutdown(m_renderContext.GetSrvHeap());
     m_imguiLayer.Shutdown();
     m_renderContext.Shutdown();
@@ -92,19 +167,20 @@ int Application::Run() {
         float dt = m_timer.DeltaTime();
 
         // Update
-        m_showcaseManager.Update(dt, m_input, m_renderContext);
+        m_cameraController.Update(m_camera, m_input, dt);
+        m_editorController.Update(m_input, m_scene, m_sceneRenderer, m_camera, &m_viewport);
 
         // Begin render frame
         m_renderContext.BeginFrame();
         auto* cmdList = m_renderContext.GetCommandList().Get();
 
-        // Set SRV heap for showcase and ImGui rendering
+        // Set SRV heap for rendering
         ID3D12DescriptorHeap* heaps[] = {m_renderContext.GetSrvHeap().GetHeap()};
         cmdList->SetDescriptorHeaps(1, heaps);
 
-        // Phase 1: Render showcase to off-screen viewport render target
+        // Phase 1: Render scene to off-screen viewport render target
         m_viewport.BeginRender(m_renderContext.GetCommandList());
-        m_showcaseManager.Render(m_renderContext);
+        m_sceneRenderer.Render(m_renderContext, m_camera, m_scene, m_editorController.GetSelectedObjectId());
         m_viewport.EndRender(m_renderContext.GetCommandList());
 
         // Phase 2: Render ImGui to back buffer
@@ -165,7 +241,7 @@ int Application::Run() {
         ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
 
         m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
-        m_showcaseManager.RenderUI();
+        m_editorController.RenderUI(m_scene, m_camera, m_cameraController, &m_viewport);
         m_console.Render();
         m_imguiLayer.EndFrame(cmdList);
 

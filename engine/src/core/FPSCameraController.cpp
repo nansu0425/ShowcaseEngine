@@ -1,4 +1,4 @@
-#include "FPSCameraController.h"
+#include <showcase/core/FPSCameraController.h>
 #include <showcase/graphics/Camera.h>
 #include <showcase/core/Input.h>
 #include <algorithm>

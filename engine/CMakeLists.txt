@@ -5,6 +5,7 @@ add_library(showcase_engine STATIC
     src/core/Timer.cpp
     src/core/Input.cpp
     src/core/Application.cpp
+    src/core/FPSCameraController.cpp
 
     # Graphics
     src/graphics/Device.cpp
@@ -24,15 +25,13 @@ add_library(showcase_engine STATIC
     src/graphics/Model.cpp
     src/graphics/Scene.cpp
     src/graphics/RenderTarget.cpp
+    src/graphics/SceneRenderer.cpp
 
     # UI
     src/ui/ImGuiLayer.cpp
     src/ui/Viewport.cpp
     src/ui/Console.cpp
-
-    # Demo
-    src/demo/ShowcaseRegistry.cpp
-    src/demo/ShowcaseManager.cpp
+    src/ui/EditorController.cpp
 )
 
 add_library(ShowcaseEngine::Core ALIAS showcase_engine)
@@ -49,6 +48,7 @@ target_link_libraries(showcase_engine
         d3dcompiler
         D3D12MemoryAllocator
         imgui::imgui
+        imguizmo_lib
         spdlog::spdlog
         nlohmann_json::nlohmann_json
         directxtk12_headers
@@ -83,3 +83,9 @@ target_precompile_headers(showcase_engine PRIVATE
 
 # Enable Unicode for Win32
 target_compile_definitions(showcase_engine PUBLIC UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+
+# Compile shaders
+target_compile_shaders(showcase_engine
+    VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh_vs.hlsl
+    PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh_ps.hlsl
+)

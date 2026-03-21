@@ -4,7 +4,7 @@ A game engine for demonstrating game tech concepts and principles in YouTube con
 
 ## Target Audience
 
-The YouTube content targets **non-developers** — viewers who have never written code. Showcases and explanations should prioritize visual clarity and intuitive understanding over technical depth. Think "revealing the hidden tricks behind what gamers already experience" rather than "teaching graphics programming."
+The YouTube content targets **non-developers** — viewers who have never written code. Explanations should prioritize visual clarity and intuitive understanding over technical depth. Think "revealing the hidden tricks behind what gamers already experience" rather than "teaching graphics programming."
 
 ## Build
 
@@ -18,26 +18,19 @@ scripts/build.bat build Release      # Release build
 
 ```
 engine/          Engine core (STATIC lib, alias ShowcaseEngine::Core)
-  include/showcase/{core,graphics,demo,ui}/   Public headers
-  src/                                        Implementations
+  include/showcase/{core,graphics,ui}/   Public headers
+  src/                                   Implementations
+  shaders/                               HLSL shaders
 app/             ShowcaseApp executable (WinMain entry point)
-showcases/       Individual showcase modules (each a STATIC lib)
+docs/            Planning documents (content plans, tech specs, progress)
 cmake/           Dependencies.cmake, ShaderCompilation.cmake
 ```
 
-## Adding a New Showcase
-
-Follow the structure of `showcases/01_hello_triangle/` (h/cpp/CMakeLists.txt/shaders/).
-
-- `REGISTER_SHOWCASE(ClassName)` macro required in cpp
-- Must link with `$<LINK_LIBRARY:WHOLE_ARCHIVE,...>` in `app/CMakeLists.txt` — otherwise MSVC linker strips the static initializer and the showcase won't register
-- Compile shaders via `target_compile_shaders()` (`cmake/ShaderCompilation.cmake`)
-- Reuse precompiled headers via `target_precompile_headers(<target> REUSE_FROM showcase_engine)` in showcase CMakeLists.txt
-
 ## Shader Pipeline
 
-- Output naming: `{NAME_WE}_{type}.cso` — e.g. `triangle_vs.hlsl` → `triangle_vs_vs.cso`
-- Runtime loading: `ctx.GetShaderManager().LoadShader("shaders/triangle_vs_vs.cso")` — relative to exe directory
+- Output naming: `{NAME_WE}_{type}.cso` — e.g. `mesh_vs.hlsl` → `mesh_vs_vs.cso`
+- Runtime loading: `ctx.GetShaderManager().LoadShader("shaders/mesh_vs_vs.cso")` — relative to exe directory
+- Compile shaders via `target_compile_shaders()` (`cmake/ShaderCompilation.cmake`)
 
 ## Conventions
 
@@ -48,7 +41,6 @@ Follow the structure of `showcases/01_hello_triangle/` (h/cpp/CMakeLists.txt/sha
 
 ## Gotchas
 
-- `ShowcaseRegistry::Register()` runs during static initialization — do not use `SE_LOG_*` (logger not yet initialized)
 - Shader paths resolve relative to exe directory, not CWD (`GetExecutableDir()` in `ShaderManager.cpp`)
 - SwapChain triple-buffering (BUFFER_COUNT=3), FrameResource also 3-frame buffering
 - HLSL `cbuffer` matrices default to column-major, but SimpleMath stores row-major — always declare `row_major float4x4` in HLSL, or transpose on CPU before upload

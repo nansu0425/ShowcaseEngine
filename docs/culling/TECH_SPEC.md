@@ -1,4 +1,4 @@
-# Culling Optimization Showcase — Technical Specification
+# Culling Optimization — Technical Specification
 
 > Reference: [CONTENT_PLAN.md](CONTENT_PLAN.md)
 
@@ -6,7 +6,7 @@
 
 ### Goal
 
-Build a showcase application that demonstrates four culling techniques on a mini-city scene, allowing real-time toggling of each technique and showing the performance impact through statistics overlay.
+Demonstrate four culling techniques on a mini-city scene within the engine, allowing real-time toggling of each technique and showing the performance impact through statistics overlay.
 
 ### Key Decisions
 
@@ -14,7 +14,7 @@ Build a showcase application that demonstrates four culling techniques on a mini
 |----------|--------|-----------|
 | Occlusion Culling | Software rasterizer (CPU) | Intuitive to visualize, debug-friendly, sufficient for demo |
 | glTF loader | tinygltf (header-only) | Lightweight, glTF 2.0 only, matches project's minimal dependency philosophy |
-| Spec scope | Unified document | Engine infra + showcase in one doc — dependencies visible at a glance |
+| Spec scope | Unified document | All components in one doc — dependencies visible at a glance |
 
 ### Tech Stack (additions)
 
@@ -32,7 +32,7 @@ Build a showcase application that demonstrates four culling techniques on a mini
 ### System Dependency Graph
 
 ```
-Engine Layer (reusable across showcases)
+Engine (all components integrated)
 ═══════════════════════════════════════════════════════════
 
                     ┌──────────────┐
@@ -42,7 +42,7 @@ Engine Layer (reusable across showcases)
               ┌────────────┼────────────┐
               ▼            ▼            ▼
       ┌──────────┐  ┌───────────┐  ┌──────────┐
-      │  Camera  │  │  Texture  │  │  Buffer  │ (existing)
+      │  Camera  │  │  Texture  │  │  Buffer  │
       └────┬─────┘  └─────┬─────┘  └────┬─────┘
            │              │              │
            │         ┌────┴────┐         │
@@ -55,35 +55,37 @@ Engine Layer (reusable across showcases)
       │    SceneObject/Scene   │
       └────────────┬───────────┘
                    │
-═══════════════════╪═══════════════════════════════════════
-Showcase Layer     │
                    ▼
       ┌─────────────────────────────────────────┐
-      │         CullingShowcase                 │
-      │  ┌──────────┐ ┌──────────────────────┐  │
-      │  │ CityScene│ │   CullingPipeline    │  │
-      │  │ Builder  │ │ ┌──────┐ ┌────────┐  │  │
-      │  │          │ │ │Frust.│ │Occlus. │  │  │
-      │  │          │ │ │Cull  │ │Cull    │  │  │
-      │  │          │ │ └──────┘ └────────┘  │  │
-      │  │          │ │ ┌──────┐ ┌────────┐  │  │
-      │  │          │ │ │Back- │ │LOD/    │  │  │
-      │  │          │ │ │face  │ │Dist.   │  │  │
-      │  │          │ │ └──────┘ └────────┘  │  │
-      │  └──────────┘ └──────────────────────┘  │
-      │  ┌──────────────┐  ┌─────────────────┐  │
-      │  │ DualCamera   │  │ StatsCollector  │  │
-      │  │ (Player/God) │  │ + ImGui UI      │  │
-      │  └──────────────┘  └─────────────────┘  │
-      └─────────────────────────────────────────┘
+      │         SceneRenderer                   │
+      │  (root signature, PSO, constant         │
+      │   buffers, draw loop, picking)          │
+      └────────────┬────────────────────────────┘
+                   │
+      ┌────────────┼───────────────┐
+      ▼            ▼               ▼
+ ┌──────────┐ ┌──────────────┐ ┌─────────────────┐
+ │FPSCamera │ │EditorControl.│ │ CullingPipeline │
+ │Controller│ │(gizmo, UI)   │ │ (to be added)   │
+ └──────────┘ └──────────────┘ │ ┌──────┐┌─────┐ │
+                               │ │Frust.││Occl.│ │
+                               │ └──────┘└─────┘ │
+                               │ ┌──────┐┌─────┐ │
+                               │ │Back- ││LOD/ │ │
+                               │ │face  ││Dist.│ │
+                               │ └──────┘└─────┘ │
+                               └─────────────────┘
 ```
 
-### Engine vs Showcase Layer
+### Component Locations
 
-| Layer | Contents | Location |
-|-------|----------|----------|
-| **Engine** | DepthBuffer, Camera, Texture, Model (glTF), SceneObject/Scene | `engine/include/showcase/graphics/`, `engine/src/` |
-| **Showcase** | CullingShowcase, CitySceneBuilder, CullingPipeline, DualCamera, debug visualization, shaders | `showcases/02_culling_optimization/` |
+| Module | Contents | Location |
+|--------|----------|----------|
+| **Graphics** | DepthBuffer, Camera, Texture, Model, Scene, SceneRenderer | `engine/include/showcase/graphics/`, `engine/src/graphics/` |
+| **Core** | FPSCameraController, Input, Timer, Window | `engine/include/showcase/core/`, `engine/src/core/` |
+| **UI** | EditorController, Viewport, Console, ImGuiLayer | `engine/include/showcase/ui/`, `engine/src/ui/` |
+| **Shaders** | mesh_vs.hlsl, mesh_ps.hlsl (+ culling shaders to be added) | `engine/shaders/` |
+| **Culling** | FrustumCuller, SoftwareOcclusionCuller, LODSelector, etc. | `engine/src/graphics/` (to be added) |
 
 ---
 
@@ -185,10 +187,10 @@ private:
 } // namespace showcase
 ```
 
-**FPS Camera Controller** (showcase layer — not engine, since God View needs different logic):
+**FPS Camera Controller** (engine core — God View will extend or compose with this):
 
 ```cpp
-// showcases/02_culling_optimization/FPSCameraController.h
+// engine/include/showcase/core/FPSCameraController.h
 class FPSCameraController {
 public:
     void Update(Camera& camera, const Input& input, float deltaTime);
@@ -382,11 +384,11 @@ private:
 
 ## 4. Culling Systems
 
-All culling systems live in the **showcase layer** (`showcases/02_culling_optimization/`) since they are tightly coupled with the demo's visualization needs.
+All culling systems will be added to the engine (`engine/src/graphics/`) as reusable components.
 
 ### 4.1 Frustum Culling
 
-**File:** `FrustumCuller.h/.cpp`
+**File:** `engine/include/showcase/graphics/FrustumCuller.h`, `engine/src/graphics/FrustumCuller.cpp`
 
 ```cpp
 class FrustumCuller {
@@ -458,7 +460,7 @@ cmdList->ResolveQueryData(m_queryHeap.Get(), D3D12_QUERY_TYPE_PIPELINE_STATISTIC
 
 ### 4.3 Occlusion Culling (Software Rasterizer)
 
-**File:** `SoftwareOcclusionCuller.h/.cpp`
+**File:** `engine/include/showcase/graphics/SoftwareOcclusionCuller.h`, `engine/src/graphics/SoftwareOcclusionCuller.cpp`
 
 **Overview:** Render large occluders (buildings) into a low-resolution CPU depth buffer, then test remaining objects' AABBs against this depth buffer.
 
@@ -524,7 +526,7 @@ private:
 
 ### 4.4 LOD / Distance Culling
 
-**File:** `LODSelector.h/.cpp`
+**File:** `engine/include/showcase/graphics/LODSelector.h`, `engine/src/graphics/LODSelector.cpp`
 
 ```cpp
 struct LODConfig {
@@ -561,11 +563,11 @@ public:
 
 ---
 
-## 5. Showcase Implementation
+## 5. Culling Demo Implementation
 
 ### 5.1 City Scene Builder
 
-**File:** `CitySceneBuilder.h/.cpp`
+**File:** `engine/include/showcase/graphics/CitySceneBuilder.h`, `engine/src/graphics/CitySceneBuilder.cpp`
 
 ```cpp
 struct CityConfig {
@@ -602,7 +604,7 @@ public:
 
 ### 5.2 Dual Camera System
 
-**File:** `DualCameraSystem.h/.cpp`
+**File:** `engine/include/showcase/graphics/DualCameraSystem.h`, `engine/src/graphics/DualCameraSystem.cpp`
 
 ```cpp
 class DualCameraSystem {
@@ -634,6 +636,8 @@ private:
 ---
 
 ### 5.3 Frustum Wireframe Visualization
+
+**File:** `engine/include/showcase/graphics/FrustumVisualizer.h`, `engine/src/graphics/FrustumVisualizer.cpp`
 
 **Rendering the frustum as 12 wireframe edges in God View.**
 
@@ -758,7 +762,7 @@ private:
 
 ## 6. Shaders
 
-All shaders in `showcases/02_culling_optimization/shaders/`.
+All shaders in `engine/shaders/`. `mesh_vs.hlsl` and `mesh_ps.hlsl` already exist; culling-specific shaders will be added here.
 
 ### 6.1 Mesh Rendering (mesh_vs.hlsl, mesh_ps.hlsl)
 
@@ -856,39 +860,57 @@ For LOD demonstration, either:
 ## Appendix: File Structure
 
 ```
-showcases/02_culling_optimization/
-├── CONTENT_PLAN.md
-├── TECH_SPEC.md
-├── CMakeLists.txt
-├── CullingShowcase.h / .cpp          # main showcase class
-├── FPSCameraController.h / .cpp
-├── DualCameraSystem.h / .cpp
-├── CitySceneBuilder.h / .cpp
-├── FrustumCuller.h / .cpp
-├── SoftwareOcclusionCuller.h / .cpp
-├── LODSelector.h / .cpp
-├── FrustumVisualizer.h / .cpp
-├── StatsCollector.h / .cpp
+engine/
+├── include/showcase/
+│   ├── core/
+│   │   ├── Application.h
+│   │   ├── FPSCameraController.h
+│   │   ├── Input.h
+│   │   ├── Timer.h
+│   │   └── Window.h
+│   ├── graphics/
+│   │   ├── Buffer.h
+│   │   ├── Camera.h
+│   │   ├── DepthBuffer.h
+│   │   ├── Model.h
+│   │   ├── Scene.h
+│   │   ├── SceneRenderer.h
+│   │   ├── Texture.h
+│   │   ├── CitySceneBuilder.h       (to be added)
+│   │   ├── DualCameraSystem.h       (to be added)
+│   │   ├── FrustumCuller.h          (to be added)
+│   │   ├── FrustumVisualizer.h      (to be added)
+│   │   ├── SoftwareOcclusionCuller.h (to be added)
+│   │   ├── LODSelector.h            (to be added)
+│   │   └── StatsCollector.h         (to be added)
+│   └── ui/
+│       ├── EditorController.h
+│       ├── Viewport.h
+│       └── Console.h
+├── src/
+│   ├── core/
+│   │   ├── Application.cpp
+│   │   └── FPSCameraController.cpp
+│   ├── graphics/
+│   │   ├── Camera.cpp
+│   │   ├── DepthBuffer.cpp
+│   │   ├── Model.cpp
+│   │   ├── Scene.cpp
+│   │   ├── SceneRenderer.cpp
+│   │   └── Texture.cpp
+│   └── ui/
+│       └── EditorController.cpp
 └── shaders/
     ├── mesh_vs.hlsl
     ├── mesh_ps.hlsl
-    ├── backface_ps.hlsl
-    ├── frustum_vs.hlsl
-    ├── frustum_ps.hlsl
-    ├── culled_ps.hlsl
-    └── lod_overlay_ps.hlsl
+    ├── backface_ps.hlsl             (to be added)
+    ├── frustum_vs.hlsl              (to be added)
+    ├── frustum_ps.hlsl              (to be added)
+    ├── culled_ps.hlsl               (to be added)
+    └── lod_overlay_ps.hlsl          (to be added)
 
-engine/
-├── include/showcase/graphics/
-│   ├── DepthBuffer.h          (new)
-│   ├── Camera.h               (new)
-│   ├── Texture.h              (new)
-│   ├── Model.h                (new)
-│   └── Scene.h                (new)
-└── src/
-    ├── DepthBuffer.cpp        (new)
-    ├── Camera.cpp             (new)
-    ├── Texture.cpp            (new)
-    ├── Model.cpp              (new)
-    └── Scene.cpp              (new)
+docs/culling/
+├── CONTENT_PLAN.md
+├── TECH_SPEC.md
+└── PROGRESS.md
 ```
