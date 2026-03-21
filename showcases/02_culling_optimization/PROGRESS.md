@@ -6,8 +6,8 @@
 > Deliverable: Camera flies through empty scene with depth testing
 
 - [x] DepthBuffer
-- [ ] Camera + FPS controller
-- [ ] Basic mesh shader (no texture)
+- [x] Camera + FPS controller
+- [x] Basic mesh shader (no texture)
 
 ## Milestone 2: Model Loading
 
