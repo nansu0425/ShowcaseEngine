@@ -22,6 +22,7 @@ add_library(showcase_engine STATIC
     src/graphics/Camera.cpp
     src/graphics/Texture.cpp
     src/graphics/Model.cpp
+    src/graphics/Scene.cpp
     src/graphics/RenderTarget.cpp
 
     # UI
