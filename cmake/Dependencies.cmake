@@ -92,3 +92,15 @@ target_include_directories(imgui_lib PUBLIC
 )
 target_link_libraries(imgui_lib PUBLIC d3d12 dxgi)
 add_library(imgui::imgui ALIAS imgui_lib)
+
+# ImGuizmo (transform gizmo overlay for ImGui)
+FetchContent_Declare(
+    imguizmo
+    GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
+    GIT_TAG        master
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(imguizmo)
+add_library(imguizmo_lib STATIC ${imguizmo_SOURCE_DIR}/ImGuizmo.cpp)
+target_include_directories(imguizmo_lib PUBLIC ${imguizmo_SOURCE_DIR})
+target_link_libraries(imguizmo_lib PUBLIC imgui::imgui)

@@ -339,9 +339,17 @@ void CullingShowcase::OnResize(uint32_t width, uint32_t height) {
 void CullingShowcase::OnUpdate(float deltaTime, const Input& input) {
     m_cameraController.Update(m_camera, input, deltaTime);
 
-    // Left-click picking (not during right-click camera rotation)
-    if (input.IsMouseButtonPressed(0) && !input.IsMouseButtonDown(1) && m_viewportHovered) {
+    // Left-click picking (not during right-click camera rotation, not when using gizmo)
+    if (input.IsMouseButtonPressed(0) && !input.IsMouseButtonDown(1)
+        && m_viewportHovered && !ImGuizmo::IsOver()) {
         m_selectedObjectId = PickObject(input.GetMouseX(), input.GetMouseY());
+    }
+
+    // Gizmo operation shortcuts (Ctrl+T / Ctrl+R / Ctrl+S)
+    if (input.IsKeyDown(VK_CONTROL)) {
+        if (input.IsKeyPressed('T')) m_gizmoOperation = ImGuizmo::TRANSLATE;
+        if (input.IsKeyPressed('R')) m_gizmoOperation = ImGuizmo::ROTATE;
+        if (input.IsKeyPressed('S')) m_gizmoOperation = ImGuizmo::SCALE;
     }
 }
 
@@ -416,6 +424,8 @@ void CullingShowcase::OnRender(RenderContext& ctx) {
 }
 
 void CullingShowcase::OnImGui() {
+    ImGuizmo::BeginFrame();
+
     // -- Showcase info (rendered inside "Showcase Selector" window) --
     ImGui::Text("Camera Position: (%.1f, %.1f, %.1f)",
         m_camera.GetPosition().x, m_camera.GetPosition().y, m_camera.GetPosition().z);
@@ -445,6 +455,64 @@ void CullingShowcase::OnImGui() {
         m_viewportMin = vpWindow->ContentRegionRect.Min;
         m_viewportMax = vpWindow->ContentRegionRect.Max;
         m_viewportHovered = ImGui::IsMouseHoveringRect(m_viewportMin, m_viewportMax, false);
+    }
+
+    // -- Gizmo rendering --
+    if (vpWindow && !vpWindow->Hidden && m_selectedObjectId > 0) {
+        SceneObject* selected = m_scene.FindById(static_cast<uint32_t>(m_selectedObjectId));
+        if (selected) {
+            ImGuizmo::SetDrawlist(vpWindow->DrawList);
+            ImGuizmo::SetRect(
+                m_viewportMin.x, m_viewportMin.y,
+                m_viewportMax.x - m_viewportMin.x,
+                m_viewportMax.y - m_viewportMin.y);
+
+            Matrix view = m_camera.GetViewMatrix();
+            Matrix proj = m_camera.GetProjectionMatrix();
+            Matrix world = selected->worldTransform;
+
+            // ImGuizmo assumes RH coordinates. Our LH view matrix has Z basis
+            // pointing into the scene; RH expects it pointing away. Negate view
+            // column 2 and proj row 2 — the two flips cancel in view*proj (so
+            // screen-space rendering is unchanged) while the camera-direction
+            // extracted from inverse(view) matches RH expectations.
+            view._13 = -view._13; view._23 = -view._23;
+            view._33 = -view._33; view._43 = -view._43;
+            proj._31 = -proj._31; proj._32 = -proj._32;
+            proj._33 = -proj._33; proj._34 = -proj._34;
+
+            float snap[3] = { 0.0f, 0.0f, 0.0f };
+            if (m_useSnap) {
+                float v = (m_gizmoOperation == ImGuizmo::ROTATE) ? m_snapRotate
+                        : (m_gizmoOperation == ImGuizmo::SCALE)  ? m_snapScale
+                        : m_snapTranslate;
+                snap[0] = snap[1] = snap[2] = v;
+            }
+
+            ImGuizmo::Manipulate(
+                &view.m[0][0], &proj.m[0][0],
+                m_gizmoOperation, m_gizmoMode,
+                &world.m[0][0], nullptr,
+                m_useSnap ? snap : nullptr);
+
+            if (ImGuizmo::IsUsing()) {
+                Vector3 newPos, newScale;
+                Quaternion newRot;
+                world.Decompose(newScale, newRot, newPos);
+
+                selected->position = newPos;
+                selected->scale = newScale;
+
+                auto euler = newRot.ToEuler();
+                selected->rotation = Vector3(
+                    XMConvertToDegrees(euler.x),
+                    XMConvertToDegrees(euler.y),
+                    XMConvertToDegrees(euler.z));
+
+                selected->RecomputeWorldTransform();
+                selected->UpdateAABB();
+            }
+        }
     }
 
     // -- Scene Hierarchy panel --
@@ -480,6 +548,33 @@ void CullingShowcase::OnImGui() {
             if (changed) {
                 selected->RecomputeWorldTransform();
                 selected->UpdateAABB();
+            }
+
+            ImGui::Separator();
+            ImGui::Text("Gizmo");
+            if (ImGui::RadioButton("Translate (Ctrl+T)", m_gizmoOperation == ImGuizmo::TRANSLATE))
+                m_gizmoOperation = ImGuizmo::TRANSLATE;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Rotate (Ctrl+R)", m_gizmoOperation == ImGuizmo::ROTATE))
+                m_gizmoOperation = ImGuizmo::ROTATE;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Scale (Ctrl+S)", m_gizmoOperation == ImGuizmo::SCALE))
+                m_gizmoOperation = ImGuizmo::SCALE;
+
+            if (ImGui::RadioButton("Local", m_gizmoMode == ImGuizmo::LOCAL))
+                m_gizmoMode = ImGuizmo::LOCAL;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("World", m_gizmoMode == ImGuizmo::WORLD))
+                m_gizmoMode = ImGuizmo::WORLD;
+
+            ImGui::Checkbox("Snap", &m_useSnap);
+            if (m_useSnap) {
+                if (m_gizmoOperation == ImGuizmo::TRANSLATE)
+                    ImGui::DragFloat("Snap Unit", &m_snapTranslate, 0.1f, 0.1f, 10.0f);
+                else if (m_gizmoOperation == ImGuizmo::ROTATE)
+                    ImGui::DragFloat("Snap Angle", &m_snapRotate, 1.0f, 1.0f, 90.0f);
+                else
+                    ImGui::DragFloat("Snap Scale", &m_snapScale, 0.01f, 0.01f, 1.0f);
             }
         } else {
             ImGui::TextDisabled("No object selected");

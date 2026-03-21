@@ -3,7 +3,7 @@ add_library(showcase_culling_optimization STATIC
     FPSCameraController.cpp
 )
 
-target_link_libraries(showcase_culling_optimization PUBLIC ShowcaseEngine::Core)
+target_link_libraries(showcase_culling_optimization PUBLIC ShowcaseEngine::Core imguizmo_lib)
 
 target_precompile_headers(showcase_culling_optimization REUSE_FROM showcase_engine)
 

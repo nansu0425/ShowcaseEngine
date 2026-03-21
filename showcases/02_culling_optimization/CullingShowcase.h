@@ -9,6 +9,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <imgui.h>
+#include <ImGuizmo.h>
 
 using Microsoft::WRL::ComPtr;
 
@@ -71,6 +72,14 @@ private:
 
     // Default white texture for untextured geometry
     Texture m_defaultWhiteTex;
+
+    // Gizmo
+    ImGuizmo::OPERATION m_gizmoOperation = ImGuizmo::TRANSLATE;
+    ImGuizmo::MODE m_gizmoMode = ImGuizmo::LOCAL;
+    bool m_useSnap = false;
+    float m_snapTranslate = 1.0f;
+    float m_snapRotate = 15.0f;
+    float m_snapScale = 0.1f;
 };
 
 } // namespace showcase
