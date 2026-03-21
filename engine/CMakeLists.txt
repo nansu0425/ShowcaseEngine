@@ -5,7 +5,6 @@ add_library(showcase_engine STATIC
     src/core/Timer.cpp
     src/core/Input.cpp
     src/core/Application.cpp
-    src/core/FPSCameraController.cpp
 
     # Graphics
     src/graphics/Device.cpp

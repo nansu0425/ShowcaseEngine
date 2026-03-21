@@ -1,9 +1,7 @@
 #pragma once
 
-#include <showcase/graphics/Camera.h>
 #include <showcase/graphics/Scene.h>
 #include <showcase/graphics/SceneRenderer.h>
-#include <showcase/core/FPSCameraController.h>
 #include <imgui.h>
 #include <ImGuizmo.h>
 
@@ -14,9 +12,9 @@ class Viewport;
 
 class EditorController {
 public:
-    void Update(const Input& input, Scene& scene, SceneRenderer& renderer, Camera& camera, Viewport* viewport);
-    void RenderUI(Scene& scene, Camera& camera, FPSCameraController& cameraCtrl, Viewport* viewport);
-    void RenderToolbar(Camera& camera, FPSCameraController& cameraCtrl);
+    void Update(const Input& input, Scene& scene, SceneRenderer& renderer, Viewport* viewport);
+    void RenderUI(Scene& scene, Viewport* viewport);
+    void RenderToolbar(Viewport& viewport);
 
     int GetSelectedObjectId() const { return m_selectedObjectId; }
 

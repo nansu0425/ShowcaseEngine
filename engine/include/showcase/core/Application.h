@@ -3,9 +3,7 @@
 #include <showcase/core/Window.h>
 #include <showcase/core/Timer.h>
 #include <showcase/core/Input.h>
-#include <showcase/core/FPSCameraController.h>
 #include <showcase/graphics/RenderContext.h>
-#include <showcase/graphics/Camera.h>
 #include <showcase/graphics/Model.h>
 #include <showcase/graphics/Scene.h>
 #include <showcase/graphics/SceneRenderer.h>
@@ -44,8 +42,6 @@ private:
     // Scene rendering
     SceneRenderer m_sceneRenderer;
     Scene m_scene;
-    Camera m_camera;
-    FPSCameraController m_cameraController;
     EditorController m_editorController;
 
     // Procedural models

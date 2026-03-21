@@ -17,7 +17,7 @@ class SceneRenderer {
 public:
     void Init(RenderContext& ctx);
     void Shutdown();
-    void OnResize(uint32_t width, uint32_t height, Camera& camera);
+    void OnResize(uint32_t width, uint32_t height);
     void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId);
 
     int PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene,

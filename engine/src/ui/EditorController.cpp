@@ -10,7 +10,9 @@ using namespace DirectX::SimpleMath;
 using namespace DirectX;
 
 void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& renderer,
-                              Camera& camera, Viewport* viewport) {
+                              Viewport* viewport) {
+    Camera& camera = viewport->GetCamera();
+
     // Left-click picking (not during right-click camera rotation, not when using gizmo)
     if (input.IsMouseButtonPressed(0) && !input.IsMouseButtonDown(1)
         && m_viewportHovered && !ImGuizmo::IsOver()) {
@@ -28,16 +30,15 @@ void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& r
     }
 }
 
-void EditorController::RenderUI(Scene& scene, Camera& camera,
-                                FPSCameraController& cameraCtrl, Viewport* viewport) {
+void EditorController::RenderUI(Scene& scene, Viewport* viewport) {
+    Camera& camera = viewport->GetCamera();
+
     ImGuizmo::BeginFrame();
 
     // -- Viewport hover detection (uses previous frame's image rect) --
-    if (viewport) {
-        m_viewportMin = viewport->GetImageMin();
-        m_viewportMax = viewport->GetImageMax();
-        m_viewportHovered = ImGui::IsMouseHoveringRect(m_viewportMin, m_viewportMax, false);
-    }
+    m_viewportMin = viewport->GetImageMin();
+    m_viewportMax = viewport->GetImageMax();
+    m_viewportHovered = ImGui::IsMouseHoveringRect(m_viewportMin, m_viewportMax, false);
 
     // -- Gizmo rendering --
     auto* vpWindow = ImGui::FindWindowByName("Viewport");
@@ -139,7 +140,9 @@ void EditorController::RenderUI(Scene& scene, Camera& camera,
     ImGui::End();
 }
 
-void EditorController::RenderToolbar(Camera& camera, FPSCameraController& cameraCtrl) {
+void EditorController::RenderToolbar(Viewport& viewport) {
+    Camera& camera = viewport.GetCamera();
+
     if (ImGui::RadioButton("Translate", m_gizmoOperation == ImGuizmo::TRANSLATE))
         m_gizmoOperation = ImGuizmo::TRANSLATE;
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Move objects along axes (W)");
@@ -191,8 +194,8 @@ void EditorController::RenderToolbar(Camera& camera, FPSCameraController& camera
     if (ImGui::BeginPopup("CameraSettings")) {
         ImGui::Text("Position: (%.1f, %.1f, %.1f)",
             camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-        ImGui::SliderFloat("Move Speed", &cameraCtrl.moveSpeed, 1.0f, 50.0f);
-        ImGui::SliderFloat("Look Sensitivity", &cameraCtrl.lookSpeed, 0.001f, 0.01f);
+        ImGui::SliderFloat("Move Speed", &viewport.cameraMoveSpeed, 1.0f, 50.0f);
+        ImGui::SliderFloat("Look Sensitivity", &viewport.cameraLookSpeed, 0.001f, 0.01f);
         ImGui::EndPopup();
     }
 }

@@ -272,9 +272,8 @@ void SceneRenderer::Shutdown() {
     m_rootSignature.Reset();
 }
 
-void SceneRenderer::OnResize(uint32_t width, uint32_t height, Camera& camera) {
+void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
     m_aspectRatio = height > 0 ? static_cast<float>(width) / height : 1.0f;
-    camera.SetPerspective(camera.GetFovY(), m_aspectRatio, camera.GetNearZ(), camera.GetFarZ());
 }
 
 // ── Render ───────────────────────────────────────────────────────────

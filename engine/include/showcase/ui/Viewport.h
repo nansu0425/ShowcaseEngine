@@ -2,6 +2,7 @@
 
 #include <showcase/graphics/RenderTarget.h>
 #include <showcase/graphics/DepthBuffer.h>
+#include <showcase/graphics/Camera.h>
 #include <showcase/graphics/CommandList.h>
 #include <showcase/graphics/CommandQueue.h>
 #include <cstdint>
@@ -9,6 +10,8 @@
 #include <imgui.h>
 
 namespace showcase {
+
+class Input;
 
 using ViewportResizeCallback = std::function<void(uint32_t, uint32_t)>;
 using ToolbarCallback = std::function<void()>;
@@ -24,6 +27,14 @@ public:
     void EndRender(CommandList& cmdList);
     void OnImGui(float fps, float deltaTime);
 
+    void InitCamera(const DirectX::SimpleMath::Vector3& position,
+                    const DirectX::SimpleMath::Vector3& lookAt,
+                    float fovY, float nearZ, float farZ);
+    void UpdateCamera(const Input& input, float deltaTime);
+
+    Camera& GetCamera() { return m_camera; }
+    const Camera& GetCamera() const { return m_camera; }
+
     void SetResizeCallback(ViewportResizeCallback callback) { m_resizeCallback = std::move(callback); }
     void SetToolbarCallback(ToolbarCallback callback) { m_toolbarCallback = std::move(callback); }
 
@@ -36,6 +47,9 @@ public:
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
     float GetAspectRatio() const { return m_height > 0 ? static_cast<float>(m_width) / m_height : 1.0f; }
+
+    float cameraMoveSpeed = 10.0f;
+    float cameraLookSpeed = 0.003f;
 
 private:
     void Resize(uint32_t width, uint32_t height);
@@ -60,6 +74,12 @@ private:
 
     ImVec2 m_imageMin = {};
     ImVec2 m_imageMax = {};
+
+    // Camera
+    Camera m_camera;
+    float m_yaw = 0.0f;
+    float m_pitch = 0.0f;
+    bool m_firstCameraUpdate = true;
 };
 
 } // namespace showcase

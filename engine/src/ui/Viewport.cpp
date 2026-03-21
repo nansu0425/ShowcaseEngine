@@ -1,6 +1,9 @@
 #include <showcase/ui/Viewport.h>
+#include <showcase/core/Input.h>
 #include <showcase/core/Log.h>
 #include <imgui.h>
+#include <algorithm>
+#include <cmath>
 
 namespace showcase {
 
@@ -127,12 +130,77 @@ void Viewport::OnImGui(float fps, float deltaTime) {
     ImGui::PopStyleVar();
 }
 
+void Viewport::InitCamera(const DirectX::SimpleMath::Vector3& position,
+                          const DirectX::SimpleMath::Vector3& lookAt,
+                          float fovY, float nearZ, float farZ) {
+    m_camera.SetPosition(position);
+    m_camera.SetLookAt(lookAt);
+    m_camera.SetPerspective(fovY, GetAspectRatio(), nearZ, farZ);
+    m_camera.UpdateViewMatrix();
+    m_firstCameraUpdate = true;
+}
+
+void Viewport::UpdateCamera(const Input& input, float deltaTime) {
+    using namespace DirectX::SimpleMath;
+
+    // Initialize yaw/pitch from current camera direction on first update
+    if (m_firstCameraUpdate) {
+        Vector3 fwd = m_camera.GetForward();
+        m_yaw = std::atan2(fwd.x, fwd.z);
+        m_pitch = std::asin(std::clamp(fwd.y, -1.0f, 1.0f));
+        m_firstCameraUpdate = false;
+    }
+
+    // Mouse look (right-click drag to avoid ImGui conflict)
+    if (input.IsMouseButtonDown(1)) {
+        m_yaw += input.GetMouseDeltaX() * cameraLookSpeed;
+        m_pitch -= input.GetMouseDeltaY() * cameraLookSpeed;
+        m_pitch = std::clamp(m_pitch, -DirectX::XM_PIDIV2 * 0.98f, DirectX::XM_PIDIV2 * 0.98f);
+    }
+
+    // Compute direction vectors from yaw/pitch
+    float cosP = std::cos(m_pitch);
+    Vector3 forward(std::sin(m_yaw) * cosP, std::sin(m_pitch), std::cos(m_yaw) * cosP);
+    forward.Normalize();
+    Vector3 worldUp(0.0f, 1.0f, 0.0f);
+    Vector3 right = worldUp.Cross(forward);
+    right.Normalize();
+
+    // WASD + QE movement (only while right-click held, to avoid conflict with gizmo shortcuts)
+    Vector3 move(0.0f, 0.0f, 0.0f);
+    if (input.IsMouseButtonDown(1)) {
+        if (input.IsKeyDown('W')) move += forward;
+        if (input.IsKeyDown('S')) move -= forward;
+        if (input.IsKeyDown('D')) move += right;
+        if (input.IsKeyDown('A')) move -= right;
+        if (input.IsKeyDown('E')) move += worldUp;
+        if (input.IsKeyDown('Q')) move -= worldUp;
+    }
+
+    if (move.LengthSquared() > 0.0f) {
+        move.Normalize();
+    }
+
+    // Shift to boost speed
+    float speed = cameraMoveSpeed;
+    if (input.IsKeyDown(VK_SHIFT)) speed *= 3.0f;
+
+    Vector3 pos = m_camera.GetPosition() + move * speed * deltaTime;
+
+    m_camera.SetPosition(pos);
+    m_camera.SetLookAt(pos + forward);
+    m_camera.UpdateViewMatrix();
+}
+
 void Viewport::Resize(uint32_t width, uint32_t height) {
     m_directQueue->Flush();
     m_renderTarget.Resize(m_device, m_allocator, *m_srvHeap, width, height);
     m_depthBuffer.Resize(m_device, m_allocator, width, height);
     m_width = width;
     m_height = height;
+
+    m_camera.SetPerspective(m_camera.GetFovY(), GetAspectRatio(),
+                            m_camera.GetNearZ(), m_camera.GetFarZ());
 
     if (m_resizeCallback) {
         m_resizeCallback(width, height);

@@ -36,11 +36,11 @@ bool Application::Init(const ApplicationDesc& desc) {
     }
 
     m_viewport.SetResizeCallback([this](uint32_t w, uint32_t h) {
-        m_sceneRenderer.OnResize(w, h, m_camera);
+        m_sceneRenderer.OnResize(w, h);
     });
 
     m_viewport.SetToolbarCallback([this]() {
-        m_editorController.RenderToolbar(m_camera, m_cameraController);
+        m_editorController.RenderToolbar(m_viewport);
     });
 
     m_renderContext.SetViewport(&m_viewport);
@@ -60,13 +60,11 @@ bool Application::Init(const ApplicationDesc& desc) {
     // Build scene
     BuildDefaultScene();
 
-    // Camera initial position
-    m_camera.SetPosition(Vector3(0.0f, 5.0f, -15.0f));
-    m_camera.SetLookAt(Vector3(0.0f, 0.0f, 0.0f));
-    float aspectRatio = m_window.GetHeight() > 0
-        ? static_cast<float>(m_window.GetWidth()) / m_window.GetHeight() : 16.0f / 9.0f;
-    m_camera.SetPerspective(XM_PIDIV4, aspectRatio, 0.1f, 1000.0f);
-    m_camera.UpdateViewMatrix();
+    // Initialize viewport camera
+    m_viewport.InitCamera(
+        Vector3(0.0f, 5.0f, -15.0f),
+        Vector3(0.0f, 0.0f, 0.0f),
+        XM_PIDIV4, 0.1f, 1000.0f);
 
     m_timer.Reset();
 
@@ -167,8 +165,8 @@ int Application::Run() {
         float dt = m_timer.DeltaTime();
 
         // Update
-        m_cameraController.Update(m_camera, m_input, dt);
-        m_editorController.Update(m_input, m_scene, m_sceneRenderer, m_camera, &m_viewport);
+        m_viewport.UpdateCamera(m_input, dt);
+        m_editorController.Update(m_input, m_scene, m_sceneRenderer, &m_viewport);
 
         // Begin render frame
         m_renderContext.BeginFrame();
@@ -180,7 +178,7 @@ int Application::Run() {
 
         // Phase 1: Render scene to off-screen viewport render target
         m_viewport.BeginRender(m_renderContext.GetCommandList());
-        m_sceneRenderer.Render(m_renderContext, m_camera, m_scene, m_editorController.GetSelectedObjectId());
+        m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene, m_editorController.GetSelectedObjectId());
         m_viewport.EndRender(m_renderContext.GetCommandList());
 
         // Phase 2: Render ImGui to back buffer
@@ -241,7 +239,7 @@ int Application::Run() {
         ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
 
         m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
-        m_editorController.RenderUI(m_scene, m_camera, m_cameraController, &m_viewport);
+        m_editorController.RenderUI(m_scene, &m_viewport);
         m_console.Render();
         m_imguiLayer.EndFrame(cmdList);
 
