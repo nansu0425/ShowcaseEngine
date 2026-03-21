@@ -32,14 +32,16 @@ void FPSCameraController::Update(Camera& camera, const Input& input, float delta
     Vector3 right = worldUp.Cross(forward);
     right.Normalize();
 
-    // WASD + QE movement
+    // WASD + QE movement (only while right-click held, to avoid conflict with gizmo shortcuts)
     Vector3 move(0.0f, 0.0f, 0.0f);
-    if (input.IsKeyDown('W')) move += forward;
-    if (input.IsKeyDown('S')) move -= forward;
-    if (input.IsKeyDown('D')) move += right;
-    if (input.IsKeyDown('A')) move -= right;
-    if (input.IsKeyDown('E')) move += worldUp;
-    if (input.IsKeyDown('Q')) move -= worldUp;
+    if (input.IsMouseButtonDown(1)) {
+        if (input.IsKeyDown('W')) move += forward;
+        if (input.IsKeyDown('S')) move -= forward;
+        if (input.IsKeyDown('D')) move += right;
+        if (input.IsKeyDown('A')) move -= right;
+        if (input.IsKeyDown('E')) move += worldUp;
+        if (input.IsKeyDown('Q')) move -= worldUp;
+    }
 
     if (move.LengthSquared() > 0.0f) {
         move.Normalize();

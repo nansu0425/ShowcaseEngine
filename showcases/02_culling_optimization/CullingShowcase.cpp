@@ -347,11 +347,12 @@ void CullingShowcase::OnUpdate(float deltaTime, const Input& input) {
         m_selectedObjectId = PickObject(input.GetMouseX(), input.GetMouseY());
     }
 
-    // Gizmo operation shortcuts (Ctrl+T / Ctrl+R / Ctrl+S)
-    if (input.IsKeyDown(VK_CONTROL)) {
-        if (input.IsKeyPressed('T')) m_gizmoOperation = ImGuizmo::TRANSLATE;
-        if (input.IsKeyPressed('R')) m_gizmoOperation = ImGuizmo::ROTATE;
-        if (input.IsKeyPressed('S')) m_gizmoOperation = ImGuizmo::SCALE;
+    // Gizmo shortcuts (only when right-click not held, to avoid camera movement conflict)
+    if (!input.IsMouseButtonDown(1)) {
+        if (input.IsKeyPressed('W')) m_gizmoOperation = ImGuizmo::TRANSLATE;
+        if (input.IsKeyPressed('E')) m_gizmoOperation = ImGuizmo::ROTATE;
+        if (input.IsKeyPressed('R')) m_gizmoOperation = ImGuizmo::SCALE;
+        if (input.IsKeyPressed('X')) m_gizmoMode = (m_gizmoMode == ImGuizmo::LOCAL) ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
     }
 }
 
@@ -563,15 +564,15 @@ void CullingShowcase::OnImGui() {
 void CullingShowcase::OnViewportToolbar() {
     if (ImGui::RadioButton("Translate", m_gizmoOperation == ImGuizmo::TRANSLATE))
         m_gizmoOperation = ImGuizmo::TRANSLATE;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Move objects along axes (Ctrl+T)");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Move objects along axes (W)");
     ImGui::SameLine();
     if (ImGui::RadioButton("Rotate", m_gizmoOperation == ImGuizmo::ROTATE))
         m_gizmoOperation = ImGuizmo::ROTATE;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rotate objects around axes (Ctrl+R)");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rotate objects around axes (E)");
     ImGui::SameLine();
     if (ImGui::RadioButton("Scale", m_gizmoOperation == ImGuizmo::SCALE))
         m_gizmoOperation = ImGuizmo::SCALE;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Scale objects along axes (Ctrl+S)");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Scale objects along axes (R)");
 
     ImGui::SameLine();
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
@@ -579,11 +580,11 @@ void CullingShowcase::OnViewportToolbar() {
 
     if (ImGui::RadioButton("Local", m_gizmoMode == ImGuizmo::LOCAL))
         m_gizmoMode = ImGuizmo::LOCAL;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Transform relative to object's own axes");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Transform relative to object's own axes (X)");
     ImGui::SameLine();
     if (ImGui::RadioButton("World", m_gizmoMode == ImGuizmo::WORLD))
         m_gizmoMode = ImGuizmo::WORLD;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Transform relative to world axes");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Transform relative to world axes (X)");
 
     ImGui::SameLine();
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
