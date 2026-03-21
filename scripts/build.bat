@@ -13,6 +13,7 @@ if "%COMMAND%"=="" goto :usage
 if /i "%COMMAND%"=="configure" goto :configure
 if /i "%COMMAND%"=="build"     goto :build
 if /i "%COMMAND%"=="clean"     goto :clean
+if /i "%COMMAND%"=="nuke"      goto :nuke
 if /i "%COMMAND%"=="rebuild"   goto :rebuild
 goto :usage
 
@@ -54,6 +55,12 @@ if %errorlevel% neq 0 (
 echo [ShowcaseEngine] Clean OK
 exit /b 0
 
+:nuke
+echo [ShowcaseEngine] Nuking build directory...
+if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
+echo [ShowcaseEngine] Nuke OK
+exit /b 0
+
 :rebuild
 if "%CONFIG%"=="" (
     echo [ShowcaseEngine] Error: config required. Usage: build.bat rebuild Debug^|Release
@@ -75,5 +82,6 @@ echo Commands:
 echo   configure            Generate CMake build files
 echo   build ^<config^>       Build the project (Debug^|Release)
 echo   clean ^<config^>       Clean build artifacts
+echo   nuke                 Delete entire build directory (fixes PCH/PDB corruption)
 echo   rebuild ^<config^>     Clean + Configure + Build
 exit /b 1

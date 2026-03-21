@@ -4,7 +4,8 @@ SamplerState linearSampler   : register(s0);
 cbuffer PerMaterial : register(b2) {
     float4 baseColorFactor;
     int    hasTexture;
-    float3 _pad1;
+    float  selectionTint;
+    float2 _pad1;
 };
 
 struct PSInput {
@@ -29,6 +30,11 @@ float4 main(PSInput input) : SV_TARGET {
     }
 
     float3 color = baseColor.rgb * (diffuse + AMBIENT);
+
+    if (selectionTint > 0.0) {
+        float3 highlight = float3(0.2, 0.5, 1.0);
+        color = lerp(color, color + highlight * 0.3, selectionTint);
+    }
 
     return float4(color, baseColor.a);
 }

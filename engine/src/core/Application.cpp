@@ -141,8 +141,16 @@ int Application::Run() {
                 ImGuiID dockBottom;
                 ImGuiID dockCenter;
                 ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, &dockBottom, &dockCenter);
+
+                ImGuiID dockRight;
+                ImGui::DockBuilderSplitNode(dockCenter, ImGuiDir_Right, 0.20f, &dockRight, &dockCenter);
+                ImGuiID dockRightTop, dockRightBottom;
+                ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.5f, &dockRightBottom, &dockRightTop);
+
                 ImGui::DockBuilderDockWindow("Console", dockBottom);
                 ImGui::DockBuilderDockWindow("Viewport", dockCenter);
+                ImGui::DockBuilderDockWindow("Scene Hierarchy", dockRightTop);
+                ImGui::DockBuilderDockWindow("Inspector", dockRightBottom);
                 ImGui::DockBuilderFinish(dockspaceId);
             }
         }

@@ -4,9 +4,11 @@
 #include <showcase/graphics/Buffer.h>
 #include <showcase/graphics/Camera.h>
 #include <showcase/graphics/Model.h>
+#include <showcase/graphics/Scene.h>
 #include "FPSCameraController.h"
 #include <d3d12.h>
 #include <wrl/client.h>
+#include <imgui.h>
 
 using Microsoft::WRL::ComPtr;
 
@@ -29,8 +31,9 @@ public:
     void OnImGui() override;
 
 private:
-    void CreateGridMesh(ID3D12Device* device, D3D12MA::Allocator* allocator);
-    void CreateCubeMesh(ID3D12Device* device, D3D12MA::Allocator* allocator);
+    void CreateGridModel(ID3D12Device* device, D3D12MA::Allocator* allocator);
+    void CreateCubeModel(ID3D12Device* device, D3D12MA::Allocator* allocator);
+    int PickObject(int mouseX, int mouseY) const;
 
     // Pipeline
     ComPtr<ID3D12RootSignature> m_rootSignature;
@@ -39,33 +42,31 @@ private:
     // Constant buffers
     Buffer m_perFrameCB;
     Buffer m_perObjectCB;
+    Buffer m_perMaterialCB;
 
-    // Geometry
-    Buffer m_gridVB;
-    Buffer m_gridIB;
-    uint32_t m_gridIndexCount = 0;
-
-    Buffer m_cubeVB;
-    Buffer m_cubeIB;
-    uint32_t m_cubeIndexCount = 0;
+    // Procedural models (own geometry buffers)
+    Model m_gridModel;
+    Model m_cubeModel;
 
     // Camera
     Camera m_camera;
     FPSCameraController m_cameraController;
     float m_aspectRatio = 16.0f / 9.0f;
 
-    static constexpr uint32_t kMaxObjects = 16;
+    static constexpr uint32_t kMaxObjects = 64;
 
-    // Cube transforms
-    struct CubeInstance {
-        DirectX::SimpleMath::Matrix world;
-    };
-    std::vector<CubeInstance> m_cubes;
+    // Scene
+    Scene m_scene;
+    int m_selectedObjectId = -1;
+
+    // Viewport picking state (1-frame delayed from OnImGui)
+    ImVec2 m_viewportMin = {};
+    ImVec2 m_viewportMax = {};
+    bool m_viewportHovered = false;
 
     // glTF model
     Model m_testModel;
     bool m_modelLoaded = false;
-    Buffer m_perMaterialCB;
     DescriptorHeap* m_srvHeap = nullptr;
 
     // Default white texture for untextured geometry

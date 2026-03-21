@@ -9,6 +9,8 @@ void Input::Update(HWND hwnd) {
         m_keysCurrent[i] = (GetAsyncKeyState(i) & 0x8000) != 0;
     }
 
+    m_prevMouseButtons = m_mouseButtons;
+
     m_mouseButtons[0] = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
     m_mouseButtons[1] = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
     m_mouseButtons[2] = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;

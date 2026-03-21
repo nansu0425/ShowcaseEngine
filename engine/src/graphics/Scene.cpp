@@ -1,18 +1,63 @@
 #include <showcase/graphics/Scene.h>
 
+using namespace DirectX::SimpleMath;
+
 namespace showcase {
 
 bool SceneObject::IsVisible() const {
     return !frustumCulled && !occlusionCulled;
 }
 
+void SceneObject::RecomputeWorldTransform() {
+    float rx = DirectX::XMConvertToRadians(rotation.x);
+    float ry = DirectX::XMConvertToRadians(rotation.y);
+    float rz = DirectX::XMConvertToRadians(rotation.z);
+
+    worldTransform = Matrix::CreateScale(scale)
+                   * Matrix::CreateRotationZ(rz)
+                   * Matrix::CreateRotationX(rx)
+                   * Matrix::CreateRotationY(ry)
+                   * Matrix::CreateTranslation(position);
+}
+
+void SceneObject::UpdateAABB() {
+    if (model) {
+        model->localAABB.Transform(worldAABB, worldTransform);
+    }
+}
+
 SceneObject& Scene::AddObject(Model* model, const DirectX::SimpleMath::Matrix& transform) {
     SceneObject obj;
+    obj.id = m_nextId++;
     obj.model = model;
     obj.worldTransform = transform;
-    model->localAABB.Transform(obj.worldAABB, transform);
+    if (model) {
+        model->localAABB.Transform(obj.worldAABB, transform);
+    }
     m_objects.push_back(std::move(obj));
     return m_objects.back();
+}
+
+SceneObject& Scene::AddObject(Model* model, const std::string& name,
+                               const Vector3& pos, const Vector3& rot, const Vector3& scl) {
+    SceneObject obj;
+    obj.id = m_nextId++;
+    obj.name = name;
+    obj.model = model;
+    obj.position = pos;
+    obj.rotation = rot;
+    obj.scale = scl;
+    obj.RecomputeWorldTransform();
+    obj.UpdateAABB();
+    m_objects.push_back(std::move(obj));
+    return m_objects.back();
+}
+
+SceneObject* Scene::FindById(uint32_t id) {
+    for (auto& obj : m_objects) {
+        if (obj.id == id) return &obj;
+    }
+    return nullptr;
 }
 
 void Scene::Clear() {

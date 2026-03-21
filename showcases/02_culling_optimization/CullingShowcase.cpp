@@ -8,11 +8,13 @@
 #include <showcase/graphics/Model.h>
 #include <showcase/graphics/CommandList.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <filesystem>
 
 namespace showcase {
 
 using namespace DirectX::SimpleMath;
+using namespace DirectX;
 
 REGISTER_SHOWCASE(CullingShowcase)
 
@@ -29,12 +31,13 @@ struct alignas(256) PerObjectData {
 struct alignas(256) PerMaterialData {
     Vector4 baseColorFactor;
     int hasTexture;
-    int _pad[3];
+    float selectionTint;
+    float _pad[2];
 };
 
 // ── Procedural geometry ──────────────────────────────────────────────
 
-void CullingShowcase::CreateGridMesh(ID3D12Device* device, D3D12MA::Allocator* allocator) {
+void CullingShowcase::CreateGridModel(ID3D12Device* device, D3D12MA::Allocator* allocator) {
     const int gridSize = 20;
     const float cellSize = 2.0f;
     const float halfExtent = gridSize * cellSize * 0.5f;
@@ -69,17 +72,24 @@ void CullingShowcase::CreateGridMesh(ID3D12Device* device, D3D12MA::Allocator* a
         }
     }
 
-    m_gridIndexCount = static_cast<uint32_t>(indices.size());
-
-    m_gridVB.InitAsVertexBuffer(device, allocator,
+    MeshPrimitive prim;
+    prim.vertexBuffer.InitAsVertexBuffer(device, allocator,
         vertices.data(), static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex)),
         sizeof(ModelVertex));
-    m_gridIB.InitAsIndexBuffer(device, allocator,
+    prim.indexBuffer.InitAsIndexBuffer(device, allocator,
         indices.data(), static_cast<uint32_t>(indices.size() * sizeof(uint32_t)));
+    prim.indexCount = static_cast<uint32_t>(indices.size());
+    prim.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(halfExtent, 0.01f, halfExtent));
+
+    Mesh mesh;
+    mesh.name = "Grid";
+    mesh.primitives.push_back(std::move(prim));
+
+    m_gridModel.meshes.push_back(std::move(mesh));
+    m_gridModel.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(halfExtent, 0.01f, halfExtent));
 }
 
-void CullingShowcase::CreateCubeMesh(ID3D12Device* device, D3D12MA::Allocator* allocator) {
-    // Unit cube centered at origin, with normals
+void CullingShowcase::CreateCubeModel(ID3D12Device* device, D3D12MA::Allocator* allocator) {
     ModelVertex vertices[] = {
         // Front face (z = +0.5)
         {{-0.5f, -0.5f,  0.5f}, { 0, 0, 1}, {0, 1}},
@@ -122,12 +132,60 @@ void CullingShowcase::CreateCubeMesh(ID3D12Device* device, D3D12MA::Allocator* a
         20, 21, 22,  20, 22, 23,   // left
     };
 
-    m_cubeIndexCount = _countof(indices);
-
-    m_cubeVB.InitAsVertexBuffer(device, allocator,
+    MeshPrimitive prim;
+    prim.vertexBuffer.InitAsVertexBuffer(device, allocator,
         vertices, sizeof(vertices), sizeof(ModelVertex));
-    m_cubeIB.InitAsIndexBuffer(device, allocator,
+    prim.indexBuffer.InitAsIndexBuffer(device, allocator,
         indices, sizeof(indices));
+    prim.indexCount = _countof(indices);
+    prim.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(0.5f, 0.5f, 0.5f));
+
+    Mesh mesh;
+    mesh.name = "Cube";
+    mesh.primitives.push_back(std::move(prim));
+
+    m_cubeModel.meshes.push_back(std::move(mesh));
+    m_cubeModel.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(0.5f, 0.5f, 0.5f));
+}
+
+// ── Ray picking ──────────────────────────────────────────────────────
+
+int CullingShowcase::PickObject(int mouseX, int mouseY) const {
+    float vpWidth = m_viewportMax.x - m_viewportMin.x;
+    float vpHeight = m_viewportMax.y - m_viewportMin.y;
+    if (vpWidth <= 0 || vpHeight <= 0) return -1;
+
+    float localX = static_cast<float>(mouseX) - m_viewportMin.x;
+    float localY = static_cast<float>(mouseY) - m_viewportMin.y;
+
+    float ndcX = (localX / vpWidth) * 2.0f - 1.0f;
+    float ndcY = 1.0f - (localY / vpHeight) * 2.0f;
+
+    Matrix vp = m_camera.GetViewProjectionMatrix();
+    Matrix invVP = vp.Invert();
+
+    XMVECTOR nearPt = XMVector3TransformCoord(
+        XMVectorSet(ndcX, ndcY, 0.0f, 1.0f), invVP);
+    XMVECTOR farPt = XMVector3TransformCoord(
+        XMVectorSet(ndcX, ndcY, 1.0f, 1.0f), invVP);
+
+    XMVECTOR rayOrigin = nearPt;
+    XMVECTOR rayDir = XMVector3Normalize(XMVectorSubtract(farPt, nearPt));
+
+    int closestId = -1;
+    float closestDist = FLT_MAX;
+
+    for (const auto& obj : m_scene.GetObjects()) {
+        float dist = 0.0f;
+        if (obj.worldAABB.Intersects(rayOrigin, rayDir, dist)) {
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestId = static_cast<int>(obj.id);
+            }
+        }
+    }
+
+    return closestId;
 }
 
 // ── Lifecycle ────────────────────────────────────────────────────────
@@ -194,26 +252,25 @@ void CullingShowcase::OnLoad(RenderContext& ctx) {
         texCmdList.Shutdown();
     }
 
-    // Geometry
-    CreateGridMesh(device, allocator);
-    CreateCubeMesh(device, allocator);
+    // Create procedural models
+    CreateGridModel(device, allocator);
+    CreateCubeModel(device, allocator);
 
-    // Place some cubes in the scene
-    m_cubes.clear();
-    m_cubes.push_back({Matrix::CreateScale(2.0f) * Matrix::CreateTranslation(0.0f, 1.0f, 0.0f)});
-    m_cubes.push_back({Matrix::CreateScale(1.5f) * Matrix::CreateTranslation(5.0f, 0.75f, 3.0f)});
-    m_cubes.push_back({Matrix::CreateScale(3.0f, 4.0f, 3.0f) * Matrix::CreateTranslation(-6.0f, 2.0f, -4.0f)});
-    m_cubes.push_back({Matrix::CreateScale(1.0f) * Matrix::CreateTranslation(8.0f, 0.5f, -7.0f)});
-    m_cubes.push_back({Matrix::CreateScale(2.0f, 1.0f, 2.0f) * Matrix::CreateTranslation(-3.0f, 0.5f, 8.0f)});
+    // Build scene
+    m_scene.Clear();
+    m_scene.AddObject(&m_gridModel, "Ground Grid", Vector3(0, 0, 0));
+    m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2));
+    m_scene.AddObject(&m_cubeModel, "Cube 2", Vector3(5, 0.75f, 3), Vector3(0, 0, 0), Vector3(1.5f, 1.5f, 1.5f));
+    m_scene.AddObject(&m_cubeModel, "Cube 3", Vector3(-6, 2, -4), Vector3(0, 0, 0), Vector3(3, 4, 3));
+    m_scene.AddObject(&m_cubeModel, "Cube 4", Vector3(8, 0.5f, -7), Vector3(0, 0, 0), Vector3(1, 1, 1));
+    m_scene.AddObject(&m_cubeModel, "Cube 5", Vector3(-3, 0.5f, 8), Vector3(0, 0, 0), Vector3(2, 1, 2));
 
     // Try loading a glTF model from assets/models/
     {
-        // Resolve path relative to executable directory
         char exePath[MAX_PATH];
         GetModuleFileNameA(nullptr, exePath, MAX_PATH);
         std::filesystem::path modelDir = std::filesystem::path(exePath).parent_path() / "assets" / "models";
 
-        // Look for the first .gltf or .glb file in the directory
         if (std::filesystem::exists(modelDir)) {
             for (const auto& entry : std::filesystem::directory_iterator(modelDir)) {
                 auto ext = entry.path().extension().string();
@@ -223,6 +280,7 @@ void CullingShowcase::OnLoad(RenderContext& ctx) {
                         ctx.GetDirectQueue(), ctx.GetSrvHeap(), m_testModel);
                     if (m_modelLoaded) {
                         SE_LOG_INFO("Loaded test model: {}", entry.path().filename().string());
+                        m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0));
                     }
                     break;
                 }
@@ -237,7 +295,7 @@ void CullingShowcase::OnLoad(RenderContext& ctx) {
     // Camera initial position
     m_camera.SetPosition(Vector3(0.0f, 5.0f, -15.0f));
     m_camera.SetLookAt(Vector3(0.0f, 0.0f, 0.0f));
-    m_camera.SetPerspective(DirectX::XM_PIDIV4, m_aspectRatio, 0.1f, 1000.0f);
+    m_camera.SetPerspective(XM_PIDIV4, m_aspectRatio, 0.1f, 1000.0f);
     m_camera.UpdateViewMatrix();
 
     SE_LOG_INFO("CullingShowcase loaded");
@@ -251,10 +309,21 @@ void CullingShowcase::OnUnload() {
     if (m_srvHeap) {
         m_defaultWhiteTex.Shutdown(*m_srvHeap);
     }
-    m_gridVB.Shutdown();
-    m_gridIB.Shutdown();
-    m_cubeVB.Shutdown();
-    m_cubeIB.Shutdown();
+    // Shutdown procedural model buffers
+    for (auto& mesh : m_gridModel.meshes)
+        for (auto& prim : mesh.primitives) {
+            prim.vertexBuffer.Shutdown();
+            prim.indexBuffer.Shutdown();
+        }
+    for (auto& mesh : m_cubeModel.meshes)
+        for (auto& prim : mesh.primitives) {
+            prim.vertexBuffer.Shutdown();
+            prim.indexBuffer.Shutdown();
+        }
+    m_gridModel.meshes.clear();
+    m_cubeModel.meshes.clear();
+
+    m_scene.Clear();
     m_perFrameCB.Shutdown();
     m_perObjectCB.Shutdown();
     m_perMaterialCB.Shutdown();
@@ -269,6 +338,11 @@ void CullingShowcase::OnResize(uint32_t width, uint32_t height) {
 
 void CullingShowcase::OnUpdate(float deltaTime, const Input& input) {
     m_cameraController.Update(m_camera, input, deltaTime);
+
+    // Left-click picking (not during right-click camera rotation)
+    if (input.IsMouseButtonPressed(0) && !input.IsMouseButtonDown(1) && m_viewportHovered) {
+        m_selectedObjectId = PickObject(input.GetMouseX(), input.GetMouseY());
+    }
 }
 
 void CullingShowcase::OnRender(RenderContext& ctx) {
@@ -289,75 +363,37 @@ void CullingShowcase::OnRender(RenderContext& ctx) {
     auto objCbBase = m_perObjectCB.GetResource()->GetGPUVirtualAddress();
     auto matCbBase = m_perMaterialCB.GetResource()->GetGPUVirtualAddress();
 
-    // Helper: bind material for untextured procedural geometry
-    auto bindDefaultMaterial = [&](const Vector4& color) {
-        PerMaterialData matData;
-        matData.baseColorFactor = color;
-        matData.hasTexture = 0;
-        m_perMaterialCB.UpdateDataAtOffset(&matData, sizeof(matData), objectIndex * sizeof(PerMaterialData));
-        cmdList->SetGraphicsRootConstantBufferView(2, matCbBase + objectIndex * sizeof(PerMaterialData));
-        cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
-    };
+    for (const auto& sceneObj : m_scene.GetObjects()) {
+        if (!sceneObj.model) continue;
 
-    // Draw ground grid
-    {
-        PerObjectData objData;
-        objData.world = Matrix::CreateTranslation(0.0f, 0.0f, 0.0f);
-        m_perObjectCB.UpdateDataAtOffset(&objData, sizeof(objData), objectIndex * sizeof(PerObjectData));
-        cmdList->SetGraphicsRootConstantBufferView(1, objCbBase + objectIndex * sizeof(PerObjectData));
-        bindDefaultMaterial(Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-        objectIndex++;
+        bool isSelected = (static_cast<int>(sceneObj.id) == m_selectedObjectId);
 
-        auto vbView = m_gridVB.GetVertexBufferView();
-        auto ibView = m_gridIB.GetIndexBufferView();
-        cmdList->IASetVertexBuffers(0, 1, &vbView);
-        cmdList->IASetIndexBuffer(&ibView);
-        cmdList->DrawIndexedInstanced(m_gridIndexCount, 1, 0, 0, 0);
-    }
-
-    // Draw cubes
-    auto cubeVBView = m_cubeVB.GetVertexBufferView();
-    auto cubeIBView = m_cubeIB.GetIndexBufferView();
-    cmdList->IASetVertexBuffers(0, 1, &cubeVBView);
-    cmdList->IASetIndexBuffer(&cubeIBView);
-
-    for (const auto& cube : m_cubes) {
-        PerObjectData objData;
-        objData.world = cube.world;
-        m_perObjectCB.UpdateDataAtOffset(&objData, sizeof(objData), objectIndex * sizeof(PerObjectData));
-        cmdList->SetGraphicsRootConstantBufferView(1, objCbBase + objectIndex * sizeof(PerObjectData));
-        bindDefaultMaterial(Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-        cmdList->DrawIndexedInstanced(m_cubeIndexCount, 1, 0, 0, 0);
-        objectIndex++;
-    }
-
-    // Draw glTF model
-    if (m_modelLoaded) {
-        for (const auto& mesh : m_testModel.meshes) {
+        for (const auto& mesh : sceneObj.model->meshes) {
             for (const auto& prim : mesh.primitives) {
-                if (prim.indexCount == 0) continue;
+                if (prim.indexCount == 0 || objectIndex >= kMaxObjects) continue;
 
-                // Per-object transform (identity for now)
+                // Per-object transform
                 PerObjectData objData;
-                objData.world = Matrix::CreateTranslation(0.0f, 0.0f, 0.0f);
+                objData.world = sceneObj.worldTransform;
                 m_perObjectCB.UpdateDataAtOffset(&objData, sizeof(objData), objectIndex * sizeof(PerObjectData));
                 cmdList->SetGraphicsRootConstantBufferView(1, objCbBase + objectIndex * sizeof(PerObjectData));
 
                 // Per-material
                 PerMaterialData matData;
-                matData.baseColorFactor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+                matData.baseColorFactor = Vector4(0.7f, 0.7f, 0.7f, 1.0f);
                 matData.hasTexture = 0;
+                matData.selectionTint = isSelected ? 1.0f : 0.0f;
 
                 if (prim.materialIndex >= 0 &&
-                    prim.materialIndex < static_cast<int>(m_testModel.materials.size())) {
-                    const auto& mat = m_testModel.materials[prim.materialIndex];
+                    prim.materialIndex < static_cast<int>(sceneObj.model->materials.size())) {
+                    const auto& mat = sceneObj.model->materials[prim.materialIndex];
                     matData.baseColorFactor = mat.baseColorFactor;
 
                     if (mat.baseColorTextureIndex >= 0 &&
-                        mat.baseColorTextureIndex < static_cast<int>(m_testModel.textures.size())) {
+                        mat.baseColorTextureIndex < static_cast<int>(sceneObj.model->textures.size())) {
                         matData.hasTexture = 1;
                         cmdList->SetGraphicsRootDescriptorTable(3,
-                            m_testModel.textures[mat.baseColorTextureIndex].GetSRVHandle().gpu);
+                            sceneObj.model->textures[mat.baseColorTextureIndex].GetSRVHandle().gpu);
                     } else {
                         cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
                     }
@@ -380,6 +416,7 @@ void CullingShowcase::OnRender(RenderContext& ctx) {
 }
 
 void CullingShowcase::OnImGui() {
+    // -- Showcase info (rendered inside "Showcase Selector" window) --
     ImGui::Text("Camera Position: (%.1f, %.1f, %.1f)",
         m_camera.GetPosition().x, m_camera.GetPosition().y, m_camera.GetPosition().z);
     ImGui::Separator();
@@ -393,6 +430,7 @@ void CullingShowcase::OnImGui() {
     }
 
     ImGui::Separator();
+    ImGui::Text("Objects: %zu", m_scene.GetObjectCount());
     if (m_modelLoaded) {
         ImGui::Text("Model: %zu meshes, %zu materials, %zu textures",
             m_testModel.meshes.size(), m_testModel.materials.size(),
@@ -400,6 +438,54 @@ void CullingShowcase::OnImGui() {
     } else {
         ImGui::TextDisabled("No glTF model loaded");
     }
+
+    // -- Viewport hover detection (uses previous frame's ImGui state) --
+    auto* vpWindow = ImGui::FindWindowByName("Viewport");
+    if (vpWindow && !vpWindow->Hidden) {
+        m_viewportMin = vpWindow->ContentRegionRect.Min;
+        m_viewportMax = vpWindow->ContentRegionRect.Max;
+        m_viewportHovered = ImGui::IsMouseHoveringRect(m_viewportMin, m_viewportMax, false);
+    }
+
+    // -- Scene Hierarchy panel --
+    if (ImGui::Begin("Scene Hierarchy")) {
+        for (auto& obj : m_scene.GetObjects()) {
+            bool isSelected = (static_cast<int>(obj.id) == m_selectedObjectId);
+            if (ImGui::Selectable(obj.name.c_str(), isSelected)) {
+                m_selectedObjectId = static_cast<int>(obj.id);
+            }
+        }
+    }
+    ImGui::End();
+
+    // -- Inspector panel --
+    if (ImGui::Begin("Inspector")) {
+        SceneObject* selected = (m_selectedObjectId > 0) ? m_scene.FindById(static_cast<uint32_t>(m_selectedObjectId)) : nullptr;
+        if (selected) {
+            ImGui::Text("Name: %s", selected->name.c_str());
+            ImGui::Text("ID: %u", selected->id);
+            ImGui::Separator();
+
+            bool changed = false;
+            if (ImGui::DragFloat3("Position", &selected->position.x, 0.1f)) {
+                changed = true;
+            }
+            if (ImGui::DragFloat3("Rotation", &selected->rotation.x, 1.0f)) {
+                changed = true;
+            }
+            if (ImGui::DragFloat3("Scale", &selected->scale.x, 0.1f, 0.01f, 100.0f)) {
+                changed = true;
+            }
+
+            if (changed) {
+                selected->RecomputeWorldTransform();
+                selected->UpdateAABB();
+            }
+        } else {
+            ImGui::TextDisabled("No object selected");
+        }
+    }
+    ImGui::End();
 }
 
 } // namespace showcase

@@ -15,6 +15,8 @@ public:
     bool IsKeyReleased(int key) const { return !m_keysCurrent[key] && m_keysPrevious[key]; }
 
     bool IsMouseButtonDown(int button) const { return m_mouseButtons[button]; }
+    bool IsMouseButtonPressed(int button) const { return m_mouseButtons[button] && !m_prevMouseButtons[button]; }
+    bool IsMouseButtonReleased(int button) const { return !m_mouseButtons[button] && m_prevMouseButtons[button]; }
     int GetMouseX() const { return m_mouseX; }
     int GetMouseY() const { return m_mouseY; }
     int GetMouseDeltaX() const { return m_mouseX - m_prevMouseX; }
@@ -27,7 +29,8 @@ public:
 private:
     std::array<bool, 256> m_keysCurrent = {};
     std::array<bool, 256> m_keysPrevious = {};
-    std::array<bool, 3> m_mouseButtons = {}; // Left, Right, Middle
+    std::array<bool, 3> m_mouseButtons = {};     // Left, Right, Middle
+    std::array<bool, 3> m_prevMouseButtons = {};
 
     int m_mouseX = 0;
     int m_mouseY = 0;
