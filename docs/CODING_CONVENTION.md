@@ -159,7 +159,7 @@ static bool LoadGLTF(const std::string& filepath,
 
 - Explain **why**, not what.
 - Use `//` for inline comments.
-- Use `///` one-line descriptions on public API declarations — no `@param` / `@return` / `@brief` tags.
+- Use `///` one-line descriptions on public API methods whose purpose, return value, or usage constraints are not obvious from the name and signature alone — no `@param` / `@return` / `@brief` tags.
 - Section banners: `// ── Name ──────...`
 
 ```cpp

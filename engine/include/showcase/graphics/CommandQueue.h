@@ -13,9 +13,12 @@ public:
     [[nodiscard]] bool Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type);
     void Shutdown();
 
+    /// Submits a command list for GPU execution and returns the fence value to wait on.
     uint64_t ExecuteCommandList(ID3D12CommandList* commandList);
+    /// Advances the fence and returns the new fence value.
     uint64_t Signal();
     void WaitForFenceValue(uint64_t fenceValue);
+    /// Blocks until all previously submitted GPU work completes.
     void Flush();
     bool IsFenceComplete(uint64_t fenceValue) const;
 

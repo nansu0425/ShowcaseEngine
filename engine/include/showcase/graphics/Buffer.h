@@ -20,7 +20,9 @@ public:
     [[nodiscard]] bool InitAsUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t size);
     void Shutdown();
 
+    /// Copies data to the mapped upload buffer (CPU-visible, no GPU sync required).
     void UpdateData(const void* data, uint32_t size);
+    /// Copies data at a 256-byte-aligned offset within the mapped upload buffer.
     void UpdateDataAtOffset(const void* data, uint32_t size, uint32_t offset);
 
     D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const { return m_vbView; }

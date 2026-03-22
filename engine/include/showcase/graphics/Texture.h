@@ -19,6 +19,7 @@ public:
                         ID3D12GraphicsCommandList* cmdList, DescriptorHeap& srvHeap,
                         const uint8_t* data, uint32_t width, uint32_t height,
                         uint32_t channels, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);
+    /// Releases the temporary upload heap after the GPU copy has completed.
     void ReleaseUploadResources();
     void Shutdown(DescriptorHeap& srvHeap);
 

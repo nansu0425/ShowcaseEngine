@@ -20,6 +20,7 @@ public:
     void OnResize(uint32_t width, uint32_t height);
     void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId);
 
+    /// Casts a ray from screen coordinates and returns the closest hit object ID, or -1 if none.
     int PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene,
                    float vpMinX, float vpMinY, float vpMaxX, float vpMaxY) const;
 
