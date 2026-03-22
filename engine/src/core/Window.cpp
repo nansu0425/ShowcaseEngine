@@ -104,13 +104,13 @@ void Window::RestorePlacement() {
     std::ifstream file(GetConfigPath());
     if (!file.is_open()) return;
 
-    nlohmann::json j;
-    try {
-        file >> j;
-    } catch (const nlohmann::json::exception&) {
+    std::string content((std::istreambuf_iterator<char>(file)),
+                         std::istreambuf_iterator<char>());
+    if (!nlohmann::json::accept(content)) {
         SE_LOG_WARN("Failed to parse window config");
         return;
     }
+    nlohmann::json j = nlohmann::json::parse(content);
 
     WINDOWPLACEMENT wp = {};
     wp.length = sizeof(WINDOWPLACEMENT);

@@ -1,4 +1,5 @@
 #include <showcase/graphics/DescriptorHeap.h>
+#include <showcase/core/Assert.h>
 #include <showcase/core/Log.h>
 
 namespace showcase {
@@ -60,6 +61,7 @@ void DescriptorHeap::Free(const DescriptorHandle& handle) {
 }
 
 DescriptorHandle DescriptorHeap::GetHandle(uint32_t index) const {
+    SE_ASSERT(index < m_numDescriptors);
     DescriptorHandle handle;
     handle.index = index;
     handle.cpu.ptr = m_cpuStart.ptr + static_cast<SIZE_T>(index) * m_descriptorSize;

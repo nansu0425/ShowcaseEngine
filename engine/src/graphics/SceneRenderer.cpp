@@ -27,6 +27,10 @@ struct alignas(256) PerMaterialData {
     float _pad[2];
 };
 
+static_assert(sizeof(PerFrameData) <= 256);
+static_assert(sizeof(PerObjectData) <= 256);
+static_assert(sizeof(PerMaterialData) <= 256);
+
 // ── Procedural geometry ──────────────────────────────────────────────
 
 void SceneRenderer::CreateGridModel(RenderContext& ctx, Model& outModel) {
@@ -67,11 +71,17 @@ void SceneRenderer::CreateGridModel(RenderContext& ctx, Model& outModel) {
     }
 
     MeshPrimitive prim;
-    prim.vertexBuffer.InitAsVertexBuffer(device, allocator,
+    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator,
         vertices.data(), static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex)),
-        sizeof(ModelVertex));
-    prim.indexBuffer.InitAsIndexBuffer(device, allocator,
-        indices.data(), static_cast<uint32_t>(indices.size() * sizeof(uint32_t)));
+        sizeof(ModelVertex))) {
+        SE_LOG_ERROR("Failed to create grid vertex buffer");
+        return;
+    }
+    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator,
+        indices.data(), static_cast<uint32_t>(indices.size() * sizeof(uint32_t)))) {
+        SE_LOG_ERROR("Failed to create grid index buffer");
+        return;
+    }
     prim.indexCount = static_cast<uint32_t>(indices.size());
     prim.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(halfExtent, 0.01f, halfExtent));
 
@@ -129,10 +139,16 @@ void SceneRenderer::CreateCubeModel(RenderContext& ctx, Model& outModel) {
     };
 
     MeshPrimitive prim;
-    prim.vertexBuffer.InitAsVertexBuffer(device, allocator,
-        vertices, sizeof(vertices), sizeof(ModelVertex));
-    prim.indexBuffer.InitAsIndexBuffer(device, allocator,
-        indices, sizeof(indices));
+    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator,
+        vertices, sizeof(vertices), sizeof(ModelVertex))) {
+        SE_LOG_ERROR("Failed to create cube vertex buffer");
+        return;
+    }
+    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator,
+        indices, sizeof(indices))) {
+        SE_LOG_ERROR("Failed to create cube index buffer");
+        return;
+    }
     prim.indexCount = _countof(indices);
     prim.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(0.5f, 0.5f, 0.5f));
 
@@ -237,9 +253,12 @@ void SceneRenderer::Init(RenderContext& ctx) {
     m_pipelineState = PipelineState::CreateGraphicsPSO(device, psoDesc);
 
     // Constant buffers (upload heap, 256-byte aligned)
-    m_perFrameCB.InitAsUploadBuffer(device, allocator, sizeof(PerFrameData));
-    m_perObjectCB.InitAsUploadBuffer(device, allocator, sizeof(PerObjectData) * kMaxObjects);
-    m_perMaterialCB.InitAsUploadBuffer(device, allocator, sizeof(PerMaterialData) * kMaxObjects);
+    if (!m_perFrameCB.InitAsUploadBuffer(device, allocator, sizeof(PerFrameData)) ||
+        !m_perObjectCB.InitAsUploadBuffer(device, allocator, sizeof(PerObjectData) * kMaxObjects) ||
+        !m_perMaterialCB.InitAsUploadBuffer(device, allocator, sizeof(PerMaterialData) * kMaxObjects)) {
+        SE_LOG_ERROR("Failed to create constant buffers");
+        return;
+    }
 
     // Store SRV heap pointer for cleanup
     m_srvHeap = &ctx.GetSrvHeap();
@@ -254,8 +273,12 @@ void SceneRenderer::Init(RenderContext& ctx) {
         texCmdList.Reset();
 
         uint8_t whitePixel[] = {255, 255, 255, 255};
-        m_defaultWhiteTex.InitFromMemory(device, allocator, texCmdList.Get(),
-            ctx.GetSrvHeap(), whitePixel, 1, 1, 4);
+        if (!m_defaultWhiteTex.InitFromMemory(device, allocator, texCmdList.Get(),
+            ctx.GetSrvHeap(), whitePixel, 1, 1, 4)) {
+            SE_LOG_ERROR("Failed to create default white texture");
+            texCmdList.Shutdown();
+            return;
+        }
 
         texCmdList.Close();
         ctx.GetDirectQueue().ExecuteCommandList(texCmdList.Get());

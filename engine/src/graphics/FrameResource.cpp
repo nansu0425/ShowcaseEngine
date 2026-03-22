@@ -1,4 +1,5 @@
 #include <showcase/graphics/FrameResource.h>
+#include <showcase/core/Assert.h>
 #include <showcase/core/Log.h>
 
 namespace showcase {
@@ -24,6 +25,7 @@ void FrameResource::Shutdown() {
 }
 
 void FrameResource::BeginFrame(uint32_t frameIndex) {
+    SE_ASSERT(frameIndex < kNumFrames);
     m_allocators[frameIndex]->Reset();
 }
 

@@ -1,4 +1,5 @@
 #include <showcase/graphics/CommandList.h>
+#include <showcase/core/Assert.h>
 #include <showcase/core/Log.h>
 
 namespace showcase {
@@ -39,6 +40,7 @@ void CommandList::Close() {
 void CommandList::TransitionBarrier(ID3D12Resource* resource,
                                      D3D12_RESOURCE_STATES before,
                                      D3D12_RESOURCE_STATES after) {
+    SE_ASSERT(resource != nullptr);
     D3D12_RESOURCE_BARRIER barrier = {};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;

@@ -1,8 +1,10 @@
 #pragma once
 
+#include <D3D12MemAlloc.h>
+
 #include <d3d12.h>
 #include <wrl/client.h>
-#include <D3D12MemAlloc.h>
+
 #include <cstdint>
 
 using Microsoft::WRL::ComPtr;
@@ -11,11 +13,11 @@ namespace showcase {
 
 class Buffer {
 public:
-    bool InitAsVertexBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
+    [[nodiscard]] bool InitAsVertexBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
                             const void* data, uint32_t size, uint32_t stride);
-    bool InitAsIndexBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
+    [[nodiscard]] bool InitAsIndexBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
                            const void* data, uint32_t size, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT);
-    bool InitAsUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t size);
+    [[nodiscard]] bool InitAsUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t size);
     void Shutdown();
 
     void UpdateData(const void* data, uint32_t size);

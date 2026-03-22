@@ -1,4 +1,5 @@
 #include <showcase/graphics/Buffer.h>
+#include <showcase/core/Assert.h>
 #include <showcase/core/Log.h>
 #include <cstring>
 
@@ -42,15 +43,16 @@ void Buffer::Shutdown() {
 }
 
 void Buffer::UpdateData(const void* data, uint32_t size) {
-    if (m_mappedData && data) {
-        memcpy(m_mappedData, data, size);
-    }
+    SE_ASSERT(data != nullptr);
+    SE_ASSERT(m_mappedData != nullptr);
+    memcpy(m_mappedData, data, size);
 }
 
 void Buffer::UpdateDataAtOffset(const void* data, uint32_t size, uint32_t offset) {
-    if (m_mappedData && data && (offset + size) <= m_size) {
-        memcpy(static_cast<uint8_t*>(m_mappedData) + offset, data, size);
-    }
+    SE_ASSERT(data != nullptr);
+    SE_ASSERT(m_mappedData != nullptr);
+    SE_ASSERT((offset + size) <= m_size);
+    memcpy(static_cast<uint8_t*>(m_mappedData) + offset, data, size);
 }
 
 bool Buffer::CreateUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
