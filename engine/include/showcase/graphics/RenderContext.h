@@ -33,6 +33,9 @@ public:
     DepthBuffer& GetDepthBuffer() { return m_depthBuffer; }
     uint32_t GetCurrentFrameIndex() const { return m_currentFrameIndex; }
 
+    bool GetVSyncEnabled() const { return m_vsyncEnabled; }
+    void SetVSyncEnabled(bool enabled) { m_vsyncEnabled = enabled; }
+
 private:
     Device m_device;
     CommandQueue m_directQueue;
@@ -46,6 +49,7 @@ private:
     uint32_t m_width = 0;
     uint32_t m_height = 0;
     uint32_t m_currentFrameIndex = 0;
+    bool m_vsyncEnabled = true;
 };
 
 } // namespace showcase

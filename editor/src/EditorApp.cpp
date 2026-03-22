@@ -30,6 +30,12 @@ bool EditorApp::Init(const EditorAppDesc &desc) {
         return m_viewport.GetShowFPS() ? "FPS overlay enabled" : "FPS overlay disabled";
     });
 
+    m_console.RegisterCommand("vsync", [this](const std::string &) -> std::string {
+        bool enabled = !m_renderContext.GetVSyncEnabled();
+        m_renderContext.SetVSyncEnabled(enabled);
+        return enabled ? "V-Sync enabled" : "V-Sync disabled";
+    });
+
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext))
         return false;
 

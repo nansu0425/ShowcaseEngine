@@ -72,7 +72,7 @@ void RenderContext::EndFrame() {
     uint64_t fenceValue = m_directQueue.ExecuteCommandList(m_commandList.Get());
     m_frameResource.SetFenceValue(m_currentFrameIndex, fenceValue);
 
-    m_swapChain.Present(true);
+    m_swapChain.Present(m_vsyncEnabled);
 }
 
 // ── Resize ───────────────────────────────────────────────────────────
