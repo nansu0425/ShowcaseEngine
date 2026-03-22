@@ -6,6 +6,13 @@ A game engine for demonstrating game tech concepts and principles in YouTube con
 
 The YouTube content targets **non-developers** — viewers who have never written code. Explanations should prioritize visual clarity and intuitive understanding over technical depth. Think "revealing the hidden tricks behind what gamers already experience" rather than "teaching graphics programming."
 
+## Prerequisites
+
+- Windows 10/11
+- Visual Studio 2022 (MSVC v143 toolchain, clang-format bundled in VS)
+- CMake 3.24+
+- VSCode with CMake Tools extension
+
 ## Build
 
 ```batch
