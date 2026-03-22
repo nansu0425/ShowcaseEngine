@@ -8,11 +8,13 @@ bool SceneObject::IsVisible() const {
 }
 
 void SceneObject::RecomputeWorldTransform() {
+    Vector3 safeScale = ClampScale(scale);
+
     float rx = ToRadians(rotation.x);
     float ry = ToRadians(rotation.y);
     float rz = ToRadians(rotation.z);
 
-    worldTransform = Matrix::CreateScale(scale)
+    worldTransform = Matrix::CreateScale(safeScale)
                    * Matrix::CreateRotationZ(rz)
                    * Matrix::CreateRotationX(rx)
                    * Matrix::CreateRotationY(ry)

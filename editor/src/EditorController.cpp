@@ -92,17 +92,17 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
             if (ImGuizmo::IsUsing()) {
                 Vector3 newPos, newScale;
                 Quaternion newRot;
-                world.Decompose(newScale, newRot, newPos);
+                if (world.Decompose(newScale, newRot, newPos)) {
+                    selected->position = newPos;
+                    selected->scale = ClampScale(newScale);
 
-                selected->position = newPos;
-                selected->scale = newScale;
+                    Vector3 euler = newRot.ToEuler();
+                    selected->rotation =
+                        Vector3(ToDegrees(euler.x), ToDegrees(euler.y), ToDegrees(euler.z));
 
-                Vector3 euler = newRot.ToEuler();
-                selected->rotation =
-                    Vector3(ToDegrees(euler.x), ToDegrees(euler.y), ToDegrees(euler.z));
-
-                selected->RecomputeWorldTransform();
-                selected->UpdateAABB();
+                    selected->RecomputeWorldTransform();
+                    selected->UpdateAABB();
+                }
             }
         }
     }

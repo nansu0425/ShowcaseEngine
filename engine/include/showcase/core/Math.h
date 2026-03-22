@@ -27,6 +27,17 @@ inline constexpr float kTwoPi   = DirectX::XM_2PI;
 inline float ToRadians(float degrees) { return DirectX::XMConvertToRadians(degrees); }
 inline float ToDegrees(float radians) { return DirectX::XMConvertToDegrees(radians); }
 
+// Scale safety — prevent zero-scale causing singular matrices
+inline constexpr float kMinScale = 1e-4f;
+
+[[nodiscard]] inline Vector3 ClampScale(const Vector3& s) {
+    auto clamp = [](float v) {
+        if (v >= 0.0f) return v < kMinScale ? kMinScale : v;
+        return v > -kMinScale ? -kMinScale : v;
+    };
+    return {clamp(s.x), clamp(s.y), clamp(s.z)};
+}
+
 // LH matrix helpers (engine coordinate system)
 inline Matrix LookAtLH(const Vector3& eye, const Vector3& target, const Vector3& up) {
     return DirectX::XMMatrixLookAtLH(eye, target, up);
