@@ -12,6 +12,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 include(cmake/Dependencies.cmake)
 include(cmake/CompilerWarnings.cmake)
 include(cmake/ShaderCompilation.cmake)
+include(cmake/EditorIncludeGuard.cmake)
 
 # Engine static library
 add_subdirectory(engine)

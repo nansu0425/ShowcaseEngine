@@ -1,8 +1,8 @@
 #include <showcase/editor/EditorApp.h>
 
+#include <showcase/core/JsonDocument.h>
 #include <showcase/core/Log.h>
 #include <showcase/core/Platform.h>
-#include <showcase/core/JsonDocument.h>
 
 #include <imgui_internal.h>
 
@@ -103,15 +103,21 @@ void EditorApp::BuildDefaultScene() {
 
     m_scene.Clear();
     m_scene.AddObject(&m_gridModel, "Ground Grid", Vector3(0, 0, 0)).modelSource = "builtin:grid";
-    m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2)).modelSource = "builtin:cube";
-    m_scene.AddObject(&m_cubeModel, "Cube 2", Vector3(5, 0.75f, 3), Vector3(0, 0, 0),
-                      Vector3(1.5f, 1.5f, 1.5f)).modelSource = "builtin:cube";
-    m_scene.AddObject(&m_cubeModel, "Cube 3", Vector3(-6, 2, -4), Vector3(0, 0, 0),
-                      Vector3(3, 4, 3)).modelSource = "builtin:cube";
-    m_scene.AddObject(&m_cubeModel, "Cube 4", Vector3(8, 0.5f, -7), Vector3(0, 0, 0),
-                      Vector3(1, 1, 1)).modelSource = "builtin:cube";
-    m_scene.AddObject(&m_cubeModel, "Cube 5", Vector3(-3, 0.5f, 8), Vector3(0, 0, 0),
-                      Vector3(2, 1, 2)).modelSource = "builtin:cube";
+    m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2))
+        .modelSource = "builtin:cube";
+    m_scene
+        .AddObject(&m_cubeModel, "Cube 2", Vector3(5, 0.75f, 3), Vector3(0, 0, 0),
+                   Vector3(1.5f, 1.5f, 1.5f))
+        .modelSource = "builtin:cube";
+    m_scene
+        .AddObject(&m_cubeModel, "Cube 3", Vector3(-6, 2, -4), Vector3(0, 0, 0), Vector3(3, 4, 3))
+        .modelSource = "builtin:cube";
+    m_scene
+        .AddObject(&m_cubeModel, "Cube 4", Vector3(8, 0.5f, -7), Vector3(0, 0, 0), Vector3(1, 1, 1))
+        .modelSource = "builtin:cube";
+    m_scene
+        .AddObject(&m_cubeModel, "Cube 5", Vector3(-3, 0.5f, 8), Vector3(0, 0, 0), Vector3(2, 1, 2))
+        .modelSource = "builtin:cube";
 
     // Try loading a glTF model from assets/models/
     {
@@ -128,7 +134,8 @@ void EditorApp::BuildDefaultScene() {
                         SE_LOG_INFO("Loaded test model: {}", entry.path().filename().string());
                         std::string relPath = "assets/models/" + entry.path().filename().string();
                         m_testModelSource = "file:" + relPath;
-                        m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0)).modelSource = m_testModelSource;
+                        m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0))
+                            .modelSource = m_testModelSource;
                     }
                     break;
                 }
@@ -195,8 +202,8 @@ void EditorApp::LoadEditorConfig() {
     auto pos = cam["position"];
     if (pos.IsArray() && pos.Size() >= 3 && cam.Contains("yaw") && cam.Contains("pitch")) {
         Vector3 cameraPos(pos[0].GetFloat(), pos[1].GetFloat(), pos[2].GetFloat());
-        m_viewport.InitCamera(cameraPos, cam["yaw"].GetFloat(), cam["pitch"].GetFloat(),
-                              kPiOver4, 0.1f, 1000.0f);
+        m_viewport.InitCamera(cameraPos, cam["yaw"].GetFloat(), cam["pitch"].GetFloat(), kPiOver4,
+                              0.1f, 1000.0f);
     }
 
     // Viewport settings
@@ -224,8 +231,7 @@ void EditorApp::LoadEditorConfig() {
             static_cast<ImGuizmo::OPERATION>(g["operation"].GetInt()));
     }
     if (g.Contains("mode")) {
-        m_editorController.SetGizmoMode(
-            static_cast<ImGuizmo::MODE>(g["mode"].GetInt()));
+        m_editorController.SetGizmoMode(static_cast<ImGuizmo::MODE>(g["mode"].GetInt()));
     }
     if (g.Contains("useSnap")) {
         m_editorController.SetUseSnap(g["useSnap"].GetBool());
@@ -299,8 +305,8 @@ void EditorApp::ResolveSceneModels() {
 
 void EditorApp::NewScene() {
     if (m_sceneDirty) {
-        DialogResult result = ShowConfirmDialog(m_window.GetHandle(),
-                                               "ShowcaseEditor", "Save changes to current scene?");
+        DialogResult result = ShowConfirmDialog(m_window.GetHandle(), "ShowcaseEditor",
+                                                "Save changes to current scene?");
         if (result == DialogResult::Cancel) return;
         if (result == DialogResult::Yes && !SaveScene()) return;
     }
@@ -343,8 +349,8 @@ void EditorApp::NewScene() {
 
 void EditorApp::OpenScene() {
     if (m_sceneDirty) {
-        DialogResult result = ShowConfirmDialog(m_window.GetHandle(),
-                                               "ShowcaseEditor", "Save changes to current scene?");
+        DialogResult result = ShowConfirmDialog(m_window.GetHandle(), "ShowcaseEditor",
+                                                "Save changes to current scene?");
         if (result == DialogResult::Cancel) return;
         if (result == DialogResult::Yes && !SaveScene()) return;
     }
@@ -452,14 +458,14 @@ void EditorApp::Shutdown() {
     }
 
     // Shutdown procedural model buffers
-    for (auto &mesh : m_gridModel.meshes) {
-        for (auto &prim : mesh.primitives) {
+    for (auto& mesh : m_gridModel.meshes) {
+        for (auto& prim : mesh.primitives) {
             prim.vertexBuffer.Shutdown();
             prim.indexBuffer.Shutdown();
         }
     }
-    for (auto &mesh : m_cubeModel.meshes) {
-        for (auto &prim : mesh.primitives) {
+    for (auto& mesh : m_cubeModel.meshes) {
+        for (auto& prim : mesh.primitives) {
             prim.vertexBuffer.Shutdown();
             prim.indexBuffer.Shutdown();
         }
@@ -509,7 +515,8 @@ int EditorApp::Run() {
             }
         }
 
-        // Process deferred menu actions before rendering (GPU resource changes can't happen mid-frame)
+        // Process deferred menu actions before rendering (GPU resource changes can't happen
+        // mid-frame)
         if (m_pendingAction == PendingAction::NewScene) {
             m_pendingAction = PendingAction::None;
             NewScene();

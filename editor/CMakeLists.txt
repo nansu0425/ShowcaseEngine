@@ -21,6 +21,9 @@ target_precompile_headers(ShowcaseEditor PRIVATE
     <imgui.h>
 )
 
+# Enforce engine/editor dependency boundary
+target_check_editor_includes(ShowcaseEditor)
+
 # Copy shaders to output directory
 add_custom_command(TARGET ShowcaseEditor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
