@@ -136,6 +136,7 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
                 changed = true;
             }
             if (ImGui::DragFloat3("Scale", &selected->scale.x, 0.1f, 0.01f, 100.0f)) {
+                selected->scale = ClampScale(selected->scale);
                 changed = true;
             }
 

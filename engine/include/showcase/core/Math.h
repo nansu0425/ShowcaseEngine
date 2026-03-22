@@ -31,11 +31,9 @@ inline float ToDegrees(float radians) { return DirectX::XMConvertToDegrees(radia
 inline constexpr float kMinScale = 1e-4f;
 
 [[nodiscard]] inline Vector3 ClampScale(const Vector3& s) {
-    auto clamp = [](float v) {
-        if (v >= 0.0f) return v < kMinScale ? kMinScale : v;
-        return v > -kMinScale ? -kMinScale : v;
-    };
-    return {clamp(s.x), clamp(s.y), clamp(s.z)};
+    return {s.x < kMinScale ? kMinScale : s.x,
+            s.y < kMinScale ? kMinScale : s.y,
+            s.z < kMinScale ? kMinScale : s.z};
 }
 
 // LH matrix helpers (engine coordinate system)
