@@ -3,7 +3,7 @@
 #include <cstdint>
 
 struct HWND__;
-typedef HWND__* HWND;
+using HWND = HWND__*;
 
 namespace showcase {
 

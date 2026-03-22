@@ -27,7 +27,7 @@ public:
     void SavePlacement() const;
     void RestorePlacement();
 
-    bool ProcessMessages();
+    [[nodiscard]] bool ProcessMessages();
 
     HWND GetHandle() const { return m_hwnd; }
     uint32_t GetWidth() const { return m_width; }
