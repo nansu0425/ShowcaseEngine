@@ -84,8 +84,8 @@ void ViewportPanel::OnImGui(float fps, float deltaTime) {
     ImGui::PopStyleVar();
 }
 
-void ViewportPanel::InitCamera(const DirectX::SimpleMath::Vector3& position,
-                               const DirectX::SimpleMath::Vector3& lookAt,
+void ViewportPanel::InitCamera(const Vector3& position,
+                               const Vector3& lookAt,
                                float fovY, float nearZ, float farZ) {
     m_camera.SetPosition(position);
     m_camera.SetLookAt(lookAt);
@@ -95,8 +95,6 @@ void ViewportPanel::InitCamera(const DirectX::SimpleMath::Vector3& position,
 }
 
 void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
-    using namespace DirectX::SimpleMath;
-
     // Initialize yaw/pitch from current camera direction on first update
     if (m_firstCameraUpdate) {
         Vector3 fwd = m_camera.GetForward();
@@ -109,7 +107,7 @@ void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
     if (input.IsMouseButtonDown(1)) {
         m_yaw += input.GetMouseDeltaX() * cameraLookSpeed;
         m_pitch -= input.GetMouseDeltaY() * cameraLookSpeed;
-        m_pitch = std::clamp(m_pitch, -DirectX::XM_PIDIV2 * 0.98f, DirectX::XM_PIDIV2 * 0.98f);
+        m_pitch = std::clamp(m_pitch, -PiOver2 * 0.98f, PiOver2 * 0.98f);
     }
 
     // Compute direction vectors from yaw/pitch

@@ -8,7 +8,6 @@
 
 namespace showcase {
 
-using namespace DirectX::SimpleMath;
 using namespace DirectX;
 
 struct alignas(256) PerFrameData {

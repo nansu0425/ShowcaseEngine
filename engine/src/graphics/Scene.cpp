@@ -1,7 +1,5 @@
 #include <showcase/graphics/Scene.h>
 
-using namespace DirectX::SimpleMath;
-
 namespace showcase {
 
 bool SceneObject::IsVisible() const {
@@ -9,9 +7,9 @@ bool SceneObject::IsVisible() const {
 }
 
 void SceneObject::RecomputeWorldTransform() {
-    float rx = DirectX::XMConvertToRadians(rotation.x);
-    float ry = DirectX::XMConvertToRadians(rotation.y);
-    float rz = DirectX::XMConvertToRadians(rotation.z);
+    float rx = ToRadians(rotation.x);
+    float ry = ToRadians(rotation.y);
+    float rz = ToRadians(rotation.z);
 
     worldTransform = Matrix::CreateScale(scale)
                    * Matrix::CreateRotationZ(rz)
@@ -26,7 +24,7 @@ void SceneObject::UpdateAABB() {
     }
 }
 
-SceneObject& Scene::AddObject(Model* model, const DirectX::SimpleMath::Matrix& transform) {
+SceneObject& Scene::AddObject(Model* model, const Matrix& transform) {
     SceneObject obj;
     obj.id = m_nextId++;
     obj.model = model;

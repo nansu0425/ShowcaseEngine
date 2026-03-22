@@ -22,8 +22,8 @@ public:
     void EndRender(CommandList& cmdList);
     void OnImGui(float fps, float deltaTime);
 
-    void InitCamera(const DirectX::SimpleMath::Vector3& position,
-                    const DirectX::SimpleMath::Vector3& lookAt,
+    void InitCamera(const Vector3& position,
+                    const Vector3& lookAt,
                     float fovY, float nearZ, float farZ);
     void UpdateCamera(const Input& input, float deltaTime);
 

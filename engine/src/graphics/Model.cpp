@@ -83,7 +83,7 @@ static void LoadMaterials(const tinygltf::Model& gltfModel,
         auto& mat = outMaterials[i];
 
         const auto& pbr = gltfMat.pbrMetallicRoughness;
-        mat.baseColorFactor = DirectX::SimpleMath::Vector4(
+        mat.baseColorFactor = Vector4(
             static_cast<float>(pbr.baseColorFactor[0]),
             static_cast<float>(pbr.baseColorFactor[1]),
             static_cast<float>(pbr.baseColorFactor[2]),
@@ -115,7 +115,7 @@ static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel,
 
     const size_t posStride = posView.byteStride ? posView.byteStride / sizeof(float) : 3;
     for (size_t i = 0; i < vertexCount; ++i) {
-        vertices[i].position = DirectX::SimpleMath::Vector3(
+        vertices[i].position = Vector3(
             posData[i * posStride + 0],
             posData[i * posStride + 1],
             posData[i * posStride + 2]);
@@ -132,14 +132,14 @@ static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel,
 
         const size_t normStride = normView.byteStride ? normView.byteStride / sizeof(float) : 3;
         for (size_t i = 0; i < vertexCount; ++i) {
-            vertices[i].normal = DirectX::SimpleMath::Vector3(
+            vertices[i].normal = Vector3(
                 normData[i * normStride + 0],
                 normData[i * normStride + 1],
                 normData[i * normStride + 2]);
         }
     } else {
         for (size_t i = 0; i < vertexCount; ++i) {
-            vertices[i].normal = DirectX::SimpleMath::Vector3(0.0f, 1.0f, 0.0f);
+            vertices[i].normal = Vector3(0.0f, 1.0f, 0.0f);
         }
     }
 
@@ -154,13 +154,13 @@ static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel,
 
         const size_t texStride = texView.byteStride ? texView.byteStride / sizeof(float) : 2;
         for (size_t i = 0; i < vertexCount; ++i) {
-            vertices[i].texCoord = DirectX::SimpleMath::Vector2(
+            vertices[i].texCoord = Vector2(
                 texData[i * texStride + 0],
                 texData[i * texStride + 1]);
         }
     } else {
         for (size_t i = 0; i < vertexCount; ++i) {
-            vertices[i].texCoord = DirectX::SimpleMath::Vector2(0.0f, 0.0f);
+            vertices[i].texCoord = Vector2(0.0f, 0.0f);
         }
     }
 

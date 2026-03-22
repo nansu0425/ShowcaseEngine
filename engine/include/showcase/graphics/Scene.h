@@ -1,8 +1,6 @@
 #pragma once
 
 #include <showcase/graphics/Model.h>
-#include <SimpleMath.h>
-#include <DirectXCollision.h>
 #include <vector>
 #include <string>
 
@@ -12,11 +10,11 @@ struct SceneObject {
     uint32_t id = 0;
     std::string name;
     Model* model = nullptr;
-    DirectX::SimpleMath::Vector3 position = {};
-    DirectX::SimpleMath::Vector3 rotation = {};       // Euler degrees (Y→X→Z)
-    DirectX::SimpleMath::Vector3 scale = {1, 1, 1};
-    DirectX::SimpleMath::Matrix worldTransform;
-    DirectX::BoundingBox worldAABB;
+    Vector3 position = {};
+    Vector3 rotation = {};       // Euler degrees (Y→X→Z)
+    Vector3 scale = {1, 1, 1};
+    Matrix worldTransform;
+    BoundingBox worldAABB;
     bool frustumCulled = false;
     bool occlusionCulled = false;
     int lodLevel = 0;
@@ -28,11 +26,11 @@ struct SceneObject {
 
 class Scene {
 public:
-    SceneObject& AddObject(Model* model, const DirectX::SimpleMath::Matrix& transform);
+    SceneObject& AddObject(Model* model, const Matrix& transform);
     SceneObject& AddObject(Model* model, const std::string& name,
-                           const DirectX::SimpleMath::Vector3& pos,
-                           const DirectX::SimpleMath::Vector3& rot = {},
-                           const DirectX::SimpleMath::Vector3& scl = {1, 1, 1});
+                           const Vector3& pos,
+                           const Vector3& rot = {},
+                           const Vector3& scl = {1, 1, 1});
     void Clear();
 
     SceneObject* FindById(uint32_t id);

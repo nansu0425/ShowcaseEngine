@@ -1,8 +1,5 @@
 #include <showcase/graphics/Camera.h>
 
-using namespace DirectX;
-using namespace DirectX::SimpleMath;
-
 namespace showcase {
 
 void Camera::SetPerspective(float fovY, float aspectRatio, float nearZ, float farZ)
@@ -11,7 +8,7 @@ void Camera::SetPerspective(float fovY, float aspectRatio, float nearZ, float fa
     m_aspectRatio = aspectRatio;
     m_nearZ = nearZ;
     m_farZ = farZ;
-    m_projMatrix = XMMatrixPerspectiveFovLH(fovY, aspectRatio, nearZ, farZ);
+    m_projMatrix = PerspectiveFovLH(fovY, aspectRatio, nearZ, farZ);
 }
 
 void Camera::SetPosition(const Vector3& position)
@@ -39,7 +36,7 @@ void Camera::UpdateViewMatrix()
     if (!m_viewDirty)
         return;
 
-    m_viewMatrix = XMMatrixLookAtLH(m_position, m_position + m_forward, m_up);
+    m_viewMatrix = LookAtLH(m_position, m_position + m_forward, m_up);
     m_viewDirty = false;
 }
 
