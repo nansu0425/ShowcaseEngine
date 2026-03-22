@@ -15,7 +15,6 @@ target_link_libraries(ShowcaseEditor PRIVATE
     ShowcaseEngine::Core
     imgui::imgui
     imguizmo_lib
-    nlohmann_json::nlohmann_json
 )
 
 target_precompile_headers(ShowcaseEditor PRIVATE

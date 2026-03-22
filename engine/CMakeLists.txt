@@ -5,6 +5,7 @@ add_library(showcase_engine STATIC
     src/core/Window.cpp
     src/core/Timer.cpp
     src/core/Input.cpp
+    src/core/JsonDocument.cpp
 
     # Graphics
     src/graphics/Device.cpp
@@ -42,10 +43,11 @@ target_link_libraries(showcase_engine
         d3dcompiler
         D3D12MemoryAllocator
         spdlog::spdlog
-        nlohmann_json::nlohmann_json
         directxtk12_headers
         tinygltf_headers
         ShowcaseEngine::Warnings
+    PRIVATE
+        nlohmann_json::nlohmann_json
 )
 
 target_compile_features(showcase_engine PUBLIC cxx_std_20)

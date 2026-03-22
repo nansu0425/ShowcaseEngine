@@ -1,10 +1,7 @@
 #include <showcase/core/Window.h>
 
 #include <showcase/core/Log.h>
-
-#include <nlohmann/json.hpp>
-
-#include <fstream>
+#include <showcase/core/JsonDocument.h>
 
 // Forward declaration for ImGui Win32 handler
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -87,18 +84,15 @@ void Window::SavePlacement() const {
     wp.length = sizeof(WINDOWPLACEMENT);
     if (!GetWindowPlacement(m_hwnd, &wp)) return;
 
-    nlohmann::json j;
-    j["showCmd"] = wp.showCmd;
-    j["normalPosition"] = {
-        {"left",   wp.rcNormalPosition.left},
-        {"top",    wp.rcNormalPosition.top},
-        {"right",  wp.rcNormalPosition.right},
-        {"bottom", wp.rcNormalPosition.bottom}
-    };
+    JsonDocument doc;
+    doc["showCmd"].Set(static_cast<int>(wp.showCmd));
+    auto np = doc["normalPosition"];
+    np["left"].Set(static_cast<long>(wp.rcNormalPosition.left));
+    np["top"].Set(static_cast<long>(wp.rcNormalPosition.top));
+    np["right"].Set(static_cast<long>(wp.rcNormalPosition.right));
+    np["bottom"].Set(static_cast<long>(wp.rcNormalPosition.bottom));
 
-    std::ofstream file(GetConfigPath());
-    if (file.is_open()) {
-        file << j.dump(2);
+    if (doc.SaveToFile(GetConfigPath())) {
         SE_LOG_INFO("Window placement saved");
     }
 }
@@ -106,26 +100,20 @@ void Window::SavePlacement() const {
 void Window::RestorePlacement() {
     if (!m_hwnd) return;
 
-    std::ifstream file(GetConfigPath());
-    if (!file.is_open()) return;
-
-    std::string content((std::istreambuf_iterator<char>(file)),
-                         std::istreambuf_iterator<char>());
-    if (!nlohmann::json::accept(content)) {
-        SE_LOG_WARN("Failed to parse window config");
+    JsonDocument doc;
+    if (!doc.LoadFromFile(GetConfigPath())) {
         return;
     }
-    nlohmann::json j = nlohmann::json::parse(content);
 
     WINDOWPLACEMENT wp = {};
     wp.length = sizeof(WINDOWPLACEMENT);
 
-    auto& np = j["normalPosition"];
-    wp.rcNormalPosition.left   = np["left"].get<LONG>();
-    wp.rcNormalPosition.top    = np["top"].get<LONG>();
-    wp.rcNormalPosition.right  = np["right"].get<LONG>();
-    wp.rcNormalPosition.bottom = np["bottom"].get<LONG>();
-    wp.showCmd = j["showCmd"].get<UINT>();
+    auto np = doc["normalPosition"];
+    wp.rcNormalPosition.left   = np["left"].GetLong();
+    wp.rcNormalPosition.top    = np["top"].GetLong();
+    wp.rcNormalPosition.right  = np["right"].GetLong();
+    wp.rcNormalPosition.bottom = np["bottom"].GetLong();
+    wp.showCmd = static_cast<UINT>(doc["showCmd"].GetInt());
 
     SetWindowPlacement(m_hwnd, &wp);
     SE_LOG_INFO("Window placement restored");

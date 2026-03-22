@@ -2,12 +2,11 @@
 
 #include <showcase/core/Log.h>
 #include <showcase/core/Platform.h>
+#include <showcase/core/JsonDocument.h>
 
 #include <imgui_internal.h>
-#include <nlohmann/json.hpp>
 
 #include <filesystem>
-#include <fstream>
 
 namespace {
 
@@ -134,104 +133,106 @@ void EditorApp::BuildDefaultScene() {
 // ── Config persistence ───────────────────────────────────────────
 
 void EditorApp::SaveEditorConfig() {
-    nlohmann::json j;
+    JsonDocument doc;
 
     // Camera
     const Vector3& pos = m_viewport.GetCamera().GetPosition();
-    j["camera"]["position"] = {pos.x, pos.y, pos.z};
-    j["camera"]["yaw"] = m_viewport.GetYaw();
-    j["camera"]["pitch"] = m_viewport.GetPitch();
+    auto cam = doc["camera"];
+    cam["position"].SetFloatArray({pos.x, pos.y, pos.z});
+    cam["yaw"].Set(m_viewport.GetYaw());
+    cam["pitch"].Set(m_viewport.GetPitch());
 
     // Viewport settings
-    j["viewport"]["showFPS"] = m_viewport.GetShowFPS();
-    j["viewport"]["cameraMoveSpeed"] = m_viewport.cameraMoveSpeed;
-    j["viewport"]["cameraLookSpeed"] = m_viewport.cameraLookSpeed;
+    auto vp = doc["viewport"];
+    vp["showFPS"].Set(m_viewport.GetShowFPS());
+    vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
+    vp["cameraLookSpeed"].Set(m_viewport.cameraLookSpeed);
 
     // Render settings
-    j["render"]["vsync"] = m_renderContext.GetVSyncEnabled();
+    doc["render"]["vsync"].Set(m_renderContext.GetVSyncEnabled());
 
     // Gizmo settings
-    j["gizmo"]["operation"] = static_cast<int>(m_editorController.GetGizmoOperation());
-    j["gizmo"]["mode"] = static_cast<int>(m_editorController.GetGizmoMode());
-    j["gizmo"]["useSnap"] = m_editorController.GetUseSnap();
-    j["gizmo"]["snapTranslate"] = m_editorController.GetSnapTranslate();
-    j["gizmo"]["snapRotate"] = m_editorController.GetSnapRotate();
-    j["gizmo"]["snapScale"] = m_editorController.GetSnapScale();
+    auto g = doc["gizmo"];
+    g["operation"].Set(static_cast<int>(m_editorController.GetGizmoOperation()));
+    g["mode"].Set(static_cast<int>(m_editorController.GetGizmoMode()));
+    g["useSnap"].Set(m_editorController.GetUseSnap());
+    g["snapTranslate"].Set(m_editorController.GetSnapTranslate());
+    g["snapRotate"].Set(m_editorController.GetSnapRotate());
+    g["snapScale"].Set(m_editorController.GetSnapScale());
 
     // Console settings
-    j["console"]["levelFilter"] = m_console.GetLevelFilter();
-    j["console"]["autoScroll"] = m_console.GetAutoScroll();
+    auto con = doc["console"];
+    con["levelFilter"].Set(m_console.GetLevelFilter());
+    con["autoScroll"].Set(m_console.GetAutoScroll());
 
-    std::ofstream file(GetEditorConfigPath());
-    if (file.is_open()) {
-        file << j.dump(2);
+    if (doc.SaveToFile(GetEditorConfigPath())) {
         SE_LOG_INFO("Editor config saved");
     }
 }
 
 void EditorApp::LoadEditorConfig() {
-    std::ifstream file(GetEditorConfigPath());
-    if (!file.is_open()) return;
-
-    std::string content((std::istreambuf_iterator<char>(file)),
-                         std::istreambuf_iterator<char>());
-    if (!nlohmann::json::accept(content)) {
-        SE_LOG_WARN("Failed to parse editor config");
+    JsonDocument doc;
+    if (!doc.LoadFromFile(GetEditorConfigPath())) {
         return;
     }
-    nlohmann::json j = nlohmann::json::parse(content);
 
-    try {
-        // Camera
-        if (j.contains("camera")) {
-            auto& cam = j["camera"];
-            if (cam.contains("position") && cam["position"].is_array() &&
-                cam["position"].size() >= 3 && cam.contains("yaw") && cam.contains("pitch")) {
-                Vector3 pos(cam["position"][0].get<float>(),
-                            cam["position"][1].get<float>(),
-                            cam["position"][2].get<float>());
-                float yaw = cam["yaw"].get<float>();
-                float pitch = cam["pitch"].get<float>();
-                m_viewport.InitCamera(pos, yaw, pitch, kPiOver4, 0.1f, 1000.0f);
-            }
-        }
+    // Camera
+    auto cam = doc["camera"];
+    auto pos = cam["position"];
+    if (pos.IsArray() && pos.Size() >= 3 && cam.Contains("yaw") && cam.Contains("pitch")) {
+        Vector3 cameraPos(pos[0].GetFloat(), pos[1].GetFloat(), pos[2].GetFloat());
+        m_viewport.InitCamera(cameraPos, cam["yaw"].GetFloat(), cam["pitch"].GetFloat(),
+                              kPiOver4, 0.1f, 1000.0f);
+    }
 
-        // Viewport settings
-        if (j.contains("viewport")) {
-            auto& vp = j["viewport"];
-            if (vp.contains("showFPS")) m_viewport.SetShowFPS(vp["showFPS"].get<bool>());
-            if (vp.contains("cameraMoveSpeed")) m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].get<float>();
-            if (vp.contains("cameraLookSpeed")) m_viewport.cameraLookSpeed = vp["cameraLookSpeed"].get<float>();
-        }
+    // Viewport settings
+    auto vp = doc["viewport"];
+    if (vp.Contains("showFPS")) {
+        m_viewport.SetShowFPS(vp["showFPS"].GetBool());
+    }
+    if (vp.Contains("cameraMoveSpeed")) {
+        m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].GetFloat();
+    }
+    if (vp.Contains("cameraLookSpeed")) {
+        m_viewport.cameraLookSpeed = vp["cameraLookSpeed"].GetFloat();
+    }
 
-        // Render settings
-        if (j.contains("render")) {
-            auto& r = j["render"];
-            if (r.contains("vsync")) m_renderContext.SetVSyncEnabled(r["vsync"].get<bool>());
-        }
+    // Render settings
+    auto r = doc["render"];
+    if (r.Contains("vsync")) {
+        m_renderContext.SetVSyncEnabled(r["vsync"].GetBool());
+    }
 
-        // Gizmo settings
-        if (j.contains("gizmo")) {
-            auto& g = j["gizmo"];
-            if (g.contains("operation")) m_editorController.SetGizmoOperation(
-                static_cast<ImGuizmo::OPERATION>(g["operation"].get<int>()));
-            if (g.contains("mode")) m_editorController.SetGizmoMode(
-                static_cast<ImGuizmo::MODE>(g["mode"].get<int>()));
-            if (g.contains("useSnap")) m_editorController.SetUseSnap(g["useSnap"].get<bool>());
-            if (g.contains("snapTranslate")) m_editorController.SetSnapTranslate(g["snapTranslate"].get<float>());
-            if (g.contains("snapRotate")) m_editorController.SetSnapRotate(g["snapRotate"].get<float>());
-            if (g.contains("snapScale")) m_editorController.SetSnapScale(g["snapScale"].get<float>());
-        }
+    // Gizmo settings
+    auto g = doc["gizmo"];
+    if (g.Contains("operation")) {
+        m_editorController.SetGizmoOperation(
+            static_cast<ImGuizmo::OPERATION>(g["operation"].GetInt()));
+    }
+    if (g.Contains("mode")) {
+        m_editorController.SetGizmoMode(
+            static_cast<ImGuizmo::MODE>(g["mode"].GetInt()));
+    }
+    if (g.Contains("useSnap")) {
+        m_editorController.SetUseSnap(g["useSnap"].GetBool());
+    }
+    if (g.Contains("snapTranslate")) {
+        m_editorController.SetSnapTranslate(g["snapTranslate"].GetFloat());
+    }
+    if (g.Contains("snapRotate")) {
+        m_editorController.SetSnapRotate(g["snapRotate"].GetFloat());
+    }
+    if (g.Contains("snapScale")) {
+        m_editorController.SetSnapScale(g["snapScale"].GetFloat());
+    }
 
-        // Console settings
-        if (j.contains("console")) {
-            auto& c = j["console"];
-            if (c.contains("levelFilter")) m_console.SetLevelFilter(c["levelFilter"].get<int>());
-            if (c.contains("autoScroll")) m_console.SetAutoScroll(c["autoScroll"].get<bool>());
-        }
-    } catch (const nlohmann::json::exception& e) {
-        SE_LOG_WARN("Failed to restore editor config: {}", e.what());
-        return;
+    // Console settings
+    auto con = doc["console"];
+    if (con.Contains("levelFilter")) {
+        m_console.SetLevelFilter(con["levelFilter"].GetInt());
+    }
+    if (con.Contains("autoScroll")) {
+        m_console.SetAutoScroll(con["autoScroll"].GetBool());
     }
 
     SE_LOG_INFO("Editor config restored");

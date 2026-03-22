@@ -57,6 +57,7 @@ The project is split into two CMake targets with a strict dependency direction:
 |-------|------|---------|
 | `Window` | `Window.h` | Win32 window creation, message pump, resize callback |
 | `Input` | `Input.h` | Keyboard and mouse state polling per frame; `Key::` constants |
+| `JsonDocument` | `JsonDocument.h` | JSON serialization wrapper (pimpl over nlohmann/json) |
 | `Timer` | `Timer.h` | Frame delta time and FPS calculation |
 | `Log` | `Log.h` | spdlog wrapper with `SE_LOG_*` macros |
 | `LogListener` | `LogListener.h` | Abstract log listener interface (`LogLevel`, `LogMessage`) for non-spdlog consumers |
