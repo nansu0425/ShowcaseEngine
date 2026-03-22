@@ -25,6 +25,7 @@ editor/          ShowcaseEditor executable (links engine + ImGui/ImGuizmo)
   include/showcase/editor/              Editor headers (EditorApp, ViewportPanel, Console, etc.)
   src/                                  Editor implementations + WinMain entry point
 docs/            Planning documents (content plans, tech specs, progress)
+  ARCHITECTURE.md                       Engine & editor architecture overview — refer to this for structural context
 cmake/           Dependencies.cmake, ShaderCompilation.cmake
 ```
 
@@ -40,6 +41,7 @@ cmake/           Dependencies.cmake, ShaderCompilation.cmake
 - **Namespace**: `showcase`
 - **Includes**: Public headers `<showcase/module/File.h>`, internal headers `"File.h"`
 - **GPU resource ownership**: `ComPtr<>` (COM), `D3D12MA::Allocation` (GPU memory), `std::unique_ptr<>` (general)
+- **Architecture doc sync**: When making architectural changes (adding/removing/renaming modules, classes, or dependencies; changing rendering pipeline, resource ownership, or build structure), update `docs/ARCHITECTURE.md` to reflect the current state
 
 ## Gotchas
 
