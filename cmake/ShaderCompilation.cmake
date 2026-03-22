@@ -34,7 +34,7 @@ function(target_compile_shaders TARGET)
         set(output_file ${SHADER_OUTPUT_DIR}/${shader_name}_vs.cso)
         add_custom_command(
             OUTPUT ${output_file}
-            COMMAND ${DXC_EXECUTABLE} -T vs_6_0 -E main -Fo ${output_file} -Zi ${shader_file}
+            COMMAND ${DXC_EXECUTABLE} -T vs_6_0 -E main -Fo ${output_file} -Zi -Qembed_debug -WX ${shader_file}
             DEPENDS ${shader_file}
             COMMENT "Compiling vertex shader: ${shader_name}"
             VERBATIM
@@ -48,7 +48,7 @@ function(target_compile_shaders TARGET)
         set(output_file ${SHADER_OUTPUT_DIR}/${shader_name}_ps.cso)
         add_custom_command(
             OUTPUT ${output_file}
-            COMMAND ${DXC_EXECUTABLE} -T ps_6_0 -E main -Fo ${output_file} -Zi ${shader_file}
+            COMMAND ${DXC_EXECUTABLE} -T ps_6_0 -E main -Fo ${output_file} -Zi -Qembed_debug -WX ${shader_file}
             DEPENDS ${shader_file}
             COMMENT "Compiling pixel shader: ${shader_name}"
             VERBATIM
@@ -62,7 +62,7 @@ function(target_compile_shaders TARGET)
         set(output_file ${SHADER_OUTPUT_DIR}/${shader_name}_cs.cso)
         add_custom_command(
             OUTPUT ${output_file}
-            COMMAND ${DXC_EXECUTABLE} -T cs_6_0 -E main -Fo ${output_file} -Zi ${shader_file}
+            COMMAND ${DXC_EXECUTABLE} -T cs_6_0 -E main -Fo ${output_file} -Zi -Qembed_debug -WX ${shader_file}
             DEPENDS ${shader_file}
             COMMENT "Compiling compute shader: ${shader_name}"
             VERBATIM
