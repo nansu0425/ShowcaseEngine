@@ -106,6 +106,22 @@ void ViewportPanel::InitCamera(const Vector3& position,
     m_firstCameraUpdate = true;
 }
 
+void ViewportPanel::InitCamera(const Vector3& position, float yaw, float pitch,
+                               float fovY, float nearZ, float farZ) {
+    m_yaw = yaw;
+    m_pitch = pitch;
+    m_firstCameraUpdate = false;
+
+    float cosP = std::cos(m_pitch);
+    Vector3 forward(std::sin(m_yaw) * cosP, std::sin(m_pitch), std::cos(m_yaw) * cosP);
+    forward.Normalize();
+
+    m_camera.SetPosition(position);
+    m_camera.SetLookAt(position + forward);
+    m_camera.SetPerspective(fovY, GetAspectRatio(), nearZ, farZ);
+    m_camera.UpdateViewMatrix();
+}
+
 void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
     // Initialize yaw/pitch from current camera direction on first update
     if (m_firstCameraUpdate) {

@@ -19,6 +19,21 @@ public:
 
     int GetSelectedObjectId() const { return m_selectedObjectId; }
 
+    // State persistence
+    ImGuizmo::OPERATION GetGizmoOperation() const { return m_gizmoOperation; }
+    ImGuizmo::MODE GetGizmoMode() const { return m_gizmoMode; }
+    bool GetUseSnap() const { return m_useSnap; }
+    float GetSnapTranslate() const { return m_snapTranslate; }
+    float GetSnapRotate() const { return m_snapRotate; }
+    float GetSnapScale() const { return m_snapScale; }
+
+    void SetGizmoOperation(ImGuizmo::OPERATION op) { m_gizmoOperation = op; }
+    void SetGizmoMode(ImGuizmo::MODE mode) { m_gizmoMode = mode; }
+    void SetUseSnap(bool snap) { m_useSnap = snap; }
+    void SetSnapTranslate(float v) { m_snapTranslate = v; }
+    void SetSnapRotate(float v) { m_snapRotate = v; }
+    void SetSnapScale(float v) { m_snapScale = v; }
+
 private:
     int m_selectedObjectId = -1;
 

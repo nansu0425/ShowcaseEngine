@@ -3,6 +3,7 @@
 #include <showcase/graphics/RenderContext.h>
 #include <showcase/graphics/CommandList.h>
 #include <showcase/core/Log.h>
+#include <showcase/core/Platform.h>
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -19,6 +20,10 @@ bool ImGuiLayer::Init(HWND hwnd, RenderContext& ctx) {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+    // Save ImGui layout to exe directory (not CWD)
+    static std::string iniPath = GetExecutableDir() + "imgui.ini";
+    io.IniFilename = iniPath.c_str();
 
     // Set dark theme
     ImGui::StyleColorsDark();

@@ -30,6 +30,8 @@ public:
 private:
     void OnResize(uint32_t width, uint32_t height);
     void BuildDefaultScene();
+    void SaveEditorConfig();
+    void LoadEditorConfig();
 
     Window m_window;
     Timer m_timer;

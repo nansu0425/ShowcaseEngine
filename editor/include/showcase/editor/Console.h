@@ -4,6 +4,7 @@
 
 #include <imgui.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <mutex>
@@ -31,6 +32,12 @@ public:
 
     void AddEntry(LogLevel level, const std::string& timestamp, const std::string& message);
     void RegisterCommand(const std::string& name, CommandHandler handler);
+
+    // State persistence
+    int GetLevelFilter() const { return m_levelFilter; }
+    bool GetAutoScroll() const { return m_autoScroll; }
+    void SetLevelFilter(int filter) { m_levelFilter = std::clamp(filter, 0, 4); }
+    void SetAutoScroll(bool scroll) { m_autoScroll = scroll; }
 
 private:
     static ImVec4 GetLevelColor(LogLevel level);

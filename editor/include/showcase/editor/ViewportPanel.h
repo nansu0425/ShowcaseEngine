@@ -39,6 +39,15 @@ public:
 
     void ToggleShowFPS() { m_showFPS = !m_showFPS; }
     bool GetShowFPS() const { return m_showFPS; }
+    void SetShowFPS(bool show) { m_showFPS = show; }
+
+    float GetYaw() const { return m_yaw; }
+    float GetPitch() const { return m_pitch; }
+    void SetYaw(float yaw) { m_yaw = yaw; }
+    void SetPitch(float pitch) { m_pitch = pitch; }
+
+    void InitCamera(const Vector3& position, float yaw, float pitch,
+                    float fovY, float nearZ, float farZ);
 
     ImVec2 GetImageMin() const { return m_imageMin; }
     ImVec2 GetImageMax() const { return m_imageMax; }
