@@ -108,6 +108,17 @@ void JsonNode::SetFloatArray(std::initializer_list<float> values) {
     }
 }
 
+void JsonNode::SetArray() {
+    auto* j = static_cast<nlohmann::json*>(m_json);
+    *j = nlohmann::json::array();
+}
+
+JsonNode JsonNode::PushBack() {
+    auto* j = static_cast<nlohmann::json*>(m_json);
+    j->push_back(nlohmann::json::object());
+    return JsonNode(&j->back());
+}
+
 bool JsonNode::Contains(const std::string& key) const {
     auto* j = static_cast<nlohmann::json*>(m_json);
     if (j && j->is_object()) {

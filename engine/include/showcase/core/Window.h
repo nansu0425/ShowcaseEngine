@@ -30,6 +30,7 @@ public:
     [[nodiscard]] bool ProcessMessages();
 
     HWND GetHandle() const { return m_hwnd; }
+    void SetTitle(const char* title);
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
     float GetAspectRatio() const { return static_cast<float>(m_width) / static_cast<float>(m_height); }

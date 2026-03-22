@@ -10,6 +10,7 @@ namespace showcase {
 struct SceneObject {
     uint32_t id = 0;
     std::string name;
+    std::string modelSource;   // e.g. "builtin:cube", "file:assets/models/duck.gltf"
     Model* model = nullptr;
     Vector3 position = {};
     Vector3 rotation = {};       // Euler degrees (Y→X→Z)
@@ -33,6 +34,9 @@ public:
                            const Vector3& rot = {},
                            const Vector3& scl = {1, 1, 1});
     void Clear();
+
+    [[nodiscard]] bool SaveToFile(const std::string& filePath) const;
+    [[nodiscard]] bool LoadFromFile(const std::string& filePath);
 
     SceneObject* FindById(uint32_t id);
     std::vector<SceneObject>& GetObjects();

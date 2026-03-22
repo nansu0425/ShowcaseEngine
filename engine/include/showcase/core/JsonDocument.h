@@ -31,6 +31,10 @@ public:
     void Set(long value);
     void SetFloatArray(std::initializer_list<float> values);
 
+    // Array operations
+    void SetArray();
+    JsonNode PushBack();
+
     // Query
     bool Contains(const std::string& key) const;
     bool IsArray() const;

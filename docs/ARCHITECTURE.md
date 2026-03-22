@@ -61,7 +61,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Timer` | `Timer.h` | Frame delta time and FPS calculation |
 | `Log` | `Log.h` | spdlog wrapper with `SE_LOG_*` macros |
 | `LogListener` | `LogListener.h` | Abstract log listener interface (`LogLevel`, `LogMessage`) for non-spdlog consumers |
-| `Platform` | `Platform.h` | OS utilities (`GetExecutableDir()`, `SleepMs()`, `ShowErrorDialog()`) |
+| `Platform` | `Platform.h` | OS utilities (`GetExecutableDir()`, `SleepMs()`, `ShowErrorDialog()`, `OpenFileDialog()`, `SaveFileDialog()`) |
 | `EntryPoint` | `EntryPoint.h` | `SE_MAIN` macro — WinMain boilerplate for editor/app entry points |
 
 ### 2.2 Graphics Module — `engine/include/showcase/graphics/`
@@ -108,7 +108,7 @@ The project is split into two CMake targets with a strict dependency direction:
 
 | Class | File | Purpose |
 |-------|------|---------|
-| `EditorApp` | `EditorApp.h` | Top-level orchestrator: owns all subsystems, runs main loop |
+| `EditorApp` | `EditorApp.h` | Top-level orchestrator: owns all subsystems, runs main loop, scene document management (new/open/save) |
 | `ViewportPanel` | `ViewportPanel.h` | 3D viewport: owns `OffscreenTarget` and `Camera`, handles FPS camera |
 | `ImGuiLayer` | `ImGuiLayer.h` | ImGui context init, DX12 backend, frame begin/end |
 | `Console` | `Console.h` | Log viewer (via `LogListener`), command system, circular buffer (2048 entries) |
@@ -194,6 +194,7 @@ EditorApp::Run()
 │   │                                                       │
 │   ├── RenderContext::BeginBackBufferPass()    // transition backbuffer → RT
 │   ├── ImGuiLayer::BeginFrame()               // ImGui::NewFrame()
+│   ├── EditorApp::RenderMainMenuBar()        // File menu (New/Open/Save)
 │   ├── DockSpace setup (one-time layout)
 │   │   ├── Viewport panel    (center, 75%)
 │   │   ├── Scene Hierarchy   (right-top)
@@ -267,7 +268,8 @@ The engine uses a **flat scene graph** — `Scene` holds a `vector<SceneObject>`
 struct SceneObject {
     uint32_t id;               // auto-incrementing ID
     string name;
-    Model* model;              // shared reference (not owned)
+    string modelSource;        // model reference ("builtin:cube", "file:path.gltf")
+    Model* model;              // shared reference (not owned), resolved at runtime
     Vector3 position;          // local-space position
     Vector3 rotation;          // Euler degrees (Y → X → Z order)
     Vector3 scale;
@@ -278,6 +280,16 @@ struct SceneObject {
     int lodLevel;
 };
 ```
+
+### Scene serialization
+
+Scenes are saved/loaded as `.scene` JSON files via `Scene::SaveToFile()` / `Scene::LoadFromFile()`:
+
+- **Save** serializes each object's `name`, `modelSource`, `position`, `rotation`, `scale`
+- **Load** deserializes into `SceneObject` structs with `model = nullptr`; the editor resolves `modelSource` strings back to `Model*` pointers via a model registry
+- **Model sources**: `"builtin:grid"`, `"builtin:cube"` for procedural geometry, `"file:relative/path.gltf"` for glTF assets
+- **Editor UI**: File menu bar (New Scene, Open, Save, Save As) with Ctrl+N/O/S/Shift+S shortcuts
+- **Dirty tracking**: `EditorController` notifies `EditorApp` on gizmo/inspector changes; window title shows `*` for unsaved state
 
 ### Object picking
 
@@ -323,6 +335,7 @@ Model (shared asset)
 | Constant buffers | Offset-based upload heap | Prevents aliasing/flickering with per-object slots |
 | glTF loading | tinygltf (header-only) | Lightweight, glTF 2.0 only, minimal dependencies |
 | Editor UI | ImGui docking + ImGuizmo | Rapid iteration, built-in docking layout, 3D gizmos |
+| Scene serialization | JSON via `JsonDocument` | Human-readable `.scene` files; model references via `modelSource` strings |
 
 ---
 

@@ -6,6 +6,8 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 
+#include <functional>
+
 namespace showcase {
 
 class Input;
@@ -18,6 +20,10 @@ public:
     void RenderToolbar(ViewportPanel& viewport);
 
     int GetSelectedObjectId() const { return m_selectedObjectId; }
+    void ClearSelection() { m_selectedObjectId = -1; }
+
+    using DirtyCallback = std::function<void()>;
+    void SetDirtyCallback(DirtyCallback cb) { m_dirtyCallback = std::move(cb); }
 
     // State persistence
     ImGuizmo::OPERATION GetGizmoOperation() const { return m_gizmoOperation; }
@@ -49,6 +55,8 @@ private:
     float m_snapTranslate = 1.0f;
     float m_snapRotate = 15.0f;
     float m_snapScale = 0.1f;
+
+    DirtyCallback m_dirtyCallback;
 };
 
 } // namespace showcase

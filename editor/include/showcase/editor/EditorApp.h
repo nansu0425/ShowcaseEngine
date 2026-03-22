@@ -12,6 +12,9 @@
 #include <showcase/editor/ViewportPanel.h>
 #include <showcase/editor/EditorController.h>
 
+#include <memory>
+#include <unordered_map>
+
 namespace showcase {
 
 struct EditorAppDesc {
@@ -33,6 +36,17 @@ private:
     void SaveEditorConfig();
     void LoadEditorConfig();
 
+    // Scene document management
+    void NewScene();
+    void OpenScene();
+    bool SaveScene();
+    bool SaveSceneAs();
+    void RenderMainMenuBar();
+    void UpdateWindowTitle();
+    void BuildModelRegistry();
+    Model* ResolveModel(const std::string& modelSource);
+    void ResolveSceneModels();
+
     Window m_window;
     Timer m_timer;
     Input m_input;
@@ -53,10 +67,21 @@ private:
     // glTF model
     Model m_testModel;
     bool m_modelLoaded = false;
+    std::string m_testModelSource;
 
     bool m_resizePending = false;
     uint32_t m_pendingWidth = 0;
     uint32_t m_pendingHeight = 0;
+
+    // Scene document state
+    std::string m_currentScenePath;
+    bool m_sceneDirty = false;
+    std::unordered_map<std::string, Model*> m_modelRegistry;
+    std::vector<std::unique_ptr<Model>> m_dynamicModels;
+
+    // Deferred scene actions (menu items run mid-frame; GPU resource changes must happen between frames)
+    enum class PendingAction { None, NewScene, OpenScene };
+    PendingAction m_pendingAction = PendingAction::None;
 };
 
 } // namespace showcase

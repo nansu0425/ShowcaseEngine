@@ -14,6 +14,9 @@ std::string GetEditorConfigPath() {
     return showcase::GetExecutableDir() + "editor_config.json";
 }
 
+const char* kSceneFileFilter = "Scene Files (*.scene)\0*.scene\0All Files (*.*)\0*.*\0";
+const char* kSceneFileExt = "scene";
+
 } // anonymous namespace
 
 namespace showcase {
@@ -79,6 +82,13 @@ bool EditorApp::Init(const EditorAppDesc &desc) {
 
     LoadEditorConfig();
 
+    m_editorController.SetDirtyCallback([this]() {
+        m_sceneDirty = true;
+        UpdateWindowTitle();
+    });
+
+    UpdateWindowTitle();
+
     m_timer.Reset();
 
     SE_LOG_INFO("Editor initialized");
@@ -92,16 +102,16 @@ void EditorApp::BuildDefaultScene() {
     m_sceneRenderer.CreateCubeModel(m_renderContext, m_cubeModel);
 
     m_scene.Clear();
-    m_scene.AddObject(&m_gridModel, "Ground Grid", Vector3(0, 0, 0));
-    m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2));
+    m_scene.AddObject(&m_gridModel, "Ground Grid", Vector3(0, 0, 0)).modelSource = "builtin:grid";
+    m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2)).modelSource = "builtin:cube";
     m_scene.AddObject(&m_cubeModel, "Cube 2", Vector3(5, 0.75f, 3), Vector3(0, 0, 0),
-                      Vector3(1.5f, 1.5f, 1.5f));
+                      Vector3(1.5f, 1.5f, 1.5f)).modelSource = "builtin:cube";
     m_scene.AddObject(&m_cubeModel, "Cube 3", Vector3(-6, 2, -4), Vector3(0, 0, 0),
-                      Vector3(3, 4, 3));
+                      Vector3(3, 4, 3)).modelSource = "builtin:cube";
     m_scene.AddObject(&m_cubeModel, "Cube 4", Vector3(8, 0.5f, -7), Vector3(0, 0, 0),
-                      Vector3(1, 1, 1));
+                      Vector3(1, 1, 1)).modelSource = "builtin:cube";
     m_scene.AddObject(&m_cubeModel, "Cube 5", Vector3(-3, 0.5f, 8), Vector3(0, 0, 0),
-                      Vector3(2, 1, 2));
+                      Vector3(2, 1, 2)).modelSource = "builtin:cube";
 
     // Try loading a glTF model from assets/models/
     {
@@ -116,7 +126,9 @@ void EditorApp::BuildDefaultScene() {
                         ModelLoader::LoadGLTF(m_renderContext, entry.path().string(), m_testModel);
                     if (m_modelLoaded) {
                         SE_LOG_INFO("Loaded test model: {}", entry.path().filename().string());
-                        m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0));
+                        std::string relPath = "assets/models/" + entry.path().filename().string();
+                        m_testModelSource = "file:" + relPath;
+                        m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0)).modelSource = m_testModelSource;
                     }
                     break;
                 }
@@ -128,6 +140,8 @@ void EditorApp::BuildDefaultScene() {
                 "No glTF model found in assets/models/ — rendering procedural geometry only");
         }
     }
+
+    BuildModelRegistry();
 }
 
 // ── Config persistence ───────────────────────────────────────────
@@ -238,12 +252,199 @@ void EditorApp::LoadEditorConfig() {
     SE_LOG_INFO("Editor config restored");
 }
 
+// ── Scene document management ────────────────────────────────────
+
+void EditorApp::BuildModelRegistry() {
+    m_modelRegistry.clear();
+    m_modelRegistry["builtin:grid"] = &m_gridModel;
+    m_modelRegistry["builtin:cube"] = &m_cubeModel;
+    if (m_modelLoaded && !m_testModelSource.empty()) {
+        m_modelRegistry[m_testModelSource] = &m_testModel;
+    }
+}
+
+Model* EditorApp::ResolveModel(const std::string& modelSource) {
+    auto it = m_modelRegistry.find(modelSource);
+    if (it != m_modelRegistry.end()) {
+        return it->second;
+    }
+
+    // Try loading file-based models (file:relative/path.gltf)
+    if (modelSource.rfind("file:", 0) == 0) {
+        std::string relPath = modelSource.substr(5);
+        std::string absPath = GetExecutableDir() + relPath;
+
+        auto model = std::make_unique<Model>();
+        if (ModelLoader::LoadGLTF(m_renderContext, absPath, *model)) {
+            SE_LOG_INFO("Dynamically loaded model: {}", relPath);
+            Model* ptr = model.get();
+            m_dynamicModels.push_back(std::move(model));
+            m_modelRegistry[modelSource] = ptr;
+            return ptr;
+        }
+
+        SE_LOG_WARN("Failed to load model: {}", absPath);
+    }
+
+    return nullptr;
+}
+
+void EditorApp::ResolveSceneModels() {
+    for (auto& obj : m_scene.GetObjects()) {
+        obj.model = ResolveModel(obj.modelSource);
+        obj.RecomputeWorldTransform();
+        obj.UpdateAABB();
+    }
+}
+
+void EditorApp::NewScene() {
+    if (m_sceneDirty) {
+        DialogResult result = ShowConfirmDialog(m_window.GetHandle(),
+                                               "ShowcaseEditor", "Save changes to current scene?");
+        if (result == DialogResult::Cancel) return;
+        if (result == DialogResult::Yes && !SaveScene()) return;
+    }
+
+    // Flush GPU and clean up all models before rebuilding
+    m_renderContext.GetDirectQueue().Flush();
+    for (auto& model : m_dynamicModels) {
+        model->Shutdown(m_renderContext);
+    }
+    m_dynamicModels.clear();
+    m_modelRegistry.clear();
+
+    if (m_modelLoaded) {
+        m_testModel.Shutdown(m_renderContext);
+        m_modelLoaded = false;
+        m_testModelSource.clear();
+    }
+    for (auto& mesh : m_gridModel.meshes) {
+        for (auto& prim : mesh.primitives) {
+            prim.vertexBuffer.Shutdown();
+            prim.indexBuffer.Shutdown();
+        }
+    }
+    m_gridModel.meshes.clear();
+    for (auto& mesh : m_cubeModel.meshes) {
+        for (auto& prim : mesh.primitives) {
+            prim.vertexBuffer.Shutdown();
+            prim.indexBuffer.Shutdown();
+        }
+    }
+    m_cubeModel.meshes.clear();
+
+    m_editorController.ClearSelection();
+    BuildDefaultScene();
+
+    m_currentScenePath.clear();
+    m_sceneDirty = false;
+    UpdateWindowTitle();
+}
+
+void EditorApp::OpenScene() {
+    if (m_sceneDirty) {
+        DialogResult result = ShowConfirmDialog(m_window.GetHandle(),
+                                               "ShowcaseEditor", "Save changes to current scene?");
+        if (result == DialogResult::Cancel) return;
+        if (result == DialogResult::Yes && !SaveScene()) return;
+    }
+
+    std::string path = OpenFileDialog(m_window.GetHandle(), kSceneFileFilter, kSceneFileExt);
+    if (path.empty()) return;
+
+    // Flush GPU and clean up dynamic models
+    m_renderContext.GetDirectQueue().Flush();
+    for (auto& model : m_dynamicModels) {
+        model->Shutdown(m_renderContext);
+    }
+    m_dynamicModels.clear();
+    m_modelRegistry.clear();
+
+    m_editorController.ClearSelection();
+
+    if (!m_scene.LoadFromFile(path)) {
+        ShowErrorMessage(m_window.GetHandle(), "ShowcaseEditor", "Failed to load scene file.");
+        return;
+    }
+
+    // Rebuild registry with builtin models
+    BuildModelRegistry();
+    ResolveSceneModels();
+
+    m_currentScenePath = path;
+    m_sceneDirty = false;
+    UpdateWindowTitle();
+}
+
+bool EditorApp::SaveScene() {
+    if (m_currentScenePath.empty()) {
+        return SaveSceneAs();
+    }
+
+    if (m_scene.SaveToFile(m_currentScenePath)) {
+        m_sceneDirty = false;
+        UpdateWindowTitle();
+        return true;
+    }
+    return false;
+}
+
+bool EditorApp::SaveSceneAs() {
+    std::string path = SaveFileDialog(m_window.GetHandle(), kSceneFileFilter, kSceneFileExt);
+    if (path.empty()) return false;
+
+    m_currentScenePath = path;
+    return SaveScene();
+}
+
+void EditorApp::UpdateWindowTitle() {
+    std::string title = "ShowcaseEditor - ";
+    if (m_currentScenePath.empty()) {
+        title += "Untitled";
+    } else {
+        std::filesystem::path p(m_currentScenePath);
+        title += p.filename().string();
+    }
+    if (m_sceneDirty) {
+        title += "*";
+    }
+    m_window.SetTitle(title.c_str());
+}
+
+void EditorApp::RenderMainMenuBar() {
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
+                m_pendingAction = PendingAction::NewScene;
+            }
+            if (ImGui::MenuItem("Open...", "Ctrl+O")) {
+                m_pendingAction = PendingAction::OpenScene;
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Save", "Ctrl+S")) {
+                SaveScene();
+            }
+            if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
+                SaveSceneAs();
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+}
+
 // ── Shutdown ─────────────────────────────────────────────────────
 
 void EditorApp::Shutdown() {
     SaveEditorConfig();
 
     m_renderContext.GetDirectQueue().Flush();
+
+    // Shutdown dynamic models loaded via OpenScene
+    for (auto& model : m_dynamicModels) {
+        model->Shutdown(m_renderContext);
+    }
+    m_dynamicModels.clear();
 
     if (m_modelLoaded) {
         m_testModel.Shutdown(m_renderContext);
@@ -295,6 +496,28 @@ int EditorApp::Run() {
 
         float dt = m_timer.DeltaTime();
 
+        // Keyboard shortcuts (Ctrl+key) — New/Open use deferred actions to avoid GPU ops mid-frame
+        if (m_input.IsKeyDown(Key::kControl)) {
+            if (m_input.IsKeyDown(Key::kShift) && m_input.IsKeyPressed('S')) {
+                SaveSceneAs();
+            } else if (m_input.IsKeyPressed('S')) {
+                SaveScene();
+            } else if (m_input.IsKeyPressed('O')) {
+                m_pendingAction = PendingAction::OpenScene;
+            } else if (m_input.IsKeyPressed('N')) {
+                m_pendingAction = PendingAction::NewScene;
+            }
+        }
+
+        // Process deferred menu actions before rendering (GPU resource changes can't happen mid-frame)
+        if (m_pendingAction == PendingAction::NewScene) {
+            m_pendingAction = PendingAction::None;
+            NewScene();
+        } else if (m_pendingAction == PendingAction::OpenScene) {
+            m_pendingAction = PendingAction::None;
+            OpenScene();
+        }
+
         // Update
         m_viewport.UpdateCamera(m_input, dt);
         m_editorController.Update(m_input, m_scene, m_sceneRenderer, m_viewport);
@@ -313,6 +536,7 @@ int EditorApp::Run() {
         m_renderContext.BeginBackBufferPass(clearColor);
 
         m_imguiLayer.BeginFrame();
+        RenderMainMenuBar();
 
         // DockBuilder must run BEFORE DockSpaceOverViewport
         ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");

@@ -102,6 +102,8 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
 
                     selected->RecomputeWorldTransform();
                     selected->UpdateAABB();
+
+                    if (m_dirtyCallback) m_dirtyCallback();
                 }
             }
         }
@@ -143,6 +145,7 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
             if (changed) {
                 selected->RecomputeWorldTransform();
                 selected->UpdateAABB();
+                if (m_dirtyCallback) m_dirtyCallback();
             }
         } else {
             ImGui::TextDisabled("No object selected");

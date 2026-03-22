@@ -76,6 +76,12 @@ void Window::Shutdown() {
     }
 }
 
+void Window::SetTitle(const char* title) {
+    if (m_hwnd) {
+        SetWindowTextA(m_hwnd, title);
+    }
+}
+
 // ── State persistence ─────────────────────────────────────────────
 void Window::SavePlacement() const {
     if (!m_hwnd) return;
