@@ -107,7 +107,7 @@ ComPtr<ID3D12RootSignature> RootSignatureBuilder::Build(ID3D12Device* device) {
     // Patch descriptor table pointers
     for (auto& param : m_parameters) {
         if (param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE) {
-            auto rangeIndex = reinterpret_cast<size_t>(param.DescriptorTable.pDescriptorRanges);
+            size_t rangeIndex = reinterpret_cast<size_t>(param.DescriptorTable.pDescriptorRanges);
             param.DescriptorTable.pDescriptorRanges = &m_ranges[rangeIndex];
         }
     }

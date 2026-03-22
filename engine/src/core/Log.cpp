@@ -7,10 +7,10 @@ namespace showcase {
 std::shared_ptr<spdlog::logger> Log::s_logger;
 
 void Log::Init() {
-    auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     consoleSink->set_pattern("[%T] [%^%l%$] %v");
 
-    auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("ShowcaseEngine.log", true);
+    std::shared_ptr<spdlog::sinks::basic_file_sink_mt> fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("ShowcaseEngine.log", true);
     fileSink->set_pattern("[%Y-%m-%d %T] [%l] %v");
 
     s_logger = std::make_shared<spdlog::logger>("SE",

@@ -49,7 +49,7 @@ void RenderContext::BeginFrame() {
     m_currentFrameIndex = m_swapChain.GetCurrentBackBufferIndex();
 
     // Wait for this frame's resources to be available
-    auto fenceValue = m_frameResource.GetFenceValue(m_currentFrameIndex);
+    uint64_t fenceValue = m_frameResource.GetFenceValue(m_currentFrameIndex);
     m_directQueue.WaitForFenceValue(fenceValue);
 
     // Reset the command allocator and command list
@@ -66,7 +66,7 @@ void RenderContext::EndFrame() {
     m_commandList.Close();
 
     // Execute and present
-    auto fenceValue = m_directQueue.ExecuteCommandList(m_commandList.Get());
+    uint64_t fenceValue = m_directQueue.ExecuteCommandList(m_commandList.Get());
     m_frameResource.SetFenceValue(m_currentFrameIndex, fenceValue);
 
     m_swapChain.Present(true);
@@ -91,7 +91,7 @@ void RenderContext::BeginBackBufferPass(const float clearColor[4]) {
         D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     // Clear and bind render target
-    auto rtv = m_swapChain.GetCurrentRTV();
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_swapChain.GetCurrentRTV();
     cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
     cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
 

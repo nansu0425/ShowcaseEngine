@@ -90,7 +90,7 @@ void EditorApp::BuildDefaultScene() {
 
         if (std::filesystem::exists(modelDir)) {
             for (const auto &entry : std::filesystem::directory_iterator(modelDir)) {
-                auto ext = entry.path().extension().string();
+                std::string ext = entry.path().extension().string();
                 if (ext == ".gltf" || ext == ".glb") {
                     m_modelLoaded =
                         ModelLoader::LoadGLTF(entry.path().string(), m_renderContext, m_testModel);
@@ -161,7 +161,7 @@ int EditorApp::Run() {
 
         // Update
         m_viewport.UpdateCamera(m_input, dt);
-        m_editorController.Update(m_input, m_scene, m_sceneRenderer, &m_viewport);
+        m_editorController.Update(m_input, m_scene, m_sceneRenderer, m_viewport);
 
         // Begin render frame
         m_renderContext.BeginFrame();
@@ -214,7 +214,7 @@ int EditorApp::Run() {
         ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
 
         m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
-        m_editorController.RenderUI(m_scene, &m_viewport);
+        m_editorController.RenderUI(m_scene, m_viewport);
         m_console.Render();
         m_imguiLayer.EndFrame(m_renderContext.GetCommandList());
 

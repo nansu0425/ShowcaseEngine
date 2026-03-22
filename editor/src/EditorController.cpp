@@ -7,8 +7,8 @@
 namespace showcase {
 
 void EditorController::Update(const Input &input, Scene &scene, SceneRenderer &renderer,
-                              ViewportPanel *viewport) {
-    Camera &camera = viewport->GetCamera();
+                              ViewportPanel &viewport) {
+    Camera &camera = viewport.GetCamera();
 
     // Left-click picking (not during right-click camera rotation, not when using gizmo)
     if (input.IsMouseButtonPressed(0) && !input.IsMouseButtonDown(1) && m_viewportHovered &&
@@ -31,14 +31,14 @@ void EditorController::Update(const Input &input, Scene &scene, SceneRenderer &r
     }
 }
 
-void EditorController::RenderUI(Scene &scene, ViewportPanel *viewport) {
-    Camera &camera = viewport->GetCamera();
+void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
+    Camera &camera = viewport.GetCamera();
 
     ImGuizmo::BeginFrame();
 
     // -- Viewport hover detection (uses previous frame's image rect) --
-    m_viewportMin = viewport->GetImageMin();
-    m_viewportMax = viewport->GetImageMax();
+    m_viewportMin = viewport.GetImageMin();
+    m_viewportMax = viewport.GetImageMax();
     m_viewportHovered = ImGui::IsMouseHoveringRect(m_viewportMin, m_viewportMax, false);
 
     // -- Gizmo rendering --
@@ -87,7 +87,7 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel *viewport) {
                 selected->position = newPos;
                 selected->scale = newScale;
 
-                auto euler = newRot.ToEuler();
+                Vector3 euler = newRot.ToEuler();
                 selected->rotation =
                     Vector3(ToDegrees(euler.x), ToDegrees(euler.y), ToDegrees(euler.z));
 

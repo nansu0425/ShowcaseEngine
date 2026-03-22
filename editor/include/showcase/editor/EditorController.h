@@ -12,8 +12,8 @@ class ViewportPanel;
 
 class EditorController {
 public:
-    void Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel* viewport);
-    void RenderUI(Scene& scene, ViewportPanel* viewport);
+    void Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport);
+    void RenderUI(Scene& scene, ViewportPanel& viewport);
     void RenderToolbar(ViewportPanel& viewport);
 
     int GetSelectedObjectId() const { return m_selectedObjectId; }

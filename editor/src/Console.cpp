@@ -7,8 +7,8 @@
 namespace showcase {
 
 static std::string CurrentTimestamp() {
-    auto now = std::chrono::system_clock::now();
-    auto tt = std::chrono::system_clock::to_time_t(now);
+    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+    std::time_t tt = std::chrono::system_clock::to_time_t(now);
     std::tm tm{};
     localtime_s(&tm, &tt);
     char buf[16];
@@ -25,8 +25,8 @@ public:
 protected:
     void sink_it_(const spdlog::details::log_msg& msg) override {
         // Format timestamp
-        auto time = msg.time;
-        auto tt = std::chrono::system_clock::to_time_t(time);
+        std::chrono::system_clock::time_point time = msg.time;
+        std::time_t tt = std::chrono::system_clock::to_time_t(time);
         std::tm tm{};
         localtime_s(&tm, &tt);
         char timeBuf[16];
@@ -45,7 +45,7 @@ private:
 };
 
 bool Console::Init() {
-    auto sink = std::make_shared<ConsoleSink<std::mutex>>(this);
+    std::shared_ptr<ConsoleSink<std::mutex>> sink = std::make_shared<ConsoleSink<std::mutex>>(this);
     sink->set_level(spdlog::level::trace);
     Log::AddSink(sink);
     return true;
@@ -91,7 +91,7 @@ void Console::RegisterCommand(const std::string& name, CommandHandler handler) {
 }
 
 void Console::ExecuteCommand(const std::string& input) {
-    auto ts = CurrentTimestamp();
+    std::string ts = CurrentTimestamp();
 
     // Echo command
     AddEntry(spdlog::level::trace, ts, "> " + input);

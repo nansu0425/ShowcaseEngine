@@ -32,7 +32,7 @@ D3D12_SHADER_BYTECODE ShaderManager::LoadShader(const std::string& path) {
         return {};
     }
 
-    auto fileSize = file.tellg();
+    std::streampos fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
 
     std::vector<uint8_t> data(static_cast<size_t>(fileSize));

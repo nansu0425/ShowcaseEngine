@@ -146,15 +146,14 @@ void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
 
 void ViewportPanel::SetResizeCallback(ResizeCallback callback) {
     // Chain with existing internal resize callback (camera update)
-    auto existingCallback = [this, externalCb = std::move(callback)](uint32_t w, uint32_t h) {
+    m_offscreenTarget.SetResizeCallback([this, externalCb = std::move(callback)](uint32_t w, uint32_t h) {
         float aspect = h > 0 ? static_cast<float>(w) / h : 1.0f;
         m_camera.SetPerspective(m_camera.GetFovY(), aspect,
                                 m_camera.GetNearZ(), m_camera.GetFarZ());
         if (externalCb) {
             externalCb(w, h);
         }
-    };
-    m_offscreenTarget.SetResizeCallback(existingCallback);
+    });
 }
 
 } // namespace showcase

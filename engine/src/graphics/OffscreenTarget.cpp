@@ -45,7 +45,7 @@ void OffscreenTarget::BeginRender(CommandList& cmdList) {
     auto rtv = m_renderTarget.GetRTV();
     auto dsv = m_depthBuffer.GetDSV();
     float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
-    auto* cmd = cmdList.Get();
+    ID3D12GraphicsCommandList* cmd = cmdList.Get();
     cmd->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
     cmd->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
     cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);

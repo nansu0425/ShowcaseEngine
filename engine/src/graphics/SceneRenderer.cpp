@@ -231,8 +231,8 @@ void SceneRenderer::Init(RenderContext& ctx) {
         .Build(device);
 
     // Load shaders
-    auto vs = ctx.GetShaderManager().LoadShader("shaders/mesh_vs_vs.cso");
-    auto ps = ctx.GetShaderManager().LoadShader("shaders/mesh_ps_ps.cso");
+    D3D12_SHADER_BYTECODE vs = ctx.GetShaderManager().LoadShader("shaders/mesh_vs_vs.cso");
+    D3D12_SHADER_BYTECODE ps = ctx.GetShaderManager().LoadShader("shaders/mesh_ps_ps.cso");
 
     // PSO
     GraphicsPipelineDesc psoDesc;
@@ -322,8 +322,8 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB.GetResource()->GetGPUVirtualAddress());
 
     uint32_t objectIndex = 0;
-    auto objCbBase = m_perObjectCB.GetResource()->GetGPUVirtualAddress();
-    auto matCbBase = m_perMaterialCB.GetResource()->GetGPUVirtualAddress();
+    D3D12_GPU_VIRTUAL_ADDRESS objCbBase = m_perObjectCB.GetResource()->GetGPUVirtualAddress();
+    D3D12_GPU_VIRTUAL_ADDRESS matCbBase = m_perMaterialCB.GetResource()->GetGPUVirtualAddress();
 
     for (const auto& sceneObj : scene.GetObjects()) {
         if (!sceneObj.model) continue;
@@ -366,8 +366,8 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                 m_perMaterialCB.UpdateDataAtOffset(&matData, sizeof(matData), objectIndex * sizeof(PerMaterialData));
                 cmdList->SetGraphicsRootConstantBufferView(2, matCbBase + objectIndex * sizeof(PerMaterialData));
 
-                auto vbView = prim.vertexBuffer.GetVertexBufferView();
-                auto ibView = prim.indexBuffer.GetIndexBufferView();
+                D3D12_VERTEX_BUFFER_VIEW vbView = prim.vertexBuffer.GetVertexBufferView();
+                D3D12_INDEX_BUFFER_VIEW ibView = prim.indexBuffer.GetIndexBufferView();
                 cmdList->IASetVertexBuffers(0, 1, &vbView);
                 cmdList->IASetIndexBuffer(&ibView);
                 cmdList->DrawIndexedInstanced(prim.indexCount, 1, 0, 0, 0);
