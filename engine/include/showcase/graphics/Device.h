@@ -1,9 +1,10 @@
 #pragma once
 
+#include <D3D12MemAlloc.h>
+
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <wrl/client.h>
-#include <D3D12MemAlloc.h>
 
 using Microsoft::WRL::ComPtr;
 
@@ -11,7 +12,7 @@ namespace showcase {
 
 class Device {
 public:
-    bool Init(bool enableDebugLayer = true);
+    [[nodiscard]] bool Init(bool enableDebugLayer = true);
     void Shutdown();
 
     ID3D12Device* GetDevice() const { return m_device.Get(); }

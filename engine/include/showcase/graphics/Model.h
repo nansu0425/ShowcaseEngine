@@ -46,7 +46,7 @@ struct Model {
 
 class ModelLoader {
 public:
-    static bool LoadGLTF(const std::string& filepath,
+    [[nodiscard]] static bool LoadGLTF(const std::string& filepath,
                          RenderContext& ctx,
                          Model& outModel);
 };

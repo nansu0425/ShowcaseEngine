@@ -20,7 +20,7 @@ public:
     Window() = default;
     ~Window();
 
-    bool Init(const WindowDesc& desc);
+    [[nodiscard]] bool Init(const WindowDesc& desc);
     void Shutdown();
 
     void SavePlacement() const;

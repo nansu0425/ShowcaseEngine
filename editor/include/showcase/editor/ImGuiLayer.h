@@ -12,7 +12,7 @@ class CommandList;
 
 class ImGuiLayer {
 public:
-    bool Init(HWND hwnd, RenderContext& ctx);
+    [[nodiscard]] bool Init(HWND hwnd, RenderContext& ctx);
     void Shutdown();
 
     void BeginFrame();

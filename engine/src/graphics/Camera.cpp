@@ -2,8 +2,7 @@
 
 namespace showcase {
 
-void Camera::SetPerspective(float fovY, float aspectRatio, float nearZ, float farZ)
-{
+void Camera::SetPerspective(float fovY, float aspectRatio, float nearZ, float farZ) {
     m_fovY = fovY;
     m_aspectRatio = aspectRatio;
     m_nearZ = nearZ;
@@ -11,14 +10,12 @@ void Camera::SetPerspective(float fovY, float aspectRatio, float nearZ, float fa
     m_projMatrix = PerspectiveFovLH(fovY, aspectRatio, nearZ, farZ);
 }
 
-void Camera::SetPosition(const Vector3& position)
-{
+void Camera::SetPosition(const Vector3& position) {
     m_position = position;
     m_viewDirty = true;
 }
 
-void Camera::SetLookAt(const Vector3& target)
-{
+void Camera::SetLookAt(const Vector3& target) {
     Vector3 direction = target - m_position;
     direction.Normalize();
 
@@ -31,8 +28,7 @@ void Camera::SetLookAt(const Vector3& target)
     m_viewDirty = true;
 }
 
-void Camera::UpdateViewMatrix()
-{
+void Camera::UpdateViewMatrix() {
     if (!m_viewDirty)
         return;
 
@@ -40,8 +36,7 @@ void Camera::UpdateViewMatrix()
     m_viewDirty = false;
 }
 
-BoundingFrustum Camera::GetBoundingFrustum() const
-{
+BoundingFrustum Camera::GetBoundingFrustum() const {
     BoundingFrustum frustum(m_projMatrix);
 
     Matrix inverseView = m_viewMatrix.Invert();

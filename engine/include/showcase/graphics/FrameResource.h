@@ -11,9 +11,9 @@ namespace showcase {
 
 class FrameResource {
 public:
-    static constexpr uint32_t NUM_FRAMES = 3;
+    static constexpr uint32_t kNumFrames = 3;
 
-    bool Init(ID3D12Device* device);
+    [[nodiscard]] bool Init(ID3D12Device* device);
     void Shutdown();
 
     void BeginFrame(uint32_t frameIndex);
@@ -26,8 +26,8 @@ public:
     void SetFenceValue(uint32_t frameIndex, uint64_t value) { m_fenceValues[frameIndex] = value; }
 
 private:
-    std::array<ComPtr<ID3D12CommandAllocator>, NUM_FRAMES> m_allocators;
-    std::array<uint64_t, NUM_FRAMES> m_fenceValues = {};
+    std::array<ComPtr<ID3D12CommandAllocator>, kNumFrames> m_allocators;
+    std::array<uint64_t, kNumFrames> m_fenceValues = {};
 };
 
 } // namespace showcase

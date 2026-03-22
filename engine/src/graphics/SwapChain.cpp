@@ -7,7 +7,7 @@ namespace showcase {
 bool SwapChain::Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue& commandQueue,
                       HWND hwnd, uint32_t width, uint32_t height) {
     // Create RTV descriptor heap
-    if (!m_rtvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, BUFFER_COUNT, false)) {
+    if (!m_rtvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kBufferCount, false)) {
         return false;
     }
 
@@ -19,7 +19,7 @@ bool SwapChain::Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue&
     swapChainDesc.Stereo = FALSE;
     swapChainDesc.SampleDesc = {1, 0};
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDesc.BufferCount = BUFFER_COUNT;
+    swapChainDesc.BufferCount = kBufferCount;
     swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
@@ -38,7 +38,7 @@ bool SwapChain::Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue&
     swapChain1.As(&m_swapChain);
     CreateRenderTargetViews(device);
 
-    SE_LOG_INFO("Swap chain created: {}x{}, {} buffers", width, height, BUFFER_COUNT);
+    SE_LOG_INFO("Swap chain created: {}x{}, {} buffers", width, height, kBufferCount);
     return true;
 }
 
@@ -65,7 +65,7 @@ void SwapChain::Resize(ID3D12Device* device, uint32_t width, uint32_t height) {
 
     DXGI_SWAP_CHAIN_DESC1 desc;
     m_swapChain->GetDesc1(&desc);
-    m_swapChain->ResizeBuffers(BUFFER_COUNT, width, height, desc.Format, desc.Flags);
+    m_swapChain->ResizeBuffers(kBufferCount, width, height, desc.Format, desc.Flags);
 
     CreateRenderTargetViews(device);
     SE_LOG_INFO("Swap chain resized: {}x{}", width, height);
@@ -80,7 +80,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE SwapChain::GetCurrentRTV() const {
 }
 
 void SwapChain::CreateRenderTargetViews(ID3D12Device* device) {
-    for (uint32_t i = 0; i < BUFFER_COUNT; i++) {
+    for (uint32_t i = 0; i < kBufferCount; i++) {
         m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]));
 
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};

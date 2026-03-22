@@ -4,7 +4,7 @@
 namespace showcase {
 
 bool FrameResource::Init(ID3D12Device* device) {
-    for (uint32_t i = 0; i < NUM_FRAMES; i++) {
+    for (uint32_t i = 0; i < kNumFrames; i++) {
         HRESULT hr = device->CreateCommandAllocator(
             D3D12_COMMAND_LIST_TYPE_DIRECT,
             IID_PPV_ARGS(&m_allocators[i]));

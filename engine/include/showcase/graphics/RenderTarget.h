@@ -1,9 +1,11 @@
 #pragma once
 
+#include <showcase/graphics/DescriptorHeap.h>
+
+#include <D3D12MemAlloc.h>
+
 #include <d3d12.h>
 #include <wrl/client.h>
-#include <D3D12MemAlloc.h>
-#include <showcase/graphics/DescriptorHeap.h>
 
 using Microsoft::WRL::ComPtr;
 
@@ -11,7 +13,7 @@ namespace showcase {
 
 class RenderTarget {
 public:
-    bool Init(ID3D12Device* device, D3D12MA::Allocator* allocator,
+    [[nodiscard]] bool Init(ID3D12Device* device, D3D12MA::Allocator* allocator,
               DescriptorHeap& srvHeap,
               uint32_t width, uint32_t height,
               DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);

@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/base_sink.h>
 #include <imgui.h>
+
 #include <string>
 #include <vector>
 #include <mutex>
@@ -21,7 +22,7 @@ using CommandHandler = std::function<std::string(const std::string&)>;
 
 class Console {
 public:
-    void Init();
+    [[nodiscard]] bool Init();
     void Render();
     void Clear();
 
@@ -39,7 +40,7 @@ private:
     bool m_open = true;
     int m_levelFilter = 0; // index into spdlog::level (0=trace)
     ImGuiTextFilter m_textFilter;
-    static constexpr size_t MAX_ENTRIES = 2048;
+    static constexpr size_t kMaxEntries = 2048;
 
     char m_inputBuf[256] = {};
     std::unordered_map<std::string, CommandHandler> m_commands;

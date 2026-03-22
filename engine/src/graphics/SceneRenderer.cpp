@@ -247,7 +247,10 @@ void SceneRenderer::Init(RenderContext& ctx) {
     // Create 1x1 white default texture for untextured geometry
     {
         CommandList texCmdList;
-        texCmdList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+        if (!texCmdList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT)) {
+            SE_LOG_ERROR("Failed to create command list for default texture");
+            return;
+        }
         texCmdList.Reset();
 
         uint8_t whitePixel[] = {255, 255, 255, 255};

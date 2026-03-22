@@ -13,7 +13,7 @@ namespace showcase {
 
 class RenderContext {
 public:
-    bool Init(HWND hwnd, uint32_t width, uint32_t height);
+    [[nodiscard]] bool Init(HWND hwnd, uint32_t width, uint32_t height);
     void Shutdown();
 
     void BeginFrame();

@@ -9,7 +9,7 @@ namespace showcase {
 
 class CommandList {
 public:
-    bool Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type);
+    [[nodiscard]] bool Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type);
     void Shutdown();
 
     void Reset();

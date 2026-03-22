@@ -10,7 +10,7 @@ namespace showcase {
 
 class CommandQueue {
 public:
-    bool Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type);
+    [[nodiscard]] bool Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type);
     void Shutdown();
 
     uint64_t ExecuteCommandList(ID3D12CommandList* commandList);

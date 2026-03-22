@@ -31,7 +31,7 @@ bool ImGuiLayer::Init(HWND hwnd, RenderContext& ctx) {
     ImGui_ImplDX12_InitInfo initInfo = {};
     initInfo.Device = ctx.GetDevice().GetDevice();
     initInfo.CommandQueue = ctx.GetDirectQueue().GetQueue();
-    initInfo.NumFramesInFlight = FrameResource::NUM_FRAMES;
+    initInfo.NumFramesInFlight = FrameResource::kNumFrames;
     initInfo.RTVFormat = ctx.GetSwapChain().GetFormat();
     initInfo.SrvDescriptorHeap = ctx.GetSrvHeap().GetHeap();
     initInfo.LegacySingleSrvCpuDescriptor = handle.cpu;

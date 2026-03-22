@@ -15,9 +15,9 @@ class CommandQueue;
 
 class SwapChain {
 public:
-    static constexpr uint32_t BUFFER_COUNT = 3;
+    static constexpr uint32_t kBufferCount = 3;
 
-    bool Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue& commandQueue,
+    [[nodiscard]] bool Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue& commandQueue,
               HWND hwnd, uint32_t width, uint32_t height);
     void Shutdown();
 
@@ -33,7 +33,7 @@ private:
     void CreateRenderTargetViews(ID3D12Device* device);
 
     ComPtr<IDXGISwapChain4> m_swapChain;
-    std::array<ComPtr<ID3D12Resource>, BUFFER_COUNT> m_backBuffers;
+    std::array<ComPtr<ID3D12Resource>, kBufferCount> m_backBuffers;
     DescriptorHeap m_rtvHeap;
     DXGI_FORMAT m_format = DXGI_FORMAT_R8G8B8A8_UNORM;
 };

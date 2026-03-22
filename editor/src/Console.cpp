@@ -44,15 +44,16 @@ private:
     Console* m_console;
 };
 
-void Console::Init() {
+bool Console::Init() {
     auto sink = std::make_shared<ConsoleSink<std::mutex>>(this);
     sink->set_level(spdlog::level::trace);
     Log::AddSink(sink);
+    return true;
 }
 
 void Console::AddEntry(spdlog::level::level_enum level, const std::string& timestamp, const std::string& message) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_entries.size() >= MAX_ENTRIES) {
+    if (m_entries.size() >= kMaxEntries) {
         m_entries.erase(m_entries.begin());
     }
     m_entries.push_back({level, timestamp, message});

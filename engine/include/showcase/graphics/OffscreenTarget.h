@@ -14,7 +14,7 @@ using ResizeCallback = std::function<void(uint32_t, uint32_t)>;
 
 class OffscreenTarget {
 public:
-    bool Init(RenderContext& ctx, uint32_t initialWidth, uint32_t initialHeight);
+    [[nodiscard]] bool Init(RenderContext& ctx, uint32_t initialWidth, uint32_t initialHeight);
     void Shutdown(RenderContext& ctx);
 
     void BeginRender(CommandList& cmdList);

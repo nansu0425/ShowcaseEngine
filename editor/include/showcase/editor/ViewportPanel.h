@@ -2,9 +2,11 @@
 
 #include <showcase/graphics/OffscreenTarget.h>
 #include <showcase/graphics/Camera.h>
+
+#include <imgui.h>
+
 #include <cstdint>
 #include <functional>
-#include <imgui.h>
 
 namespace showcase {
 
@@ -15,7 +17,7 @@ using ToolbarCallback = std::function<void()>;
 
 class ViewportPanel {
 public:
-    bool Init(RenderContext& ctx, uint32_t initialWidth, uint32_t initialHeight);
+    [[nodiscard]] bool Init(RenderContext& ctx, uint32_t initialWidth, uint32_t initialHeight);
     void Shutdown(RenderContext& ctx);
 
     void BeginRender(CommandList& cmdList);

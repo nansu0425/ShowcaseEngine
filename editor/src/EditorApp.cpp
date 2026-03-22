@@ -1,7 +1,10 @@
-#include <filesystem>
-#include <imgui_internal.h>
-#include <showcase/core/Log.h>
 #include <showcase/editor/EditorApp.h>
+
+#include <showcase/core/Log.h>
+
+#include <imgui_internal.h>
+
+#include <filesystem>
 
 namespace showcase {
 
@@ -15,7 +18,10 @@ bool EditorApp::Init(const EditorAppDesc &desc) {
         return false;
     }
 
-    m_console.Init();
+    if (!m_console.Init()) {
+        SE_LOG_ERROR("Failed to initialize Console");
+        return false;
+    }
 
     m_console.RegisterCommand("fps", [this](const std::string &) -> std::string {
         m_viewport.ToggleShowFPS();

@@ -19,7 +19,7 @@ struct DescriptorHandle {
 
 class DescriptorHeap {
 public:
-    bool Init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
+    [[nodiscard]] bool Init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
               uint32_t numDescriptors, bool shaderVisible = false);
     void Shutdown();
 

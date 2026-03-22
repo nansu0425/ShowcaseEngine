@@ -20,7 +20,7 @@ struct EditorAppDesc {
 
 class EditorApp {
 public:
-    bool Init(const EditorAppDesc& desc);
+    [[nodiscard]] bool Init(const EditorAppDesc& desc);
     void Shutdown();
     int Run();
 
