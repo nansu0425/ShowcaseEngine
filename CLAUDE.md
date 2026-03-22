@@ -59,3 +59,11 @@ cmake/           Dependencies.cmake, ShaderCompilation.cmake
 - A single upload-heap constant buffer rewritten per draw call causes GPU aliasing (flickering) — use offset-based writes (`UpdateDataAtOffset`) so each object occupies its own 256-byte-aligned slot
 - SimpleMath `Matrix::CreateLookAt` / `CreatePerspectiveFieldOfView` produce RH matrices — use `XMMatrixLookAtLH` / `XMMatrixPerspectiveFovLH` directly for LH pipelines
 - Incremental Debug builds can fail with `LNK1103: debugging information corrupt` after large header changes (struct/include modifications) — stale PCH objects cause PDB mismatch. Fix: `scripts/build.bat nuke` then reconfigure and rebuild
+
+## Verification
+
+- **Never declare work complete without verification.** Every task must be verified before reporting completion.
+- After any code change, at minimum confirm a successful build (`scripts/build.bat build Debug`)
+- For non-code tasks (config changes, scripts, docs, etc.), verify the result works as intended (e.g., run the script, validate the config)
+- If automated verification is not possible (runtime visuals, editor UX, GPU behavior, etc.), provide concrete manual verification steps the user can follow
+- If tests exist for the area being changed, run them
