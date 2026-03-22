@@ -1,6 +1,8 @@
 #include <showcase/graphics/Buffer.h>
+
 #include <showcase/core/Assert.h>
 #include <showcase/core/Log.h>
+
 #include <cstring>
 
 namespace showcase {

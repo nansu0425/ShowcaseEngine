@@ -3,6 +3,7 @@
 #include <showcase/graphics/RenderTarget.h>
 #include <showcase/graphics/DepthBuffer.h>
 #include <showcase/graphics/CommandList.h>
+
 #include <cstdint>
 #include <functional>
 

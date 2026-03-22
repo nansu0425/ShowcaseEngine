@@ -1,4 +1,5 @@
 #include <showcase/graphics/CommandList.h>
+
 #include <showcase/core/Assert.h>
 #include <showcase/core/Log.h>
 

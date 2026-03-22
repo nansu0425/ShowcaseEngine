@@ -1,5 +1,7 @@
 #include <showcase/graphics/Device.h>
+
 #include <showcase/core/Log.h>
+
 #include <stdexcept>
 
 namespace showcase {

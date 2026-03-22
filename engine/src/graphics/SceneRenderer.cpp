@@ -1,9 +1,11 @@
 #include <showcase/graphics/SceneRenderer.h>
+
 #include <showcase/core/Log.h>
+#include <showcase/graphics/CommandList.h>
 #include <showcase/graphics/PipelineState.h>
 #include <showcase/graphics/RenderContext.h>
 #include <showcase/graphics/RootSignature.h>
-#include <showcase/graphics/CommandList.h>
+
 #include <cfloat>
 
 namespace showcase {

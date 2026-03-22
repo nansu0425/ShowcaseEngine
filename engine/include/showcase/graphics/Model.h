@@ -4,6 +4,7 @@
 #include <showcase/graphics/Texture.h>
 #include <showcase/graphics/DescriptorHeap.h>
 #include <showcase/core/Math.h>
+
 #include <string>
 #include <vector>
 

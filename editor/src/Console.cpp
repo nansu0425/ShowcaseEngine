@@ -1,7 +1,10 @@
 #include <showcase/editor/Console.h>
+
 #include <showcase/core/Log.h>
+
 #include <spdlog/details/log_msg.h>
 #include <spdlog/pattern_formatter.h>
+
 #include <chrono>
 
 namespace showcase {

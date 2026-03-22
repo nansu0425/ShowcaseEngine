@@ -1,4 +1,5 @@
 #include <showcase/graphics/DepthBuffer.h>
+
 #include <showcase/core/Log.h>
 
 namespace showcase {

@@ -1,8 +1,10 @@
+#include <showcase/editor/EditorController.h>
+
+#include <showcase/core/Input.h>
+#include <showcase/editor/ViewportPanel.h>
+
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <showcase/core/Input.h>
-#include <showcase/editor/EditorController.h>
-#include <showcase/editor/ViewportPanel.h>
 
 namespace showcase {
 

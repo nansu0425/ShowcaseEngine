@@ -1,4 +1,5 @@
 #include <showcase/editor/EditorApp.h>
+
 #include <Windows.h>
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {

@@ -1,13 +1,13 @@
+#include <showcase/graphics/Model.h>
+
+#include <showcase/graphics/RenderContext.h>
+#include <showcase/core/Log.h>
+
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-
 #include <nlohmann/json.hpp>
 #include <tiny_gltf.h>
-
-#include <showcase/graphics/Model.h>
-#include <showcase/graphics/RenderContext.h>
-#include <showcase/core/Log.h>
 
 namespace showcase {
 

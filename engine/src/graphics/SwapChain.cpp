@@ -1,4 +1,5 @@
 #include <showcase/graphics/SwapChain.h>
+
 #include <showcase/graphics/CommandQueue.h>
 #include <showcase/core/Log.h>
 

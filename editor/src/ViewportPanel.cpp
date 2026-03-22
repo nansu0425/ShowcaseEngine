@@ -1,8 +1,11 @@
 #include <showcase/editor/ViewportPanel.h>
+
 #include <showcase/graphics/RenderContext.h>
 #include <showcase/core/Input.h>
 #include <showcase/core/Log.h>
+
 #include <imgui.h>
+
 #include <algorithm>
 #include <cmath>
 

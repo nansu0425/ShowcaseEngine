@@ -1,4 +1,5 @@
 #include <showcase/graphics/DescriptorHeap.h>
+
 #include <showcase/core/Assert.h>
 #include <showcase/core/Log.h>
 

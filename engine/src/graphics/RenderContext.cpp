@@ -1,4 +1,5 @@
 #include <showcase/graphics/RenderContext.h>
+
 #include <showcase/core/Log.h>
 
 namespace showcase {

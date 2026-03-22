@@ -1,7 +1,10 @@
 #include <showcase/graphics/ShaderManager.h>
+
 #include <showcase/core/Log.h>
-#include <fstream>
+
 #include <Windows.h>
+
+#include <fstream>
 
 namespace showcase {
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <showcase/graphics/Model.h>
+
 #include <vector>
 #include <string>
 

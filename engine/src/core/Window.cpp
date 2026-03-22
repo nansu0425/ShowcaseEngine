@@ -1,6 +1,9 @@
 #include <showcase/core/Window.h>
+
 #include <showcase/core/Log.h>
+
 #include <nlohmann/json.hpp>
+
 #include <fstream>
 
 // Forward declaration for ImGui Win32 handler

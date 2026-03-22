@@ -2,6 +2,7 @@
 
 #include <showcase/graphics/Scene.h>
 #include <showcase/graphics/SceneRenderer.h>
+
 #include <imgui.h>
 #include <ImGuizmo.h>
 
