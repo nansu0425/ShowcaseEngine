@@ -72,8 +72,7 @@ void Scene::Clear() {
 }
 
 // ── Serialization ───────────────────────────────────────────────────
-bool Scene::SaveToFile(const std::string& filePath) const {
-    JsonDocument doc;
+void Scene::Serialize(JsonDocument& doc) const {
     doc["version"].Set(1);
 
     auto objects = doc["objects"];
@@ -87,29 +86,14 @@ bool Scene::SaveToFile(const std::string& filePath) const {
         node["rotation"].SetFloatArray({obj.rotation.x, obj.rotation.y, obj.rotation.z});
         node["scale"].SetFloatArray({obj.scale.x, obj.scale.y, obj.scale.z});
     }
-
-    if (!doc.SaveToFile(filePath)) {
-        SE_LOG_ERROR("Failed to save scene: {}", filePath);
-        return false;
-    }
-
-    SE_LOG_INFO("Scene saved: {}", filePath);
-    return true;
 }
 
-bool Scene::LoadFromFile(const std::string& filePath) {
-    JsonDocument doc;
-    if (!doc.LoadFromFile(filePath)) {
-        SE_LOG_ERROR("Failed to load scene: {}", filePath);
-        return false;
-    }
-
+bool Scene::Deserialize(JsonDocument& doc) {
     m_objects.clear();
     m_nextId = 1;
 
     auto objects = doc["objects"];
     if (!objects.IsArray()) {
-        SE_LOG_ERROR("Scene file missing 'objects' array: {}", filePath);
         return false;
     }
 
@@ -136,6 +120,34 @@ bool Scene::LoadFromFile(const std::string& filePath) {
         }
 
         m_objects.push_back(std::move(obj));
+    }
+
+    return true;
+}
+
+bool Scene::SaveToFile(const std::string& filePath) const {
+    JsonDocument doc;
+    Serialize(doc);
+
+    if (!doc.SaveToFile(filePath)) {
+        SE_LOG_ERROR("Failed to save scene: {}", filePath);
+        return false;
+    }
+
+    SE_LOG_INFO("Scene saved: {}", filePath);
+    return true;
+}
+
+bool Scene::LoadFromFile(const std::string& filePath) {
+    JsonDocument doc;
+    if (!doc.LoadFromFile(filePath)) {
+        SE_LOG_ERROR("Failed to load scene: {}", filePath);
+        return false;
+    }
+
+    if (!Deserialize(doc)) {
+        SE_LOG_ERROR("Scene file missing 'objects' array: {}", filePath);
+        return false;
     }
 
     SE_LOG_INFO("Scene loaded: {} ({} objects)", filePath, m_objects.size());

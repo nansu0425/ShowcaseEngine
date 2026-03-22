@@ -283,10 +283,10 @@ struct SceneObject {
 
 ### Scene serialization
 
-Scenes are saved/loaded as `.scene` JSON files via `Scene::SaveToFile()` / `Scene::LoadFromFile()`:
+Scenes are saved/loaded as `.scene` JSON files. `Scene::Serialize()` / `Scene::Deserialize()` handle object data, while `EditorApp` manages file I/O and injects editor-specific sections:
 
-- **Save** serializes each object's `name`, `modelSource`, `position`, `rotation`, `scale`
-- **Load** deserializes into `SceneObject` structs with `model = nullptr`; the editor resolves `modelSource` strings back to `Model*` pointers via a model registry
+- **Save** serializes each object's `name`, `modelSource`, `position`, `rotation`, `scale`, plus an optional `camera` section (editor viewport position/yaw/pitch)
+- **Load** deserializes into `SceneObject` structs with `model = nullptr`; the editor resolves `modelSource` strings back to `Model*` pointers via a model registry. Editor camera is restored from the `camera` section if present
 - **Model sources**: `"builtin:grid"`, `"builtin:cube"` for procedural geometry, `"file:relative/path.gltf"` for glTF assets
 - **Editor UI**: File menu bar (New Scene, Open, Save, Save As) with Ctrl+N/O/S/Shift+S shortcuts
 - **Dirty tracking**: `EditorController` notifies `EditorApp` on gizmo/inspector changes; window title shows `*` for unsaved state
@@ -335,7 +335,7 @@ Model (shared asset)
 | Constant buffers | Offset-based upload heap | Prevents aliasing/flickering with per-object slots |
 | glTF loading | tinygltf (header-only) | Lightweight, glTF 2.0 only, minimal dependencies |
 | Editor UI | ImGui docking + ImGuizmo | Rapid iteration, built-in docking layout, 3D gizmos |
-| Scene serialization | JSON via `JsonDocument` | Human-readable `.scene` files; model references via `modelSource` strings |
+| Scene serialization | JSON via `JsonDocument` | Human-readable `.scene` files; model references via `modelSource` strings; editor camera saved per-scene |
 
 ---
 

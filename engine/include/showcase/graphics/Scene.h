@@ -1,6 +1,7 @@
 #pragma once
 
 #include <showcase/graphics/Model.h>
+#include <showcase/core/JsonDocument.h>
 
 #include <vector>
 #include <string>
@@ -34,6 +35,9 @@ public:
                            const Vector3& rot = {},
                            const Vector3& scl = {1, 1, 1});
     void Clear();
+
+    void Serialize(JsonDocument& doc) const;
+    bool Deserialize(JsonDocument& doc);
 
     [[nodiscard]] bool SaveToFile(const std::string& filePath) const;
     [[nodiscard]] bool LoadFromFile(const std::string& filePath);

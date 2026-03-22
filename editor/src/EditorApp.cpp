@@ -156,13 +156,6 @@ void EditorApp::BuildDefaultScene() {
 void EditorApp::SaveEditorConfig() {
     JsonDocument doc;
 
-    // Camera
-    const Vector3& pos = m_viewport.GetCamera().GetPosition();
-    auto cam = doc["camera"];
-    cam["position"].SetFloatArray({pos.x, pos.y, pos.z});
-    cam["yaw"].Set(m_viewport.GetYaw());
-    cam["pitch"].Set(m_viewport.GetPitch());
-
     // Viewport settings
     auto vp = doc["viewport"];
     vp["showFPS"].Set(m_viewport.GetShowFPS());
@@ -195,15 +188,6 @@ void EditorApp::LoadEditorConfig() {
     JsonDocument doc;
     if (!doc.LoadFromFile(GetEditorConfigPath())) {
         return;
-    }
-
-    // Camera
-    auto cam = doc["camera"];
-    auto pos = cam["position"];
-    if (pos.IsArray() && pos.Size() >= 3 && cam.Contains("yaw") && cam.Contains("pitch")) {
-        Vector3 cameraPos(pos[0].GetFloat(), pos[1].GetFloat(), pos[2].GetFloat());
-        m_viewport.InitCamera(cameraPos, cam["yaw"].GetFloat(), cam["pitch"].GetFloat(), kPiOver4,
-                              0.1f, 1000.0f);
     }
 
     // Viewport settings
@@ -342,6 +326,10 @@ void EditorApp::NewScene() {
     m_editorController.ClearSelection();
     BuildDefaultScene();
 
+    // Reset camera to default
+    m_viewport.InitCamera(Vector3(0.0f, 5.0f, -15.0f), Vector3(0.0f, 0.0f, 0.0f), kPiOver4,
+                          0.1f, 1000.0f);
+
     m_currentScenePath.clear();
     m_sceneDirty = false;
     UpdateWindowTitle();
@@ -368,9 +356,24 @@ void EditorApp::OpenScene() {
 
     m_editorController.ClearSelection();
 
-    if (!m_scene.LoadFromFile(path)) {
+    JsonDocument doc;
+    if (!doc.LoadFromFile(path)) {
         ShowErrorMessage(m_window.GetHandle(), "ShowcaseEditor", "Failed to load scene file.");
         return;
+    }
+    if (!m_scene.Deserialize(doc)) {
+        ShowErrorMessage(m_window.GetHandle(), "ShowcaseEditor", "Scene file missing 'objects' array.");
+        return;
+    }
+
+    // Restore editor camera from scene
+    auto cam = doc["camera"];
+    auto camPos = cam["position"];
+    if (camPos.IsArray() && camPos.Size() >= 3 && cam.Contains("yaw") && cam.Contains("pitch")) {
+        m_viewport.InitCamera(
+            Vector3(camPos[0].GetFloat(), camPos[1].GetFloat(), camPos[2].GetFloat()),
+            cam["yaw"].GetFloat(), cam["pitch"].GetFloat(),
+            kPiOver4, 0.1f, 1000.0f);
     }
 
     // Rebuild registry with builtin models
@@ -387,12 +390,25 @@ bool EditorApp::SaveScene() {
         return SaveSceneAs();
     }
 
-    if (m_scene.SaveToFile(m_currentScenePath)) {
-        m_sceneDirty = false;
-        UpdateWindowTitle();
-        return true;
+    JsonDocument doc;
+    m_scene.Serialize(doc);
+
+    // Editor camera
+    const Vector3& camPos = m_viewport.GetCamera().GetPosition();
+    auto cam = doc["camera"];
+    cam["position"].SetFloatArray({camPos.x, camPos.y, camPos.z});
+    cam["yaw"].Set(m_viewport.GetYaw());
+    cam["pitch"].Set(m_viewport.GetPitch());
+
+    if (!doc.SaveToFile(m_currentScenePath)) {
+        SE_LOG_ERROR("Failed to save scene: {}", m_currentScenePath);
+        return false;
     }
-    return false;
+
+    SE_LOG_INFO("Scene saved: {}", m_currentScenePath);
+    m_sceneDirty = false;
+    UpdateWindowTitle();
+    return true;
 }
 
 bool EditorApp::SaveSceneAs() {
