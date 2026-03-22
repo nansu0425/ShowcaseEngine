@@ -4,6 +4,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool Device::Init(bool enableDebugLayer) {
     UINT dxgiFactoryFlags = 0;
 

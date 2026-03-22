@@ -3,6 +3,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool CommandQueue::Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type) {
     D3D12_COMMAND_QUEUE_DESC desc = {};
     desc.Type = type;
@@ -40,6 +41,7 @@ void CommandQueue::Shutdown() {
     m_queue.Reset();
 }
 
+// ── Execution ────────────────────────────────────────────────────────
 uint64_t CommandQueue::ExecuteCommandList(ID3D12CommandList* commandList) {
     m_queue->ExecuteCommandLists(1, &commandList);
     return Signal();
@@ -51,6 +53,7 @@ uint64_t CommandQueue::Signal() {
     return m_fenceValue;
 }
 
+// ── Synchronization ─────────────────────────────────────────────────
 void CommandQueue::WaitForFenceValue(uint64_t fenceValue) {
     if (!IsFenceComplete(fenceValue)) {
         m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent);

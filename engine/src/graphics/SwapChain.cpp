@@ -4,6 +4,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool SwapChain::Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue& commandQueue,
                       HWND hwnd, uint32_t width, uint32_t height) {
     // Create RTV descriptor heap
@@ -50,6 +51,7 @@ void SwapChain::Shutdown() {
     m_swapChain.Reset();
 }
 
+// ── Present / Resize ─────────────────────────────────────────────────
 void SwapChain::Present(bool vsync) {
     UINT syncInterval = vsync ? 1 : 0;
     UINT flags = vsync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
@@ -71,6 +73,7 @@ void SwapChain::Resize(ID3D12Device* device, uint32_t width, uint32_t height) {
     SE_LOG_INFO("Swap chain resized: {}x{}", width, height);
 }
 
+// ── Query ────────────────────────────────────────────────────────────
 ID3D12Resource* SwapChain::GetCurrentBackBuffer() const {
     return m_backBuffers[m_swapChain->GetCurrentBackBufferIndex()].Get();
 }
@@ -79,6 +82,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE SwapChain::GetCurrentRTV() const {
     return m_rtvHeap.GetHandle(m_swapChain->GetCurrentBackBufferIndex()).cpu;
 }
 
+// ── Internal ─────────────────────────────────────────────────────────
 void SwapChain::CreateRenderTargetViews(ID3D12Device* device) {
     for (uint32_t i = 0; i < kBufferCount; i++) {
         m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]));

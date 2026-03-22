@@ -4,6 +4,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool CommandList::Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type) {
     m_type = type;
 
@@ -28,6 +29,7 @@ void CommandList::Shutdown() {
     m_allocator.Reset();
 }
 
+// ── Frame management ─────────────────────────────────────────────────
 void CommandList::Reset() {
     m_allocator->Reset();
     m_commandList->Reset(m_allocator.Get(), nullptr);
@@ -37,6 +39,7 @@ void CommandList::Close() {
     m_commandList->Close();
 }
 
+// ── Barriers ─────────────────────────────────────────────────────────
 void CommandList::TransitionBarrier(ID3D12Resource* resource,
                                      D3D12_RESOURCE_STATES before,
                                      D3D12_RESOURCE_STATES after) {

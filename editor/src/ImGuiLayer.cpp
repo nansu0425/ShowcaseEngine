@@ -8,6 +8,8 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────
+
 bool ImGuiLayer::Init(HWND hwnd, RenderContext& ctx) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -47,6 +49,8 @@ void ImGuiLayer::Shutdown() {
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 }
+
+// ── Frame management ──────────────────────────────────────────────
 
 void ImGuiLayer::BeginFrame() {
     ImGui_ImplDX12_NewFrame();

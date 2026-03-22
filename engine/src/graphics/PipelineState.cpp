@@ -3,6 +3,7 @@
 
 namespace showcase {
 
+// ── Graphics PSO ─────────────────────────────────────────────────────
 ComPtr<ID3D12PipelineState> PipelineState::CreateGraphicsPSO(ID3D12Device* device,
                                                                const GraphicsPipelineDesc& desc) {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
@@ -33,6 +34,7 @@ ComPtr<ID3D12PipelineState> PipelineState::CreateGraphicsPSO(ID3D12Device* devic
     return pso;
 }
 
+// ── Compute PSO ──────────────────────────────────────────────────────
 ComPtr<ID3D12PipelineState> PipelineState::CreateComputePSO(ID3D12Device* device,
                                                               ID3D12RootSignature* rootSignature,
                                                               D3D12_SHADER_BYTECODE computeShader) {

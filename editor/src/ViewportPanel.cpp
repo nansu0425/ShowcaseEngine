@@ -8,6 +8,8 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────
+
 bool ViewportPanel::Init(RenderContext& ctx, uint32_t initialWidth, uint32_t initialHeight) {
     // Set up camera aspect ratio update on resize
     m_offscreenTarget.SetResizeCallback([this](uint32_t w, uint32_t h) {
@@ -23,6 +25,8 @@ void ViewportPanel::Shutdown(RenderContext& ctx) {
     m_offscreenTarget.Shutdown(ctx);
 }
 
+// ── Rendering ────────────────────────────────────────────────────
+
 void ViewportPanel::BeginRender(CommandList& cmdList) {
     m_offscreenTarget.BeginRender(cmdList);
 }
@@ -30,6 +34,8 @@ void ViewportPanel::BeginRender(CommandList& cmdList) {
 void ViewportPanel::EndRender(CommandList& cmdList) {
     m_offscreenTarget.EndRender(cmdList);
 }
+
+// ── ImGui ─────────────────────────────────────────────────────────
 
 void ViewportPanel::OnImGui(float fps, float deltaTime) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -83,6 +89,8 @@ void ViewportPanel::OnImGui(float fps, float deltaTime) {
     ImGui::End();
     ImGui::PopStyleVar();
 }
+
+// ── Camera ────────────────────────────────────────────────────────
 
 void ViewportPanel::InitCamera(const Vector3& position,
                                const Vector3& lookAt,

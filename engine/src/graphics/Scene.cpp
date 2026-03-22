@@ -2,6 +2,7 @@
 
 namespace showcase {
 
+// ── SceneObject ──────────────────────────────────────────────────────
 bool SceneObject::IsVisible() const {
     return !frustumCulled && !occlusionCulled;
 }
@@ -24,6 +25,7 @@ void SceneObject::UpdateAABB() {
     }
 }
 
+// ── Scene management ─────────────────────────────────────────────────
 SceneObject& Scene::AddObject(Model* model, const Matrix& transform) {
     SceneObject obj;
     obj.id = m_nextId++;
@@ -51,6 +53,7 @@ SceneObject& Scene::AddObject(Model* model, const std::string& name,
     return m_objects.back();
 }
 
+// ── Query ────────────────────────────────────────────────────────────
 SceneObject* Scene::FindById(uint32_t id) {
     for (auto& obj : m_objects) {
         if (obj.id == id) return &obj;

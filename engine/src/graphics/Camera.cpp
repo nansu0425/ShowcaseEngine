@@ -2,6 +2,7 @@
 
 namespace showcase {
 
+// ── Projection ───────────────────────────────────────────────────────
 void Camera::SetPerspective(float fovY, float aspectRatio, float nearZ, float farZ) {
     m_fovY = fovY;
     m_aspectRatio = aspectRatio;
@@ -10,6 +11,7 @@ void Camera::SetPerspective(float fovY, float aspectRatio, float nearZ, float fa
     m_projMatrix = PerspectiveFovLH(fovY, aspectRatio, nearZ, farZ);
 }
 
+// ── View ─────────────────────────────────────────────────────────────
 void Camera::SetPosition(const Vector3& position) {
     m_position = position;
     m_viewDirty = true;
@@ -36,6 +38,7 @@ void Camera::UpdateViewMatrix() {
     m_viewDirty = false;
 }
 
+// ── Query ────────────────────────────────────────────────────────────
 BoundingFrustum Camera::GetBoundingFrustum() const {
     BoundingFrustum frustum(m_projMatrix);
 

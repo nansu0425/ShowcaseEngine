@@ -5,6 +5,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool Buffer::InitAsVertexBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
                                  const void* data, uint32_t size, uint32_t stride) {
     if (!CreateUploadBuffer(device, allocator, size, data)) {
@@ -42,6 +43,7 @@ void Buffer::Shutdown() {
     m_resource.Reset();
 }
 
+// ── Data update ──────────────────────────────────────────────────────
 void Buffer::UpdateData(const void* data, uint32_t size) {
     SE_ASSERT(data != nullptr);
     SE_ASSERT(m_mappedData != nullptr);
@@ -55,6 +57,7 @@ void Buffer::UpdateDataAtOffset(const void* data, uint32_t size, uint32_t offset
     memcpy(static_cast<uint8_t*>(m_mappedData) + offset, data, size);
 }
 
+// ── Internal ─────────────────────────────────────────────────────────
 bool Buffer::CreateUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
                                  uint32_t size, const void* data) {
     m_size = size;

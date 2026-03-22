@@ -4,6 +4,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool DescriptorHeap::Init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
                            uint32_t numDescriptors, bool shaderVisible) {
     m_type = type;
@@ -38,6 +39,7 @@ void DescriptorHeap::Shutdown() {
     m_nextIndex = 0;
 }
 
+// ── Allocation ───────────────────────────────────────────────────────
 DescriptorHandle DescriptorHeap::Allocate() {
     uint32_t index;
     if (!m_freeIndices.empty()) {
@@ -60,6 +62,7 @@ void DescriptorHeap::Free(const DescriptorHandle& handle) {
     }
 }
 
+// ── Query ────────────────────────────────────────────────────────────
 DescriptorHandle DescriptorHeap::GetHandle(uint32_t index) const {
     SE_ASSERT(index < m_numDescriptors);
     DescriptorHandle handle;

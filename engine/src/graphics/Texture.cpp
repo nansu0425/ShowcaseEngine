@@ -3,6 +3,7 @@
 
 namespace showcase {
 
+// ── Init ─────────────────────────────────────────────────────────────
 bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator,
                               ID3D12GraphicsCommandList* cmdList, DescriptorHeap& srvHeap,
                               const uint8_t* data, uint32_t width, uint32_t height,
@@ -143,6 +144,7 @@ bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator
     return true;
 }
 
+// ── Lifecycle ────────────────────────────────────────────────────────
 void Texture::ReleaseUploadResources() {
     m_uploadResource.Reset();
     m_uploadAllocation.Reset();

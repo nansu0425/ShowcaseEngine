@@ -2,6 +2,7 @@
 
 namespace showcase {
 
+// ── Lifecycle ─────────────────────────────────────────────────────
 Timer::Timer() {
     int64_t countsPerSec;
     QueryPerformanceFrequency(reinterpret_cast<LARGE_INTEGER*>(&countsPerSec));
@@ -23,6 +24,7 @@ void Timer::Reset() {
     m_fpsFrameCount = 0;
 }
 
+// ── Frame timing ──────────────────────────────────────────────────
 void Timer::Tick() {
     if (m_paused) {
         m_deltaTime = 0.0;
@@ -51,6 +53,7 @@ void Timer::Tick() {
     }
 }
 
+// ── Pause / Resume ────────────────────────────────────────────────
 void Timer::Pause() {
     if (!m_paused) {
         QueryPerformanceCounter(reinterpret_cast<LARGE_INTEGER*>(&m_stopTime));
@@ -70,6 +73,7 @@ void Timer::Resume() {
     }
 }
 
+// ── Query ─────────────────────────────────────────────────────────
 float Timer::TotalTime() const {
     if (m_paused) {
         return static_cast<float>(

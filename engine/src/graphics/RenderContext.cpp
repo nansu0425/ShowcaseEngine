@@ -3,6 +3,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
 #ifdef _DEBUG
     bool enableDebug = true;
@@ -45,6 +46,7 @@ void RenderContext::Shutdown() {
     m_device.Shutdown();
 }
 
+// ── Frame management ─────────────────────────────────────────────────
 void RenderContext::BeginFrame() {
     m_currentFrameIndex = m_swapChain.GetCurrentBackBufferIndex();
 
@@ -72,6 +74,7 @@ void RenderContext::EndFrame() {
     m_swapChain.Present(true);
 }
 
+// ── Resize ───────────────────────────────────────────────────────────
 void RenderContext::Resize(uint32_t width, uint32_t height) {
     if (width == 0 || height == 0) return;
 
@@ -82,6 +85,7 @@ void RenderContext::Resize(uint32_t width, uint32_t height) {
     m_depthBuffer.Resize(m_device.GetDevice(), m_device.GetAllocator(), width, height);
 }
 
+// ── Back buffer pass ─────────────────────────────────────────────────
 void RenderContext::BeginBackBufferPass(const float clearColor[4]) {
     auto* cmdList = m_commandList.Get();
 

@@ -4,6 +4,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool OffscreenTarget::Init(RenderContext& ctx, uint32_t initialWidth, uint32_t initialHeight) {
     m_ctx = &ctx;
 
@@ -30,6 +31,7 @@ void OffscreenTarget::Shutdown(RenderContext& ctx) {
     m_depthBuffer.Shutdown();
 }
 
+// ── Rendering ────────────────────────────────────────────────────────
 void OffscreenTarget::BeginRender(CommandList& cmdList) {
     // Apply deferred resize
     if (m_resizePending) {
@@ -68,6 +70,7 @@ void OffscreenTarget::EndRender(CommandList& cmdList) {
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
+// ── Resize ───────────────────────────────────────────────────────────
 void OffscreenTarget::RequestResize(uint32_t width, uint32_t height) {
     if (width != m_width || height != m_height) {
         m_pendingWidth = width;

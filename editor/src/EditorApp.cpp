@@ -8,6 +8,8 @@
 
 namespace showcase {
 
+// ── Init ──────────────────────────────────────────────────────────
+
 bool EditorApp::Init(const EditorAppDesc &desc) {
     Log::Init();
 
@@ -65,6 +67,8 @@ bool EditorApp::Init(const EditorAppDesc &desc) {
     return true;
 }
 
+// ── Scene setup ──────────────────────────────────────────────────
+
 void EditorApp::BuildDefaultScene() {
     m_sceneRenderer.CreateGridModel(m_renderContext, m_gridModel);
     m_sceneRenderer.CreateCubeModel(m_renderContext, m_cubeModel);
@@ -110,6 +114,8 @@ void EditorApp::BuildDefaultScene() {
     }
 }
 
+// ── Shutdown ─────────────────────────────────────────────────────
+
 void EditorApp::Shutdown() {
     m_renderContext.GetDirectQueue().Flush();
 
@@ -140,6 +146,8 @@ void EditorApp::Shutdown() {
     m_window.Shutdown();
     SE_LOG_INFO("Editor shutdown");
 }
+
+// ── Main loop ────────────────────────────────────────────────────
 
 int EditorApp::Run() {
     while (m_window.ProcessMessages()) {
@@ -226,6 +234,8 @@ int EditorApp::Run() {
 
     return 0;
 }
+
+// ── Resize ────────────────────────────────────────────────────────
 
 void EditorApp::OnResize(uint32_t width, uint32_t height) {
     m_renderContext.Resize(width, height);

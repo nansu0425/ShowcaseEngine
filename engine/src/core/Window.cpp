@@ -23,6 +23,7 @@ Window::~Window() {
     Shutdown();
 }
 
+// ── Init / Shutdown ───────────────────────────────────────────────
 bool Window::Init(const WindowDesc& desc) {
     m_width = desc.width;
     m_height = desc.height;
@@ -75,6 +76,7 @@ void Window::Shutdown() {
     }
 }
 
+// ── State persistence ─────────────────────────────────────────────
 void Window::SavePlacement() const {
     if (!m_hwnd) return;
 
@@ -126,6 +128,7 @@ void Window::RestorePlacement() {
     SE_LOG_INFO("Window placement restored");
 }
 
+// ── Message processing ────────────────────────────────────────────
 bool Window::ProcessMessages() {
     MSG msg = {};
     while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -138,6 +141,7 @@ bool Window::ProcessMessages() {
     return true;
 }
 
+// ── Win32 message handling ────────────────────────────────────────
 LRESULT CALLBACK Window::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     Window* window = nullptr;
 

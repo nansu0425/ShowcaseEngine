@@ -3,6 +3,7 @@
 
 namespace showcase {
 
+// ── Root parameters ──────────────────────────────────────────────────
 RootSignatureBuilder& RootSignatureBuilder::AddCBV(uint32_t shaderRegister, uint32_t space,
                                                      D3D12_SHADER_VISIBILITY visibility) {
     D3D12_ROOT_PARAMETER1 param = {};
@@ -77,6 +78,7 @@ RootSignatureBuilder& RootSignatureBuilder::AddDescriptorTable(D3D12_DESCRIPTOR_
     return *this;
 }
 
+// ── Samplers / Flags ─────────────────────────────────────────────────
 RootSignatureBuilder& RootSignatureBuilder::AddStaticSampler(uint32_t shaderRegister, uint32_t space,
                                                                D3D12_FILTER filter,
                                                                D3D12_SHADER_VISIBILITY visibility) {
@@ -103,6 +105,7 @@ RootSignatureBuilder& RootSignatureBuilder::SetFlags(D3D12_ROOT_SIGNATURE_FLAGS 
     return *this;
 }
 
+// ── Build ────────────────────────────────────────────────────────────
 ComPtr<ID3D12RootSignature> RootSignatureBuilder::Build(ID3D12Device* device) {
     // Patch descriptor table pointers
     for (auto& param : m_parameters) {

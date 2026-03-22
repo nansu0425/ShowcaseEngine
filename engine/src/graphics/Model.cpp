@@ -11,6 +11,7 @@
 
 namespace showcase {
 
+// ── Lifecycle ────────────────────────────────────────────────────────
 void Model::Shutdown(RenderContext& ctx) {
     for (auto& mesh : meshes) {
         for (auto& prim : mesh.primitives) {
@@ -26,6 +27,7 @@ void Model::Shutdown(RenderContext& ctx) {
     textures.clear();
 }
 
+// ── Texture loading ──────────────────────────────────────────────────
 static bool LoadTextures(const tinygltf::Model& gltfModel,
                          RenderContext& ctx,
                          std::vector<Texture>& outTextures) {
@@ -74,6 +76,7 @@ static bool LoadTextures(const tinygltf::Model& gltfModel,
     return true;
 }
 
+// ── Material loading ─────────────────────────────────────────────────
 static void LoadMaterials(const tinygltf::Model& gltfModel,
                           std::vector<Material>& outMaterials) {
     outMaterials.resize(gltfModel.materials.size());
@@ -96,6 +99,7 @@ static void LoadMaterials(const tinygltf::Model& gltfModel,
     }
 }
 
+// ── Mesh extraction ──────────────────────────────────────────────────
 static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel,
                                       const tinygltf::Primitive& gltfPrim,
                                       std::vector<ModelVertex>& vertices,
@@ -189,6 +193,7 @@ static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel,
     }
 }
 
+// ── AABB computation ─────────────────────────────────────────────────
 static DirectX::BoundingBox ComputeAABB(const std::vector<ModelVertex>& vertices) {
     if (vertices.empty()) {
         return DirectX::BoundingBox({0, 0, 0}, {0, 0, 0});
@@ -208,6 +213,7 @@ static DirectX::BoundingBox ComputeAABB(const std::vector<ModelVertex>& vertices
     return aabb;
 }
 
+// ── glTF loading ─────────────────────────────────────────────────────
 bool ModelLoader::LoadGLTF(const std::string& filepath,
                            RenderContext& ctx,
                            Model& outModel) {

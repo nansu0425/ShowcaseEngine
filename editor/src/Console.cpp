@@ -6,6 +6,8 @@
 
 namespace showcase {
 
+// ── Utilities ─────────────────────────────────────────────────────
+
 static std::string CurrentTimestamp() {
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
     std::time_t tt = std::chrono::system_clock::to_time_t(now);
@@ -15,6 +17,8 @@ static std::string CurrentTimestamp() {
     std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
     return buf;
 }
+
+// ── Console sink ──────────────────────────────────────────────────
 
 // Custom spdlog sink that forwards log messages to Console
 template<typename Mutex>
@@ -44,12 +48,16 @@ private:
     Console* m_console;
 };
 
+// ── Init ──────────────────────────────────────────────────────────
+
 bool Console::Init() {
     std::shared_ptr<ConsoleSink<std::mutex>> sink = std::make_shared<ConsoleSink<std::mutex>>(this);
     sink->set_level(spdlog::level::trace);
     Log::AddSink(sink);
     return true;
 }
+
+// ── Entry management ──────────────────────────────────────────────
 
 void Console::AddEntry(spdlog::level::level_enum level, const std::string& timestamp, const std::string& message) {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -63,6 +71,8 @@ void Console::Clear() {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_entries.clear();
 }
+
+// ── UI helpers ────────────────────────────────────────────────────
 
 ImVec4 Console::GetLevelColor(spdlog::level::level_enum level) {
     switch (level) {
@@ -85,6 +95,8 @@ const char* Console::GetLevelLabel(spdlog::level::level_enum level) {
         default:                      return "???";
     }
 }
+
+// ── Commands ──────────────────────────────────────────────────────
 
 void Console::RegisterCommand(const std::string& name, CommandHandler handler) {
     m_commands[name] = std::move(handler);
@@ -118,6 +130,8 @@ void Console::ExecuteCommand(const std::string& input) {
         AddEntry(spdlog::level::warn, ts, "Unknown command: /" + command);
     }
 }
+
+// ── Rendering ────────────────────────────────────────────────────
 
 void Console::Render() {
     if (!m_open) return;

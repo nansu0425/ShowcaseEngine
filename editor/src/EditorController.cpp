@@ -6,6 +6,8 @@
 
 namespace showcase {
 
+// ── Update ────────────────────────────────────────────────────────
+
 void EditorController::Update(const Input &input, Scene &scene, SceneRenderer &renderer,
                               ViewportPanel &viewport) {
     Camera &camera = viewport.GetCamera();
@@ -30,6 +32,8 @@ void EditorController::Update(const Input &input, Scene &scene, SceneRenderer &r
             m_gizmoMode = (m_gizmoMode == ImGuizmo::LOCAL) ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
     }
 }
+
+// ── UI ────────────────────────────────────────────────────────────
 
 void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
     Camera &camera = viewport.GetCamera();
@@ -139,6 +143,8 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
     }
     ImGui::End();
 }
+
+// ── Toolbar ───────────────────────────────────────────────────────
 
 void EditorController::RenderToolbar(ViewportPanel &viewport) {
     Camera &camera = viewport.GetCamera();

@@ -3,6 +3,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool RenderTarget::Init(ID3D12Device* device, D3D12MA::Allocator* allocator,
                          DescriptorHeap& srvHeap,
                          uint32_t width, uint32_t height, DXGI_FORMAT format) {
@@ -31,6 +32,7 @@ void RenderTarget::Shutdown(DescriptorHeap& srvHeap) {
     m_rtvHeap.Shutdown();
 }
 
+// ── Resize ───────────────────────────────────────────────────────────
 void RenderTarget::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator,
                             DescriptorHeap& srvHeap,
                             uint32_t width, uint32_t height) {
@@ -45,6 +47,7 @@ void RenderTarget::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator,
     SE_LOG_INFO("Render target resized ({}x{})", width, height);
 }
 
+// ── Internal ─────────────────────────────────────────────────────────
 bool RenderTarget::CreateResources(ID3D12Device* device, D3D12MA::Allocator* allocator,
                                     DescriptorHeap& srvHeap,
                                     uint32_t width, uint32_t height) {

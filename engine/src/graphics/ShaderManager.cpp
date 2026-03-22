@@ -12,6 +12,7 @@ static std::string GetExecutableDir() {
     return exePath.substr(0, exePath.find_last_of("\\/") + 1);
 }
 
+// ── Shader loading ───────────────────────────────────────────────────
 D3D12_SHADER_BYTECODE ShaderManager::LoadShader(const std::string& path) {
     // Check cache
     auto it = m_shaderCache.find(path);
@@ -44,6 +45,7 @@ D3D12_SHADER_BYTECODE ShaderManager::LoadShader(const std::string& path) {
     return {insertIt->second.data(), insertIt->second.size()};
 }
 
+// ── Lifecycle ────────────────────────────────────────────────────────
 void ShaderManager::Clear() {
     m_shaderCache.clear();
 }

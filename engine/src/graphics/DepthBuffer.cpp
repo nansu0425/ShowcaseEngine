@@ -3,6 +3,7 @@
 
 namespace showcase {
 
+// ── Init / Shutdown ──────────────────────────────────────────────────
 bool DepthBuffer::Init(ID3D12Device* device, D3D12MA::Allocator* allocator,
                        uint32_t width, uint32_t height, DXGI_FORMAT format) {
     m_format = format;
@@ -26,6 +27,7 @@ void DepthBuffer::Shutdown() {
     m_dsvHeap.Shutdown();
 }
 
+// ── Resize ───────────────────────────────────────────────────────────
 void DepthBuffer::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator,
                           uint32_t width, uint32_t height) {
     m_resource.Reset();
@@ -34,6 +36,7 @@ void DepthBuffer::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator,
     SE_LOG_INFO("Depth buffer resized ({}x{})", width, height);
 }
 
+// ── Internal ─────────────────────────────────────────────────────────
 bool DepthBuffer::CreateResources(ID3D12Device* device, D3D12MA::Allocator* allocator,
                                    uint32_t width, uint32_t height) {
     D3D12_CLEAR_VALUE clearValue = {};
