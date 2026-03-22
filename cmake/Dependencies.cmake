@@ -24,6 +24,7 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/microsoft/DirectXTK12.git
     GIT_TAG        oct2025
     GIT_SHALLOW    TRUE
+    EXCLUDE_FROM_ALL
 )
 
 # spdlog
@@ -48,24 +49,22 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
     GIT_TAG        v2.9.5
     GIT_SHALLOW    TRUE
+    EXCLUDE_FROM_ALL
 )
+
+# Suppress deprecation warnings from third-party CMakeLists.txt
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
 
 # Make available: D3D12MA, spdlog, json
 FetchContent_MakeAvailable(D3D12MemoryAllocator spdlog nlohmann_json)
 
 # DirectXTK12 — fetch source only (SimpleMath is header-only)
-FetchContent_GetProperties(directxtk12)
-if(NOT directxtk12_POPULATED)
-    FetchContent_Populate(directxtk12)
-endif()
+FetchContent_MakeAvailable(directxtk12)
 add_library(directxtk12_headers INTERFACE)
 target_include_directories(directxtk12_headers INTERFACE ${directxtk12_SOURCE_DIR}/Inc)
 
 # tinygltf — fetch source only (header-only library)
-FetchContent_GetProperties(tinygltf)
-if(NOT tinygltf_POPULATED)
-    FetchContent_Populate(tinygltf)
-endif()
+FetchContent_MakeAvailable(tinygltf)
 add_library(tinygltf_headers INTERFACE)
 target_include_directories(tinygltf_headers INTERFACE ${tinygltf_SOURCE_DIR})
 target_compile_definitions(tinygltf_headers INTERFACE TINYGLTF_NO_INCLUDE_JSON)
@@ -104,3 +103,5 @@ FetchContent_MakeAvailable(imguizmo)
 add_library(imguizmo_lib STATIC ${imguizmo_SOURCE_DIR}/ImGuizmo.cpp)
 target_include_directories(imguizmo_lib PUBLIC ${imguizmo_SOURCE_DIR})
 target_link_libraries(imguizmo_lib PUBLIC imgui::imgui)
+
+set(CMAKE_WARN_DEPRECATED ON CACHE BOOL "" FORCE)
