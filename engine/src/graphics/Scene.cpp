@@ -3,6 +3,8 @@
 #include <showcase/core/JsonDocument.h>
 #include <showcase/core/Log.h>
 
+#include <algorithm>
+
 namespace showcase {
 
 // ── SceneObject ──────────────────────────────────────────────────────
@@ -17,11 +19,8 @@ void SceneObject::RecomputeWorldTransform() {
     float ry = ToRadians(rotation.y);
     float rz = ToRadians(rotation.z);
 
-    worldTransform = Matrix::CreateScale(safeScale)
-                   * Matrix::CreateRotationZ(rz)
-                   * Matrix::CreateRotationX(rx)
-                   * Matrix::CreateRotationY(ry)
-                   * Matrix::CreateTranslation(position);
+    worldTransform = Matrix::CreateScale(safeScale) * Matrix::CreateRotationZ(rz) * Matrix::CreateRotationX(rx) *
+                     Matrix::CreateRotationY(ry) * Matrix::CreateTranslation(position);
 }
 
 void SceneObject::UpdateAABB() {
@@ -43,8 +42,8 @@ SceneObject& Scene::AddObject(Model* model, const Matrix& transform) {
     return m_objects.back();
 }
 
-SceneObject& Scene::AddObject(Model* model, const std::string& name,
-                               const Vector3& pos, const Vector3& rot, const Vector3& scl) {
+SceneObject& Scene::AddObject(Model* model, const std::string& name, const Vector3& pos, const Vector3& rot,
+                              const Vector3& scl) {
     SceneObject obj;
     obj.id = m_nextId++;
     obj.name = name;
@@ -58,10 +57,19 @@ SceneObject& Scene::AddObject(Model* model, const std::string& name,
     return m_objects.back();
 }
 
+bool Scene::RemoveObject(uint32_t id) {
+    auto it = std::find_if(m_objects.begin(), m_objects.end(), [id](const SceneObject& obj) { return obj.id == id; });
+    if (it == m_objects.end())
+        return false;
+    m_objects.erase(it);
+    return true;
+}
+
 // ── Query ────────────────────────────────────────────────────────────
 SceneObject* Scene::FindById(uint32_t id) {
     for (auto& obj : m_objects) {
-        if (obj.id == id) return &obj;
+        if (obj.id == id)
+            return &obj;
     }
     return nullptr;
 }

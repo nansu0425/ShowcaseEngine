@@ -25,6 +25,9 @@ public:
     using DirtyCallback = std::function<void()>;
     void SetDirtyCallback(DirtyCallback cb) { m_dirtyCallback = std::move(cb); }
 
+    using AddObjectCallback = std::function<SceneObject*(const std::string& modelSource)>;
+    void SetAddObjectCallback(AddObjectCallback cb) { m_addObjectCallback = std::move(cb); }
+
     // State persistence
     ImGuizmo::OPERATION GetGizmoOperation() const { return m_gizmoOperation; }
     ImGuizmo::MODE GetGizmoMode() const { return m_gizmoMode; }
@@ -57,6 +60,7 @@ private:
     float m_snapScale = 0.1f;
 
     DirtyCallback m_dirtyCallback;
+    AddObjectCallback m_addObjectCallback;
 };
 
 } // namespace showcase

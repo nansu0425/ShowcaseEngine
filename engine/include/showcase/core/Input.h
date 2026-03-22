@@ -2,8 +2,8 @@
 
 #include <Windows.h>
 
-#include <cstdint>
 #include <array>
+#include <cstdint>
 
 namespace showcase {
 
@@ -30,7 +30,7 @@ public:
 private:
     std::array<bool, 256> m_keysCurrent = {};
     std::array<bool, 256> m_keysPrevious = {};
-    std::array<bool, 3> m_mouseButtons = {};     // Left, Right, Middle
+    std::array<bool, 3> m_mouseButtons = {}; // Left, Right, Middle
     std::array<bool, 3> m_prevMouseButtons = {};
 
     int m_mouseX = 0;
@@ -41,9 +41,10 @@ private:
 };
 
 namespace Key {
-    constexpr int kShift   = 0x10; // VK_SHIFT
-    constexpr int kControl = 0x11; // VK_CONTROL
-    constexpr int kAlt     = 0x12; // VK_MENU
+constexpr int kShift = 0x10;   // VK_SHIFT
+constexpr int kControl = 0x11; // VK_CONTROL
+constexpr int kAlt = 0x12;     // VK_MENU
+constexpr int kDelete = 0x2E;  // VK_DELETE
 } // namespace Key
 
 } // namespace showcase

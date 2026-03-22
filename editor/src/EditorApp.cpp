@@ -23,7 +23,7 @@ namespace showcase {
 
 // ── Init ──────────────────────────────────────────────────────────
 
-bool EditorApp::Init(const EditorAppDesc &desc) {
+bool EditorApp::Init(const EditorAppDesc& desc) {
     Log::Init();
 
     if (!m_window.Init(desc.window))
@@ -38,12 +38,12 @@ bool EditorApp::Init(const EditorAppDesc &desc) {
         return false;
     }
 
-    m_console.RegisterCommand("fps", [this](const std::string &) -> std::string {
+    m_console.RegisterCommand("fps", [this](const std::string&) -> std::string {
         m_viewport.ToggleShowFPS();
         return m_viewport.GetShowFPS() ? "FPS overlay enabled" : "FPS overlay disabled";
     });
 
-    m_console.RegisterCommand("vsync", [this](const std::string &) -> std::string {
+    m_console.RegisterCommand("vsync", [this](const std::string&) -> std::string {
         bool enabled = !m_renderContext.GetVSyncEnabled();
         m_renderContext.SetVSyncEnabled(enabled);
         return enabled ? "V-Sync enabled" : "V-Sync disabled";
@@ -56,8 +56,7 @@ bool EditorApp::Init(const EditorAppDesc &desc) {
         return false;
     }
 
-    m_viewport.SetResizeCallback(
-        [this](uint32_t w, uint32_t h) { m_sceneRenderer.OnResize(w, h); });
+    m_viewport.SetResizeCallback([this](uint32_t w, uint32_t h) { m_sceneRenderer.OnResize(w, h); });
 
     m_viewport.SetToolbarCallback([this]() { m_editorController.RenderToolbar(m_viewport); });
 
@@ -77,14 +76,22 @@ bool EditorApp::Init(const EditorAppDesc &desc) {
     BuildDefaultScene();
 
     // Initialize viewport camera (defaults, overridden by config if available)
-    m_viewport.InitCamera(Vector3(0.0f, 5.0f, -15.0f), Vector3(0.0f, 0.0f, 0.0f), kPiOver4, 0.1f,
-                          1000.0f);
+    m_viewport.InitCamera(Vector3(0.0f, 5.0f, -15.0f), Vector3(0.0f, 0.0f, 0.0f), kPiOver4, 0.1f, 1000.0f);
 
     LoadEditorConfig();
 
     m_editorController.SetDirtyCallback([this]() {
         m_sceneDirty = true;
         UpdateWindowTitle();
+    });
+
+    m_editorController.SetAddObjectCallback([this](const std::string& modelSource) -> SceneObject* {
+        Model* model = ResolveModel(modelSource);
+        if (!model)
+            return nullptr;
+        SceneObject& obj = m_scene.AddObject(model, "Cube", Vector3(0, 1, 0));
+        obj.modelSource = modelSource;
+        return &obj;
     });
 
     UpdateWindowTitle();
@@ -103,39 +110,31 @@ void EditorApp::BuildDefaultScene() {
 
     m_scene.Clear();
     m_scene.AddObject(&m_gridModel, "Ground Grid", Vector3(0, 0, 0)).modelSource = "builtin:grid";
-    m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2))
+    m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2)).modelSource =
+        "builtin:cube";
+    m_scene.AddObject(&m_cubeModel, "Cube 2", Vector3(5, 0.75f, 3), Vector3(0, 0, 0), Vector3(1.5f, 1.5f, 1.5f))
         .modelSource = "builtin:cube";
-    m_scene
-        .AddObject(&m_cubeModel, "Cube 2", Vector3(5, 0.75f, 3), Vector3(0, 0, 0),
-                   Vector3(1.5f, 1.5f, 1.5f))
-        .modelSource = "builtin:cube";
-    m_scene
-        .AddObject(&m_cubeModel, "Cube 3", Vector3(-6, 2, -4), Vector3(0, 0, 0), Vector3(3, 4, 3))
-        .modelSource = "builtin:cube";
-    m_scene
-        .AddObject(&m_cubeModel, "Cube 4", Vector3(8, 0.5f, -7), Vector3(0, 0, 0), Vector3(1, 1, 1))
-        .modelSource = "builtin:cube";
-    m_scene
-        .AddObject(&m_cubeModel, "Cube 5", Vector3(-3, 0.5f, 8), Vector3(0, 0, 0), Vector3(2, 1, 2))
-        .modelSource = "builtin:cube";
+    m_scene.AddObject(&m_cubeModel, "Cube 3", Vector3(-6, 2, -4), Vector3(0, 0, 0), Vector3(3, 4, 3)).modelSource =
+        "builtin:cube";
+    m_scene.AddObject(&m_cubeModel, "Cube 4", Vector3(8, 0.5f, -7), Vector3(0, 0, 0), Vector3(1, 1, 1)).modelSource =
+        "builtin:cube";
+    m_scene.AddObject(&m_cubeModel, "Cube 5", Vector3(-3, 0.5f, 8), Vector3(0, 0, 0), Vector3(2, 1, 2)).modelSource =
+        "builtin:cube";
 
     // Try loading a glTF model from assets/models/
     {
-        std::filesystem::path modelDir =
-            std::filesystem::path(GetExecutableDir()) / "assets" / "models";
+        std::filesystem::path modelDir = std::filesystem::path(GetExecutableDir()) / "assets" / "models";
 
         if (std::filesystem::exists(modelDir)) {
-            for (const auto &entry : std::filesystem::directory_iterator(modelDir)) {
+            for (const auto& entry : std::filesystem::directory_iterator(modelDir)) {
                 std::string ext = entry.path().extension().string();
                 if (ext == ".gltf" || ext == ".glb") {
-                    m_modelLoaded =
-                        ModelLoader::LoadGLTF(m_renderContext, entry.path().string(), m_testModel);
+                    m_modelLoaded = ModelLoader::LoadGLTF(m_renderContext, entry.path().string(), m_testModel);
                     if (m_modelLoaded) {
                         SE_LOG_INFO("Loaded test model: {}", entry.path().filename().string());
                         std::string relPath = "assets/models/" + entry.path().filename().string();
                         m_testModelSource = "file:" + relPath;
-                        m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0))
-                            .modelSource = m_testModelSource;
+                        m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0)).modelSource = m_testModelSource;
                     }
                     break;
                 }
@@ -143,8 +142,7 @@ void EditorApp::BuildDefaultScene() {
         }
 
         if (!m_modelLoaded) {
-            SE_LOG_INFO(
-                "No glTF model found in assets/models/ — rendering procedural geometry only");
+            SE_LOG_INFO("No glTF model found in assets/models/ — rendering procedural geometry only");
         }
     }
 
@@ -211,8 +209,7 @@ void EditorApp::LoadEditorConfig() {
     // Gizmo settings
     auto g = doc["gizmo"];
     if (g.Contains("operation")) {
-        m_editorController.SetGizmoOperation(
-            static_cast<ImGuizmo::OPERATION>(g["operation"].GetInt()));
+        m_editorController.SetGizmoOperation(static_cast<ImGuizmo::OPERATION>(g["operation"].GetInt()));
     }
     if (g.Contains("mode")) {
         m_editorController.SetGizmoMode(static_cast<ImGuizmo::MODE>(g["mode"].GetInt()));
@@ -289,10 +286,12 @@ void EditorApp::ResolveSceneModels() {
 
 void EditorApp::NewScene() {
     if (m_sceneDirty) {
-        DialogResult result = ShowConfirmDialog(m_window.GetHandle(), "ShowcaseEditor",
-                                                "Save changes to current scene?");
-        if (result == DialogResult::Cancel) return;
-        if (result == DialogResult::Yes && !SaveScene()) return;
+        DialogResult result =
+            ShowConfirmDialog(m_window.GetHandle(), "ShowcaseEditor", "Save changes to current scene?");
+        if (result == DialogResult::Cancel)
+            return;
+        if (result == DialogResult::Yes && !SaveScene())
+            return;
     }
 
     // Flush GPU and clean up all models before rebuilding
@@ -327,8 +326,7 @@ void EditorApp::NewScene() {
     BuildDefaultScene();
 
     // Reset camera to default
-    m_viewport.InitCamera(Vector3(0.0f, 5.0f, -15.0f), Vector3(0.0f, 0.0f, 0.0f), kPiOver4,
-                          0.1f, 1000.0f);
+    m_viewport.InitCamera(Vector3(0.0f, 5.0f, -15.0f), Vector3(0.0f, 0.0f, 0.0f), kPiOver4, 0.1f, 1000.0f);
 
     m_currentScenePath.clear();
     m_sceneDirty = false;
@@ -337,14 +335,17 @@ void EditorApp::NewScene() {
 
 void EditorApp::OpenScene() {
     if (m_sceneDirty) {
-        DialogResult result = ShowConfirmDialog(m_window.GetHandle(), "ShowcaseEditor",
-                                                "Save changes to current scene?");
-        if (result == DialogResult::Cancel) return;
-        if (result == DialogResult::Yes && !SaveScene()) return;
+        DialogResult result =
+            ShowConfirmDialog(m_window.GetHandle(), "ShowcaseEditor", "Save changes to current scene?");
+        if (result == DialogResult::Cancel)
+            return;
+        if (result == DialogResult::Yes && !SaveScene())
+            return;
     }
 
     std::string path = OpenFileDialog(m_window.GetHandle(), kSceneFileFilter, kSceneFileExt);
-    if (path.empty()) return;
+    if (path.empty())
+        return;
 
     // Flush GPU and clean up dynamic models
     m_renderContext.GetDirectQueue().Flush();
@@ -370,10 +371,8 @@ void EditorApp::OpenScene() {
     auto cam = doc["camera"];
     auto camPos = cam["position"];
     if (camPos.IsArray() && camPos.Size() >= 3 && cam.Contains("yaw") && cam.Contains("pitch")) {
-        m_viewport.InitCamera(
-            Vector3(camPos[0].GetFloat(), camPos[1].GetFloat(), camPos[2].GetFloat()),
-            cam["yaw"].GetFloat(), cam["pitch"].GetFloat(),
-            kPiOver4, 0.1f, 1000.0f);
+        m_viewport.InitCamera(Vector3(camPos[0].GetFloat(), camPos[1].GetFloat(), camPos[2].GetFloat()),
+                              cam["yaw"].GetFloat(), cam["pitch"].GetFloat(), kPiOver4, 0.1f, 1000.0f);
     }
 
     // Rebuild registry with builtin models
@@ -413,7 +412,8 @@ bool EditorApp::SaveScene() {
 
 bool EditorApp::SaveSceneAs() {
     std::string path = SaveFileDialog(m_window.GetHandle(), kSceneFileFilter, kSceneFileExt);
-    if (path.empty()) return false;
+    if (path.empty())
+        return false;
 
     m_currentScenePath = path;
     return SaveScene();
@@ -566,24 +566,21 @@ int EditorApp::Run() {
         static bool s_dockLayoutChecked = false;
         if (!s_dockLayoutChecked) {
             s_dockLayoutChecked = true;
-            ImGuiDockNode *node = ImGui::DockBuilderGetNode(dockspaceId);
+            ImGuiDockNode* node = ImGui::DockBuilderGetNode(dockspaceId);
             if (!node || !node->IsSplitNode()) {
                 ImGui::DockBuilderRemoveNode(dockspaceId);
                 ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
-                const ImGuiViewport *vp = ImGui::GetMainViewport();
+                const ImGuiViewport* vp = ImGui::GetMainViewport();
                 ImGui::DockBuilderSetNodeSize(dockspaceId, vp->Size);
 
                 ImGuiID dockBottom;
                 ImGuiID dockCenter;
-                ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, &dockBottom,
-                                            &dockCenter);
+                ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, &dockBottom, &dockCenter);
 
                 ImGuiID dockRight;
-                ImGui::DockBuilderSplitNode(dockCenter, ImGuiDir_Right, 0.20f, &dockRight,
-                                            &dockCenter);
+                ImGui::DockBuilderSplitNode(dockCenter, ImGuiDir_Right, 0.20f, &dockRight, &dockCenter);
                 ImGuiID dockRightTop, dockRightBottom;
-                ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.5f, &dockRightBottom,
-                                            &dockRightTop);
+                ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.5f, &dockRightBottom, &dockRightTop);
 
                 ImGui::DockBuilderDockWindow("Console", dockBottom);
                 ImGui::DockBuilderDockWindow("Viewport", dockCenter);

@@ -1,20 +1,20 @@
 #pragma once
 
-#include <showcase/graphics/Model.h>
 #include <showcase/core/JsonDocument.h>
+#include <showcase/graphics/Model.h>
 
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace showcase {
 
 struct SceneObject {
     uint32_t id = 0;
     std::string name;
-    std::string modelSource;   // e.g. "builtin:cube", "file:assets/models/duck.gltf"
+    std::string modelSource; // e.g. "builtin:cube", "file:assets/models/duck.gltf"
     Model* model = nullptr;
     Vector3 position = {};
-    Vector3 rotation = {};       // Euler degrees (Y→X→Z)
+    Vector3 rotation = {}; // Euler degrees (Y→X→Z)
     Vector3 scale = {1, 1, 1};
     Matrix worldTransform;
     BoundingBox worldAABB;
@@ -30,10 +30,9 @@ struct SceneObject {
 class Scene {
 public:
     SceneObject& AddObject(Model* model, const Matrix& transform);
-    SceneObject& AddObject(Model* model, const std::string& name,
-                           const Vector3& pos,
-                           const Vector3& rot = {},
+    SceneObject& AddObject(Model* model, const std::string& name, const Vector3& pos, const Vector3& rot = {},
                            const Vector3& scl = {1, 1, 1});
+    bool RemoveObject(uint32_t id);
     void Clear();
 
     void Serialize(JsonDocument& doc) const;

@@ -10,16 +10,13 @@ namespace showcase {
 
 // ── Update ────────────────────────────────────────────────────────
 
-void EditorController::Update(const Input &input, Scene &scene, SceneRenderer &renderer,
-                              ViewportPanel &viewport) {
-    Camera &camera = viewport.GetCamera();
+void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport) {
+    Camera& camera = viewport.GetCamera();
 
     // Left-click picking (not during right-click camera rotation, not when using gizmo)
-    if (input.IsMouseButtonPressed(0) && !input.IsMouseButtonDown(1) && m_viewportHovered &&
-        !ImGuizmo::IsOver()) {
-        m_selectedObjectId =
-            renderer.PickObject(input.GetMouseX(), input.GetMouseY(), camera, scene,
-                                m_viewportMin.x, m_viewportMin.y, m_viewportMax.x, m_viewportMax.y);
+    if (input.IsMouseButtonPressed(0) && !input.IsMouseButtonDown(1) && m_viewportHovered && !ImGuizmo::IsOver()) {
+        m_selectedObjectId = renderer.PickObject(input.GetMouseX(), input.GetMouseY(), camera, scene, m_viewportMin.x,
+                                                 m_viewportMin.y, m_viewportMax.x, m_viewportMax.y);
     }
 
     // Gizmo shortcuts (only when right-click not held, to avoid camera movement conflict)
@@ -36,13 +33,20 @@ void EditorController::Update(const Input &input, Scene &scene, SceneRenderer &r
         if (input.IsKeyPressed('X')) {
             m_gizmoMode = (m_gizmoMode == ImGuizmo::LOCAL) ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
         }
+        if (input.IsKeyPressed(Key::kDelete) && m_selectedObjectId > 0) {
+            if (scene.RemoveObject(static_cast<uint32_t>(m_selectedObjectId))) {
+                m_selectedObjectId = -1;
+                if (m_dirtyCallback)
+                    m_dirtyCallback();
+            }
+        }
     }
 }
 
 // ── UI ────────────────────────────────────────────────────────────
 
-void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
-    Camera &camera = viewport.GetCamera();
+void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
+    Camera& camera = viewport.GetCamera();
 
     ImGuizmo::BeginFrame();
 
@@ -52,9 +56,9 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
     m_viewportHovered = ImGui::IsMouseHoveringRect(m_viewportMin, m_viewportMax, false);
 
     // -- Gizmo rendering --
-    auto *vpWindow = ImGui::FindWindowByName("Viewport");
+    auto* vpWindow = ImGui::FindWindowByName("Viewport");
     if (vpWindow && !vpWindow->Hidden && m_selectedObjectId > 0) {
-        SceneObject *selected = scene.FindById(static_cast<uint32_t>(m_selectedObjectId));
+        SceneObject* selected = scene.FindById(static_cast<uint32_t>(m_selectedObjectId));
         if (selected) {
             ImGuizmo::SetDrawlist(vpWindow->DrawList);
             ImGuizmo::SetRect(m_viewportMin.x, m_viewportMin.y, m_viewportMax.x - m_viewportMin.x,
@@ -86,8 +90,8 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
                 snap[0] = snap[1] = snap[2] = v;
             }
 
-            ImGuizmo::Manipulate(&view.m[0][0], &proj.m[0][0], m_gizmoOperation, m_gizmoMode,
-                                 &world.m[0][0], nullptr, m_useSnap ? snap : nullptr);
+            ImGuizmo::Manipulate(&view.m[0][0], &proj.m[0][0], m_gizmoOperation, m_gizmoMode, &world.m[0][0], nullptr,
+                                 m_useSnap ? snap : nullptr);
 
             if (ImGuizmo::IsUsing()) {
                 Vector3 newPos, newScale;
@@ -97,13 +101,13 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
                     selected->scale = ClampScale(newScale);
 
                     Vector3 euler = newRot.ToEuler();
-                    selected->rotation =
-                        Vector3(ToDegrees(euler.x), ToDegrees(euler.y), ToDegrees(euler.z));
+                    selected->rotation = Vector3(ToDegrees(euler.x), ToDegrees(euler.y), ToDegrees(euler.z));
 
                     selected->RecomputeWorldTransform();
                     selected->UpdateAABB();
 
-                    if (m_dirtyCallback) m_dirtyCallback();
+                    if (m_dirtyCallback)
+                        m_dirtyCallback();
                 }
             }
         }
@@ -111,20 +115,72 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
 
     // -- Scene Hierarchy panel --
     if (ImGui::Begin("Scene Hierarchy")) {
-        for (auto &obj : scene.GetObjects()) {
+        if (ImGui::Button("+")) {
+            ImGui::OpenPopup("AddObjectPopup");
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Add object to scene");
+        }
+        ImGui::SameLine();
+        const bool hasSelection = m_selectedObjectId > 0;
+        if (!hasSelection)
+            ImGui::BeginDisabled();
+        if (ImGui::Button("-")) {
+            scene.RemoveObject(static_cast<uint32_t>(m_selectedObjectId));
+            m_selectedObjectId = -1;
+            if (m_dirtyCallback)
+                m_dirtyCallback();
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            ImGui::SetTooltip("Remove selected object (Del)");
+        }
+        if (!hasSelection)
+            ImGui::EndDisabled();
+        if (ImGui::BeginPopup("AddObjectPopup")) {
+            if (ImGui::MenuItem("Cube")) {
+                if (m_addObjectCallback) {
+                    SceneObject* newObj = m_addObjectCallback("builtin:cube");
+                    if (newObj) {
+                        m_selectedObjectId = static_cast<int>(newObj->id);
+                        if (m_dirtyCallback)
+                            m_dirtyCallback();
+                    }
+                }
+            }
+            ImGui::EndPopup();
+        }
+
+        ImGui::Separator();
+
+        for (auto& obj : scene.GetObjects()) {
+            ImGui::PushID(static_cast<int>(obj.id));
             bool isSelected = (static_cast<int>(obj.id) == m_selectedObjectId);
             if (ImGui::Selectable(obj.name.c_str(), isSelected)) {
                 m_selectedObjectId = static_cast<int>(obj.id);
             }
+            if (ImGui::BeginPopupContextItem()) {
+                if (ImGui::MenuItem("Delete")) {
+                    if (static_cast<int>(obj.id) == m_selectedObjectId) {
+                        m_selectedObjectId = -1;
+                    }
+                    scene.RemoveObject(obj.id);
+                    if (m_dirtyCallback)
+                        m_dirtyCallback();
+                    ImGui::EndPopup();
+                    ImGui::PopID();
+                    break;
+                }
+                ImGui::EndPopup();
+            }
+            ImGui::PopID();
         }
     }
     ImGui::End();
 
     // -- Inspector panel --
     if (ImGui::Begin("Inspector")) {
-        SceneObject *selected = (m_selectedObjectId > 0)
-                                    ? scene.FindById(static_cast<uint32_t>(m_selectedObjectId))
-                                    : nullptr;
+        SceneObject* selected =
+            (m_selectedObjectId > 0) ? scene.FindById(static_cast<uint32_t>(m_selectedObjectId)) : nullptr;
         if (selected) {
             ImGui::Text("Name: %s", selected->name.c_str());
             ImGui::Text("ID: %u", selected->id);
@@ -145,8 +201,10 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
             if (changed) {
                 selected->RecomputeWorldTransform();
                 selected->UpdateAABB();
-                if (m_dirtyCallback) m_dirtyCallback();
+                if (m_dirtyCallback)
+                    m_dirtyCallback();
             }
+
         } else {
             ImGui::TextDisabled("No object selected");
         }
@@ -156,8 +214,8 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
 
 // ── Toolbar ───────────────────────────────────────────────────────
 
-void EditorController::RenderToolbar(ViewportPanel &viewport) {
-    Camera &camera = viewport.GetCamera();
+void EditorController::RenderToolbar(ViewportPanel& viewport) {
+    Camera& camera = viewport.GetCamera();
 
     if (ImGui::RadioButton("Translate", m_gizmoOperation == ImGuizmo::TRANSLATE)) {
         m_gizmoOperation = ImGuizmo::TRANSLATE;
