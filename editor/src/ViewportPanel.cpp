@@ -119,7 +119,7 @@ void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
     if (input.IsMouseButtonDown(1)) {
         m_yaw += input.GetMouseDeltaX() * cameraLookSpeed;
         m_pitch -= input.GetMouseDeltaY() * cameraLookSpeed;
-        m_pitch = std::clamp(m_pitch, -PiOver2 * 0.98f, PiOver2 * 0.98f);
+        m_pitch = std::clamp(m_pitch, -kPiOver2 * 0.98f, kPiOver2 * 0.98f);
     }
 
     // Compute direction vectors from yaw/pitch

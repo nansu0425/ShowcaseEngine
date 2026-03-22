@@ -36,7 +36,7 @@ private:
     Matrix m_viewMatrix = {};
     Matrix m_projMatrix = {};
 
-    float m_fovY = PiOver4;
+    float m_fovY = kPiOver4;
     float m_aspectRatio = 16.0f / 9.0f;
     float m_nearZ = 0.1f;
     float m_farZ = 1000.0f;

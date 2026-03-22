@@ -58,7 +58,7 @@ bool EditorApp::Init(const EditorAppDesc &desc) {
     BuildDefaultScene();
 
     // Initialize viewport camera
-    m_viewport.InitCamera(Vector3(0.0f, 5.0f, -15.0f), Vector3(0.0f, 0.0f, 0.0f), PiOver4, 0.1f,
+    m_viewport.InitCamera(Vector3(0.0f, 5.0f, -15.0f), Vector3(0.0f, 0.0f, 0.0f), kPiOver4, 0.1f,
                           1000.0f);
 
     m_timer.Reset();

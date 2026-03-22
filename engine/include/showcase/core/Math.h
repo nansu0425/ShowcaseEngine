@@ -18,10 +18,10 @@ using BoundingBox     = DirectX::BoundingBox;
 using BoundingFrustum = DirectX::BoundingFrustum;
 
 // Constants
-inline constexpr float Pi      = DirectX::XM_PI;
-inline constexpr float PiOver2 = DirectX::XM_PIDIV2;
-inline constexpr float PiOver4 = DirectX::XM_PIDIV4;
-inline constexpr float TwoPi   = DirectX::XM_2PI;
+inline constexpr float kPi      = DirectX::XM_PI;
+inline constexpr float kPiOver2 = DirectX::XM_PIDIV2;
+inline constexpr float kPiOver4 = DirectX::XM_PIDIV4;
+inline constexpr float kTwoPi   = DirectX::XM_2PI;
 
 // Angle conversion
 inline float ToRadians(float degrees) { return DirectX::XMConvertToRadians(degrees); }
