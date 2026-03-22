@@ -1,6 +1,7 @@
 #include <showcase/editor/EditorApp.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Platform.h>
 
 #include <imgui_internal.h>
 
@@ -93,10 +94,8 @@ void EditorApp::BuildDefaultScene() {
 
     // Try loading a glTF model from assets/models/
     {
-        char exePath[MAX_PATH];
-        GetModuleFileNameA(nullptr, exePath, MAX_PATH);
         std::filesystem::path modelDir =
-            std::filesystem::path(exePath).parent_path() / "assets" / "models";
+            std::filesystem::path(GetExecutableDir()) / "assets" / "models";
 
         if (std::filesystem::exists(modelDir)) {
             for (const auto &entry : std::filesystem::directory_iterator(modelDir)) {
@@ -163,7 +162,7 @@ int EditorApp::Run() {
         m_input.Update(m_window.GetHandle());
 
         if (m_window.IsMinimized()) {
-            Sleep(10);
+            SleepMs(10);
             continue;
         }
 

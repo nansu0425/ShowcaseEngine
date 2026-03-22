@@ -2,9 +2,6 @@
 
 #include <showcase/core/Log.h>
 
-#include <spdlog/details/log_msg.h>
-#include <spdlog/pattern_formatter.h>
-
 #include <chrono>
 
 namespace showcase {
@@ -15,54 +12,47 @@ static std::string CurrentTimestamp() {
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
     std::time_t tt = std::chrono::system_clock::to_time_t(now);
     std::tm tm{};
+#ifdef _MSC_VER
     localtime_s(&tm, &tt);
+#else
+    localtime_r(&tt, &tm);
+#endif
     char buf[16];
     std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
     return buf;
 }
 
-// ── Console sink ──────────────────────────────────────────────────
+// ── Console log listener ─────────────────────────────────────────
 
-// Custom spdlog sink that forwards log messages to Console
-template<typename Mutex>
-class ConsoleSink : public spdlog::sinks::base_sink<Mutex> {
+class ConsoleLogListener : public LogListener {
 public:
-    explicit ConsoleSink(Console* console) : m_console(console) {}
+    explicit ConsoleLogListener(Console* console) : m_console(console) {}
 
-protected:
-    void sink_it_(const spdlog::details::log_msg& msg) override {
-        // Format timestamp
-        std::chrono::system_clock::time_point time = msg.time;
-        std::time_t tt = std::chrono::system_clock::to_time_t(time);
-        std::tm tm{};
-        localtime_s(&tm, &tt);
-        char timeBuf[16];
-        std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
-
-        // Format message payload
-        std::string payload(msg.payload.data(), msg.payload.size());
-
-        m_console->AddEntry(msg.level, timeBuf, payload);
+    void OnLogMessage(const LogMessage& msg) override {
+        m_console->AddEntry(msg.level, msg.timestamp, msg.message);
     }
-
-    void flush_() override {}
 
 private:
     Console* m_console;
 };
 
-// ── Init ──────────────────────────────────────────────────────────
+// ── Init / Shutdown ──────────────────────────────────────────────
 
 bool Console::Init() {
-    std::shared_ptr<ConsoleSink<std::mutex>> sink = std::make_shared<ConsoleSink<std::mutex>>(this);
-    sink->set_level(spdlog::level::trace);
-    Log::AddSink(sink);
+    m_logListener = std::make_unique<ConsoleLogListener>(this);
+    Log::AddListener(m_logListener.get());
     return true;
+}
+
+Console::~Console() {
+    if (m_logListener) {
+        Log::RemoveListener(m_logListener.get());
+    }
 }
 
 // ── Entry management ──────────────────────────────────────────────
 
-void Console::AddEntry(spdlog::level::level_enum level, const std::string& timestamp, const std::string& message) {
+void Console::AddEntry(LogLevel level, const std::string& timestamp, const std::string& message) {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (m_entries.size() >= kMaxEntries) {
         m_entries.erase(m_entries.begin());
@@ -77,25 +67,25 @@ void Console::Clear() {
 
 // ── UI helpers ────────────────────────────────────────────────────
 
-ImVec4 Console::GetLevelColor(spdlog::level::level_enum level) {
+ImVec4 Console::GetLevelColor(LogLevel level) {
     switch (level) {
-        case spdlog::level::trace:    return {0.5f, 0.5f, 0.5f, 1.0f}; // gray
-        case spdlog::level::info:     return {1.0f, 1.0f, 1.0f, 1.0f}; // white
-        case spdlog::level::warn:     return {1.0f, 0.9f, 0.3f, 1.0f}; // yellow
-        case spdlog::level::err:      return {1.0f, 0.3f, 0.3f, 1.0f}; // red
-        case spdlog::level::critical: return {1.0f, 0.1f, 0.1f, 1.0f}; // bright red
-        default:                      return {1.0f, 1.0f, 1.0f, 1.0f};
+        case LogLevel::Trace:    return {0.5f, 0.5f, 0.5f, 1.0f}; // gray
+        case LogLevel::Info:     return {1.0f, 1.0f, 1.0f, 1.0f}; // white
+        case LogLevel::Warn:     return {1.0f, 0.9f, 0.3f, 1.0f}; // yellow
+        case LogLevel::Error:    return {1.0f, 0.3f, 0.3f, 1.0f}; // red
+        case LogLevel::Critical: return {1.0f, 0.1f, 0.1f, 1.0f}; // bright red
+        default:                 return {1.0f, 1.0f, 1.0f, 1.0f};
     }
 }
 
-const char* Console::GetLevelLabel(spdlog::level::level_enum level) {
+const char* Console::GetLevelLabel(LogLevel level) {
     switch (level) {
-        case spdlog::level::trace:    return "TRACE";
-        case spdlog::level::info:     return "INFO";
-        case spdlog::level::warn:     return "WARN";
-        case spdlog::level::err:      return "ERROR";
-        case spdlog::level::critical: return "CRITICAL";
-        default:                      return "???";
+        case LogLevel::Trace:    return "TRACE";
+        case LogLevel::Info:     return "INFO";
+        case LogLevel::Warn:     return "WARN";
+        case LogLevel::Error:    return "ERROR";
+        case LogLevel::Critical: return "CRITICAL";
+        default:                 return "???";
     }
 }
 
@@ -109,11 +99,11 @@ void Console::ExecuteCommand(const std::string& input) {
     std::string ts = CurrentTimestamp();
 
     // Echo command
-    AddEntry(spdlog::level::trace, ts, "> " + input);
+    AddEntry(LogLevel::Trace, ts, "> " + input);
 
     // Must start with '/'
     if (input.empty() || input[0] != '/') {
-        AddEntry(spdlog::level::warn, ts, "Commands must start with '/'");
+        AddEntry(LogLevel::Warn, ts, "Commands must start with '/'");
         return;
     }
 
@@ -127,10 +117,10 @@ void Console::ExecuteCommand(const std::string& input) {
     if (it != m_commands.end()) {
         std::string result = it->second(args);
         if (!result.empty()) {
-            AddEntry(spdlog::level::info, ts, result);
+            AddEntry(LogLevel::Info, ts, result);
         }
     } else {
-        AddEntry(spdlog::level::warn, ts, "Unknown command: /" + command);
+        AddEntry(LogLevel::Warn, ts, "Unknown command: /" + command);
     }
 }
 
@@ -146,9 +136,9 @@ void Console::Render() {
 
     // Toolbar
     static const char* levelNames[] = {"Trace", "Info", "Warn", "Error", "Critical"};
-    static const spdlog::level::level_enum levelValues[] = {
-        spdlog::level::trace, spdlog::level::info, spdlog::level::warn,
-        spdlog::level::err, spdlog::level::critical
+    static const LogLevel levelValues[] = {
+        LogLevel::Trace, LogLevel::Info, LogLevel::Warn,
+        LogLevel::Error, LogLevel::Critical
     };
 
     ImGui::SetNextItemWidth(100.0f);
@@ -169,7 +159,7 @@ void Console::Render() {
 
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        spdlog::level::level_enum filterLevel = levelValues[m_levelFilter];
+        LogLevel filterLevel = levelValues[m_levelFilter];
 
         for (const auto& entry : m_entries) {
             if (entry.level < filterLevel) continue;

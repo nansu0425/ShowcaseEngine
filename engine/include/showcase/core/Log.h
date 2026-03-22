@@ -1,5 +1,7 @@
 #pragma once
 
+#include <showcase/core/LogListener.h>
+
 #include <spdlog/spdlog.h>
 
 #include <memory>
@@ -10,6 +12,8 @@ class Log {
 public:
     static void Init();
     static void AddSink(spdlog::sink_ptr sink);
+    static void AddListener(LogListener* listener);
+    static void RemoveListener(LogListener* listener);
     static std::shared_ptr<spdlog::logger>& GetLogger() { return s_logger; }
 
 private:

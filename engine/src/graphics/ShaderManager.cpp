@@ -1,19 +1,11 @@
 #include <showcase/graphics/ShaderManager.h>
 
 #include <showcase/core/Log.h>
-
-#include <Windows.h>
+#include <showcase/core/Platform.h>
 
 #include <fstream>
 
 namespace showcase {
-
-static std::string GetExecutableDir() {
-    char path[MAX_PATH];
-    GetModuleFileNameA(nullptr, path, MAX_PATH);
-    std::string exePath(path);
-    return exePath.substr(0, exePath.find_last_of("\\/") + 1);
-}
 
 // ── Shader loading ───────────────────────────────────────────────────
 D3D12_SHADER_BYTECODE ShaderManager::LoadShader(const std::string& path) {

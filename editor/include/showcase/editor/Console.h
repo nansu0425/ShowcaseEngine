@@ -1,19 +1,20 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/base_sink.h>
+#include <showcase/core/LogListener.h>
+
 #include <imgui.h>
 
 #include <string>
 #include <vector>
 #include <mutex>
 #include <functional>
+#include <memory>
 #include <unordered_map>
 
 namespace showcase {
 
 struct LogEntry {
-    spdlog::level::level_enum level;
+    LogLevel level;
     std::string timestamp;
     std::string message;
 };
@@ -22,28 +23,32 @@ using CommandHandler = std::function<std::string(const std::string&)>;
 
 class Console {
 public:
+    ~Console();
+
     [[nodiscard]] bool Init();
     void Render();
     void Clear();
 
-    void AddEntry(spdlog::level::level_enum level, const std::string& timestamp, const std::string& message);
+    void AddEntry(LogLevel level, const std::string& timestamp, const std::string& message);
     void RegisterCommand(const std::string& name, CommandHandler handler);
 
 private:
-    static ImVec4 GetLevelColor(spdlog::level::level_enum level);
-    static const char* GetLevelLabel(spdlog::level::level_enum level);
+    static ImVec4 GetLevelColor(LogLevel level);
+    static const char* GetLevelLabel(LogLevel level);
     void ExecuteCommand(const std::string& input);
 
     std::vector<LogEntry> m_entries;
     std::mutex m_mutex;
     bool m_autoScroll = true;
     bool m_open = true;
-    int m_levelFilter = 0; // index into spdlog::level (0=trace)
+    int m_levelFilter = 0; // index into LogLevel (0=Trace)
     ImGuiTextFilter m_textFilter;
     static constexpr size_t kMaxEntries = 2048;
 
     char m_inputBuf[256] = {};
     std::unordered_map<std::string, CommandHandler> m_commands;
+
+    std::unique_ptr<LogListener> m_logListener;
 };
 
 } // namespace showcase

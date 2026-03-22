@@ -147,7 +147,7 @@ void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
 
     // Shift to boost speed
     float speed = cameraMoveSpeed;
-    if (input.IsKeyDown(VK_SHIFT)) speed *= 3.0f;
+    if (input.IsKeyDown(Key::kShift)) speed *= 3.0f;
 
     Vector3 pos = m_camera.GetPosition() + move * speed * deltaTime;
 

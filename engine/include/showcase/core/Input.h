@@ -40,4 +40,10 @@ private:
     int m_wheelDelta = 0;
 };
 
+namespace Key {
+    constexpr int kShift   = 0x10; // VK_SHIFT
+    constexpr int kControl = 0x11; // VK_CONTROL
+    constexpr int kAlt     = 0x12; // VK_MENU
+} // namespace Key
+
 } // namespace showcase

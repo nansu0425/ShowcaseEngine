@@ -41,7 +41,11 @@ The project is split into two CMake targets with a strict dependency direction:
 └──────────────────────────────────────────────┘
 ```
 
-**Key principle:** The engine has **zero ImGui dependency**. All UI lives in the editor. This keeps the engine testable and reusable independently.
+**Key principles:**
+- The engine has **zero ImGui dependency**. All UI lives in the editor.
+- **Dependency policy:** The editor depends only on **ImGui/ImGuizmo** (external) and **engine public API**. All other external libraries (spdlog, tinygltf, D3D12MA, etc.) and low-level APIs (Win32, D3D12) are owned by the engine, which exposes abstractions for editor use (e.g., `LogListener` for log capture, `Platform.h` for OS utilities, `Key::` constants for input).
+- **Accepted boundary exceptions:** `ImGuiLayer` is the designated platform integration point where ImGui backends (`imgui_impl_win32`, `imgui_impl_dx12`) necessarily touch Win32/D3D12 types.
+- **Entry point:** `EntryPoint.h` provides the `SE_MAIN` macro, which encapsulates WinMain boilerplate so that `main.cpp` needs no direct `<Windows.h>` include.
 
 ---
 
@@ -52,9 +56,12 @@ The project is split into two CMake targets with a strict dependency direction:
 | Class | File | Purpose |
 |-------|------|---------|
 | `Window` | `Window.h` | Win32 window creation, message pump, resize callback |
-| `Input` | `Input.h` | Keyboard and mouse state polling per frame |
+| `Input` | `Input.h` | Keyboard and mouse state polling per frame; `Key::` constants |
 | `Timer` | `Timer.h` | Frame delta time and FPS calculation |
 | `Log` | `Log.h` | spdlog wrapper with `SE_LOG_*` macros |
+| `LogListener` | `LogListener.h` | Abstract log listener interface (`LogLevel`, `LogMessage`) for non-spdlog consumers |
+| `Platform` | `Platform.h` | OS utilities (`GetExecutableDir()`, `SleepMs()`, `ShowErrorDialog()`) |
+| `EntryPoint` | `EntryPoint.h` | `SE_MAIN` macro — WinMain boilerplate for editor/app entry points |
 
 ### 2.2 Graphics Module — `engine/include/showcase/graphics/`
 
@@ -103,7 +110,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `EditorApp` | `EditorApp.h` | Top-level orchestrator: owns all subsystems, runs main loop |
 | `ViewportPanel` | `ViewportPanel.h` | 3D viewport: owns `OffscreenTarget` and `Camera`, handles FPS camera |
 | `ImGuiLayer` | `ImGuiLayer.h` | ImGui context init, DX12 backend, frame begin/end |
-| `Console` | `Console.h` | Log viewer (spdlog sink), command system, circular buffer (2048 entries) |
+| `Console` | `Console.h` | Log viewer (via `LogListener`), command system, circular buffer (2048 entries) |
 | `EditorController` | `EditorController.h` | Object picking, ImGuizmo gizmos (W/E/R), Scene Hierarchy + Inspector panels |
 
 ---
