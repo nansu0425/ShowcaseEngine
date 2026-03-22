@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "filepath=$(cat | python -c \"import sys,json; print(json.load(sys.stdin)['tool_input']['file_path'])\") && case \"$filepath\" in *.h|*.cpp|*.hlsl|*.hlsli) \"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/bin/clang-format.exe\" -i \"$filepath\" ;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}

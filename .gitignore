@@ -31,5 +31,5 @@ _deps/
 # ImGui runtime config
 imgui.ini
 
-# Claude AI
-.claude/
+# Claude AI (local settings only)
+.claude/settings.local.json
