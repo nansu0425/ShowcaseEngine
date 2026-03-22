@@ -97,7 +97,7 @@ void EditorApp::BuildDefaultScene() {
                 std::string ext = entry.path().extension().string();
                 if (ext == ".gltf" || ext == ".glb") {
                     m_modelLoaded =
-                        ModelLoader::LoadGLTF(entry.path().string(), m_renderContext, m_testModel);
+                        ModelLoader::LoadGLTF(m_renderContext, entry.path().string(), m_testModel);
                     if (m_modelLoaded) {
                         SE_LOG_INFO("Loaded test model: {}", entry.path().filename().string());
                         m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0));

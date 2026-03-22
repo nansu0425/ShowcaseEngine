@@ -214,8 +214,8 @@ static DirectX::BoundingBox ComputeAABB(const std::vector<ModelVertex>& vertices
 }
 
 // ── glTF loading ─────────────────────────────────────────────────────
-bool ModelLoader::LoadGLTF(const std::string& filepath,
-                           RenderContext& ctx,
+bool ModelLoader::LoadGLTF(RenderContext& ctx,
+                           const std::string& filepath,
                            Model& outModel) {
     auto* device = ctx.GetDevice().GetDevice();
     auto* allocator = ctx.GetDevice().GetAllocator();
