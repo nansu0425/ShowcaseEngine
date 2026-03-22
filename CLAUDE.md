@@ -41,6 +41,7 @@ cmake/           Dependencies.cmake, ShaderCompilation.cmake
 - **Namespace**: `showcase`
 - **Includes**: Public headers `<showcase/module/File.h>`, internal headers `"File.h"`
 - **GPU resource ownership**: `ComPtr<>` (COM), `D3D12MA::Allocation` (GPU memory), `std::unique_ptr<>` (general)
+- **Coding convention**: See `docs/CODING_CONVENTION.md` for full naming, formatting, and style rules
 - **Architecture doc sync**: When making architectural changes (adding/removing/renaming modules, classes, or dependencies; changing rendering pipeline, resource ownership, or build structure), update `docs/ARCHITECTURE.md` to reflect the current state
 
 ## Gotchas
