@@ -24,14 +24,18 @@ void EditorController::Update(const Input &input, Scene &scene, SceneRenderer &r
 
     // Gizmo shortcuts (only when right-click not held, to avoid camera movement conflict)
     if (!input.IsMouseButtonDown(1)) {
-        if (input.IsKeyPressed('W'))
+        if (input.IsKeyPressed('W')) {
             m_gizmoOperation = ImGuizmo::TRANSLATE;
-        if (input.IsKeyPressed('E'))
+        }
+        if (input.IsKeyPressed('E')) {
             m_gizmoOperation = ImGuizmo::ROTATE;
-        if (input.IsKeyPressed('R'))
+        }
+        if (input.IsKeyPressed('R')) {
             m_gizmoOperation = ImGuizmo::SCALE;
-        if (input.IsKeyPressed('X'))
+        }
+        if (input.IsKeyPressed('X')) {
             m_gizmoMode = (m_gizmoMode == ImGuizmo::LOCAL) ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
+        }
     }
 }
 
@@ -151,59 +155,72 @@ void EditorController::RenderUI(Scene &scene, ViewportPanel &viewport) {
 void EditorController::RenderToolbar(ViewportPanel &viewport) {
     Camera &camera = viewport.GetCamera();
 
-    if (ImGui::RadioButton("Translate", m_gizmoOperation == ImGuizmo::TRANSLATE))
+    if (ImGui::RadioButton("Translate", m_gizmoOperation == ImGuizmo::TRANSLATE)) {
         m_gizmoOperation = ImGuizmo::TRANSLATE;
-    if (ImGui::IsItemHovered())
+    }
+    if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Move objects along axes (W)");
+    }
     ImGui::SameLine();
-    if (ImGui::RadioButton("Rotate", m_gizmoOperation == ImGuizmo::ROTATE))
+    if (ImGui::RadioButton("Rotate", m_gizmoOperation == ImGuizmo::ROTATE)) {
         m_gizmoOperation = ImGuizmo::ROTATE;
-    if (ImGui::IsItemHovered())
+    }
+    if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Rotate objects around axes (E)");
+    }
     ImGui::SameLine();
-    if (ImGui::RadioButton("Scale", m_gizmoOperation == ImGuizmo::SCALE))
+    if (ImGui::RadioButton("Scale", m_gizmoOperation == ImGuizmo::SCALE)) {
         m_gizmoOperation = ImGuizmo::SCALE;
-    if (ImGui::IsItemHovered())
+    }
+    if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Scale objects along axes (R)");
-
-    ImGui::SameLine();
-    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    ImGui::SameLine();
-
-    if (ImGui::RadioButton("Local", m_gizmoMode == ImGuizmo::LOCAL))
-        m_gizmoMode = ImGuizmo::LOCAL;
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Transform relative to object's own axes (X)");
-    ImGui::SameLine();
-    if (ImGui::RadioButton("World", m_gizmoMode == ImGuizmo::WORLD))
-        m_gizmoMode = ImGuizmo::WORLD;
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Transform relative to world axes (X)");
-
-    ImGui::SameLine();
-    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    ImGui::SameLine();
-
-    ImGui::Checkbox("Snap", &m_useSnap);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Snap transform values to fixed increments");
-    if (m_useSnap) {
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(80);
-        if (m_gizmoOperation == ImGuizmo::TRANSLATE)
-            ImGui::DragFloat("##SnapVal", &m_snapTranslate, 0.1f, 0.1f, 10.0f);
-        else if (m_gizmoOperation == ImGuizmo::ROTATE)
-            ImGui::DragFloat("##SnapVal", &m_snapRotate, 1.0f, 1.0f, 90.0f);
-        else
-            ImGui::DragFloat("##SnapVal", &m_snapScale, 0.01f, 0.01f, 1.0f);
     }
 
     ImGui::SameLine();
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
     ImGui::SameLine();
 
-    if (ImGui::Button("Camera"))
+    if (ImGui::RadioButton("Local", m_gizmoMode == ImGuizmo::LOCAL)) {
+        m_gizmoMode = ImGuizmo::LOCAL;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Transform relative to object's own axes (X)");
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("World", m_gizmoMode == ImGuizmo::WORLD)) {
+        m_gizmoMode = ImGuizmo::WORLD;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Transform relative to world axes (X)");
+    }
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    ImGui::Checkbox("Snap", &m_useSnap);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Snap transform values to fixed increments");
+    }
+    if (m_useSnap) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80);
+        if (m_gizmoOperation == ImGuizmo::TRANSLATE) {
+            ImGui::DragFloat("##SnapVal", &m_snapTranslate, 0.1f, 0.1f, 10.0f);
+        } else if (m_gizmoOperation == ImGuizmo::ROTATE) {
+            ImGui::DragFloat("##SnapVal", &m_snapRotate, 1.0f, 1.0f, 90.0f);
+        } else {
+            ImGui::DragFloat("##SnapVal", &m_snapScale, 0.01f, 0.01f, 1.0f);
+        }
+    }
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    if (ImGui::Button("Camera")) {
         ImGui::OpenPopup("CameraSettings");
+    }
 
     if (ImGui::BeginPopup("CameraSettings")) {
         ImGui::Text("Position: (%.1f, %.1f, %.1f)", camera.GetPosition().x, camera.GetPosition().y,

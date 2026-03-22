@@ -66,7 +66,8 @@ void ViewportPanel::OnImGui(float fps, float deltaTime) {
 
         // Display render target
         auto gpuHandle = m_offscreenTarget.GetRenderTarget().GetSRVHandle().gpu;
-        ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(static_cast<float>(GetWidth()), static_cast<float>(GetHeight())));
+        ImGui::Image((ImTextureID)gpuHandle.ptr,
+                     ImVec2(static_cast<float>(GetWidth()), static_cast<float>(GetHeight())));
 
         // Store image rect for external use (gizmo, hover detection)
         m_imageMin = ImGui::GetItemRectMin();

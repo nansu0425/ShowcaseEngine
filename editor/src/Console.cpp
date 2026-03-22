@@ -164,7 +164,8 @@ void Console::Render() {
     ImGui::Separator();
 
     // Log entries
-    ImGui::BeginChild("LogScrollRegion", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::BeginChild("LogScrollRegion", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()),
+                      ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
 
     {
         std::lock_guard<std::mutex> lock(m_mutex);

@@ -125,16 +125,18 @@ void EditorApp::Shutdown() {
     }
 
     // Shutdown procedural model buffers
-    for (auto &mesh : m_gridModel.meshes)
+    for (auto &mesh : m_gridModel.meshes) {
         for (auto &prim : mesh.primitives) {
             prim.vertexBuffer.Shutdown();
             prim.indexBuffer.Shutdown();
         }
-    for (auto &mesh : m_cubeModel.meshes)
+    }
+    for (auto &mesh : m_cubeModel.meshes) {
         for (auto &prim : mesh.primitives) {
             prim.vertexBuffer.Shutdown();
             prim.indexBuffer.Shutdown();
         }
+    }
     m_gridModel.meshes.clear();
     m_cubeModel.meshes.clear();
 
