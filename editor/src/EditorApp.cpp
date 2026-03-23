@@ -481,6 +481,52 @@ void EditorApp::Shutdown() {
     SE_LOG_INFO("Editor shutdown");
 }
 
+// ── Play mode transitions ────────────────────────────────────────
+
+void EditorApp::EnterPlayMode() {
+    // Save editor camera state
+    m_savedCameraPosition = m_viewport.GetCamera().GetPosition();
+    m_savedCameraYaw = m_viewport.GetYaw();
+    m_savedCameraPitch = m_viewport.GetPitch();
+
+    m_mode = EditorMode::Play;
+
+    // Update camera aspect ratio to match window (not viewport panel)
+    float aspect = m_window.GetHeight() > 0 ? static_cast<float>(m_window.GetWidth()) / m_window.GetHeight() : 1.0f;
+    auto& cam = m_viewport.GetCamera();
+    cam.SetPerspective(cam.GetFovY(), aspect, cam.GetNearZ(), cam.GetFarZ());
+
+    // Capture cursor for FPS controls
+    HWND hwnd = m_window.GetHandle();
+    SetCapture(hwnd);
+    ShowCursor(FALSE);
+
+    RECT rect;
+    GetClientRect(hwnd, &rect);
+    POINT center = {(rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2};
+    POINT clientCenter = center;
+    ClientToScreen(hwnd, &center);
+    SetCursorPos(center.x, center.y);
+    m_input.SetMousePosition(clientCenter.x, clientCenter.y);
+
+    SE_LOG_INFO("Entered Play mode (F5)");
+}
+
+void EditorApp::ExitPlayMode() {
+    m_mode = EditorMode::Edit;
+
+    // Restore editor camera
+    auto& cam = m_viewport.GetCamera();
+    m_viewport.InitCamera(m_savedCameraPosition, m_savedCameraYaw, m_savedCameraPitch, cam.GetFovY(), cam.GetNearZ(),
+                          cam.GetFarZ());
+
+    // Release cursor
+    ReleaseCapture();
+    ShowCursor(TRUE);
+
+    SE_LOG_INFO("Exited Play mode (ESC)");
+}
+
 // ── Main loop ────────────────────────────────────────────────────
 
 int EditorApp::Run() {
@@ -501,90 +547,126 @@ int EditorApp::Run() {
 
         float dt = m_timer.DeltaTime();
 
-        // Keyboard shortcuts (Ctrl+key) — New/Open use deferred actions to avoid GPU ops mid-frame
-        if (m_input.IsKeyDown(Key::kControl)) {
-            if (m_input.IsKeyDown(Key::kShift) && m_input.IsKeyPressed('S')) {
-                SaveSceneAs();
-            } else if (m_input.IsKeyPressed('S')) {
-                SaveScene();
-            } else if (m_input.IsKeyPressed('O')) {
-                m_pendingAction = PendingAction::OpenScene;
-            } else if (m_input.IsKeyPressed('N')) {
-                m_pendingAction = PendingAction::NewScene;
+        if (m_mode == EditorMode::Edit) {
+            // F5 to enter play mode
+            if (m_input.IsKeyPressed(Key::kF5)) {
+                EnterPlayMode();
             }
-        }
 
-        // Process deferred menu actions before rendering (GPU resource changes can't happen
-        // mid-frame)
-        if (m_pendingAction == PendingAction::NewScene) {
-            m_pendingAction = PendingAction::None;
-            NewScene();
-        } else if (m_pendingAction == PendingAction::OpenScene) {
-            m_pendingAction = PendingAction::None;
-            OpenScene();
-        }
-
-        // Update
-        m_viewport.UpdateCamera(m_input, dt);
-        m_editorController.Update(m_input, m_scene, m_sceneRenderer, m_viewport);
-
-        // Begin render frame
-        m_renderContext.BeginFrame();
-
-        // Phase 1: Render scene to off-screen viewport render target
-        m_viewport.BeginRender(m_renderContext.GetCommandList());
-        m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
-                               m_editorController.GetSelectedObjectId());
-        m_viewport.EndRender(m_renderContext.GetCommandList());
-
-        // Phase 2: Render ImGui to back buffer
-        float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
-        m_renderContext.BeginBackBufferPass(clearColor);
-
-        m_imguiLayer.BeginFrame();
-        RenderMainMenuBar();
-
-        // DockBuilder must run BEFORE DockSpaceOverViewport
-        ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");
-        static bool s_dockLayoutChecked = false;
-        if (!s_dockLayoutChecked) {
-            s_dockLayoutChecked = true;
-            ImGuiDockNode* node = ImGui::DockBuilderGetNode(dockspaceId);
-            if (!node || !node->IsSplitNode()) {
-                ImGui::DockBuilderRemoveNode(dockspaceId);
-                ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
-                const ImGuiViewport* vp = ImGui::GetMainViewport();
-                ImGui::DockBuilderSetNodeSize(dockspaceId, vp->Size);
-
-                ImGuiID dockBottom;
-                ImGuiID dockCenter;
-                ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, &dockBottom, &dockCenter);
-
-                ImGuiID dockRight;
-                ImGui::DockBuilderSplitNode(dockCenter, ImGuiDir_Right, 0.20f, &dockRight, &dockCenter);
-                ImGuiID dockRightTop, dockRightBottom;
-                ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.5f, &dockRightBottom, &dockRightTop);
-
-                ImGui::DockBuilderDockWindow("Console", dockBottom);
-                ImGui::DockBuilderDockWindow("Viewport", dockCenter);
-                ImGui::DockBuilderDockWindow("Scene Hierarchy", dockRightTop);
-                ImGui::DockBuilderDockWindow("Inspector", dockRightBottom);
-                ImGui::DockBuilderFinish(dockspaceId);
+            // Keyboard shortcuts (Ctrl+key)
+            if (m_input.IsKeyDown(Key::kControl)) {
+                if (m_input.IsKeyDown(Key::kShift) && m_input.IsKeyPressed('S')) {
+                    SaveSceneAs();
+                } else if (m_input.IsKeyPressed('S')) {
+                    SaveScene();
+                } else if (m_input.IsKeyPressed('O')) {
+                    m_pendingAction = PendingAction::OpenScene;
+                } else if (m_input.IsKeyPressed('N')) {
+                    m_pendingAction = PendingAction::NewScene;
+                }
             }
+
+            // Process deferred menu actions
+            if (m_pendingAction == PendingAction::NewScene) {
+                m_pendingAction = PendingAction::None;
+                NewScene();
+            } else if (m_pendingAction == PendingAction::OpenScene) {
+                m_pendingAction = PendingAction::None;
+                OpenScene();
+            }
+
+            // Update
+            m_viewport.UpdateCamera(m_input, dt);
+            m_editorController.Update(m_input, m_scene, m_sceneRenderer, m_viewport);
+
+            // Begin render frame
+            m_renderContext.BeginFrame();
+
+            // Phase 1: Render scene to off-screen viewport render target
+            m_viewport.BeginRender(m_renderContext.GetCommandList());
+            m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
+                                   m_editorController.GetSelectedObjectId());
+            m_viewport.EndRender(m_renderContext.GetCommandList());
+
+            // Phase 2: Render ImGui to back buffer
+            float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
+            m_renderContext.BeginBackBufferPass(clearColor);
+
+            m_imguiLayer.BeginFrame();
+            RenderMainMenuBar();
+
+            // DockBuilder must run BEFORE DockSpaceOverViewport
+            ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");
+            static bool s_dockLayoutChecked = false;
+            if (!s_dockLayoutChecked) {
+                s_dockLayoutChecked = true;
+                ImGuiDockNode* node = ImGui::DockBuilderGetNode(dockspaceId);
+                if (!node || !node->IsSplitNode()) {
+                    ImGui::DockBuilderRemoveNode(dockspaceId);
+                    ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+                    const ImGuiViewport* vp = ImGui::GetMainViewport();
+                    ImGui::DockBuilderSetNodeSize(dockspaceId, vp->Size);
+
+                    ImGuiID dockBottom;
+                    ImGuiID dockCenter;
+                    ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, &dockBottom, &dockCenter);
+
+                    ImGuiID dockRight;
+                    ImGui::DockBuilderSplitNode(dockCenter, ImGuiDir_Right, 0.20f, &dockRight, &dockCenter);
+                    ImGuiID dockRightTop, dockRightBottom;
+                    ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.5f, &dockRightBottom, &dockRightTop);
+
+                    ImGui::DockBuilderDockWindow("Console", dockBottom);
+                    ImGui::DockBuilderDockWindow("Viewport", dockCenter);
+                    ImGui::DockBuilderDockWindow("Scene Hierarchy", dockRightTop);
+                    ImGui::DockBuilderDockWindow("Inspector", dockRightBottom);
+                    ImGui::DockBuilderFinish(dockspaceId);
+                }
+            }
+
+            // Create full-screen DockSpace
+            ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
+
+            m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
+            m_editorController.RenderUI(m_scene, m_viewport);
+            m_console.Render();
+            m_imguiLayer.EndFrame(m_renderContext.GetCommandList());
+
+            m_renderContext.EndBackBufferPass();
+            m_renderContext.EndFrame();
+
+        } else {
+            // ── Play mode ────────────────────────────────────────
+
+            // ESC to exit play mode
+            if (m_input.IsKeyPressed(Key::kEscape)) {
+                ExitPlayMode();
+                continue;
+            }
+
+            // Update camera with direct FPS controls (no right-click needed)
+            m_viewport.UpdateCamera(m_input, dt, true);
+
+            // Re-center cursor each frame to prevent edge-hitting
+            HWND hwnd = m_window.GetHandle();
+            RECT rect;
+            GetClientRect(hwnd, &rect);
+            POINT center = {(rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2};
+            POINT clientCenter = center;
+            ClientToScreen(hwnd, &center);
+            SetCursorPos(center.x, center.y);
+            m_input.SetMousePosition(clientCenter.x, clientCenter.y);
+
+            // Render scene directly to back buffer
+            m_renderContext.BeginFrame();
+
+            float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
+            m_renderContext.BeginBackBufferScenePass(clearColor);
+            m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene, -1);
+            m_renderContext.EndBackBufferPass();
+
+            m_renderContext.EndFrame();
         }
-
-        // Create full-screen DockSpace
-        ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
-
-        m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
-        m_editorController.RenderUI(m_scene, m_viewport);
-        m_console.Render();
-        m_imguiLayer.EndFrame(m_renderContext.GetCommandList());
-
-        m_renderContext.EndBackBufferPass();
-
-        // End frame
-        m_renderContext.EndFrame();
     }
 
     return 0;
@@ -594,6 +676,14 @@ int EditorApp::Run() {
 
 void EditorApp::OnResize(uint32_t width, uint32_t height) {
     m_renderContext.Resize(width, height);
+
+    // In play mode, update camera aspect to match window
+    if (m_mode == EditorMode::Play && height > 0) {
+        float aspect = static_cast<float>(width) / height;
+        auto& cam = m_viewport.GetCamera();
+        cam.SetPerspective(cam.GetFovY(), aspect, cam.GetNearZ(), cam.GetFarZ());
+    }
+
     SE_LOG_INFO("Editor resized: {}x{}", width, height);
 }
 

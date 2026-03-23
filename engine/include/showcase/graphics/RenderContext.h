@@ -1,13 +1,13 @@
 #pragma once
 
-#include <showcase/graphics/Device.h>
+#include <showcase/graphics/CommandList.h>
 #include <showcase/graphics/CommandQueue.h>
-#include <showcase/graphics/SwapChain.h>
+#include <showcase/graphics/DepthBuffer.h>
 #include <showcase/graphics/DescriptorHeap.h>
+#include <showcase/graphics/Device.h>
 #include <showcase/graphics/FrameResource.h>
 #include <showcase/graphics/ShaderManager.h>
-#include <showcase/graphics/CommandList.h>
-#include <showcase/graphics/DepthBuffer.h>
+#include <showcase/graphics/SwapChain.h>
 
 namespace showcase {
 
@@ -21,6 +21,7 @@ public:
     void Resize(uint32_t width, uint32_t height);
 
     void BeginBackBufferPass(const float clearColor[4]);
+    void BeginBackBufferScenePass(const float clearColor[4]);
     void EndBackBufferPass();
 
     Device& GetDevice() { return m_device; }

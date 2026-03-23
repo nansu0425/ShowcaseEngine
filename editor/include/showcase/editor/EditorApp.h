@@ -17,6 +17,11 @@
 
 namespace showcase {
 
+enum class EditorMode {
+    Edit,
+    Play
+};
+
 struct EditorAppDesc {
     WindowDesc window;
 };
@@ -85,6 +90,15 @@ private:
         OpenScene
     };
     PendingAction m_pendingAction = PendingAction::None;
+
+    // Play mode
+    EditorMode m_mode = EditorMode::Edit;
+    Vector3 m_savedCameraPosition;
+    float m_savedCameraYaw = 0.0f;
+    float m_savedCameraPitch = 0.0f;
+
+    void EnterPlayMode();
+    void ExitPlayMode();
 };
 
 } // namespace showcase

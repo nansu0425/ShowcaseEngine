@@ -120,6 +120,33 @@ void RenderContext::BeginBackBufferPass(const float clearColor[4]) {
     cmdList->RSSetScissorRects(1, &scissor);
 }
 
+void RenderContext::BeginBackBufferScenePass(const float clearColor[4]) {
+    auto* cmdList = m_commandList.Get();
+
+    // Transition back buffer to render target
+    auto* backBuffer = m_swapChain.GetCurrentBackBuffer();
+    m_commandList.TransitionBarrier(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+    // Clear render target and depth buffer
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_swapChain.GetCurrentRTV();
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthBuffer.GetDSV();
+    cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+    cmdList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+    // Set viewport
+    D3D12_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(m_width);
+    viewport.Height = static_cast<float>(m_height);
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    cmdList->RSSetViewports(1, &viewport);
+
+    // Set scissor rect
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    cmdList->RSSetScissorRects(1, &scissor);
+}
+
 void RenderContext::EndBackBufferPass() {
     auto* backBuffer = m_swapChain.GetCurrentBackBuffer();
     m_commandList.TransitionBarrier(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);

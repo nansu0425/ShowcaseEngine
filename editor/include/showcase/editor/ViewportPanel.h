@@ -1,7 +1,7 @@
 #pragma once
 
-#include <showcase/graphics/OffscreenTarget.h>
 #include <showcase/graphics/Camera.h>
+#include <showcase/graphics/OffscreenTarget.h>
 
 #include <imgui.h>
 
@@ -24,10 +24,8 @@ public:
     void EndRender(CommandList& cmdList);
     void OnImGui(float fps, float deltaTime);
 
-    void InitCamera(const Vector3& position,
-                    const Vector3& lookAt,
-                    float fovY, float nearZ, float farZ);
-    void UpdateCamera(const Input& input, float deltaTime);
+    void InitCamera(const Vector3& position, const Vector3& lookAt, float fovY, float nearZ, float farZ);
+    void UpdateCamera(const Input& input, float deltaTime, bool playMode = false);
 
     Camera& GetCamera() { return m_camera; }
     const Camera& GetCamera() const { return m_camera; }
@@ -46,8 +44,7 @@ public:
     void SetYaw(float yaw) { m_yaw = yaw; }
     void SetPitch(float pitch) { m_pitch = pitch; }
 
-    void InitCamera(const Vector3& position, float yaw, float pitch,
-                    float fovY, float nearZ, float farZ);
+    void InitCamera(const Vector3& position, float yaw, float pitch, float fovY, float nearZ, float farZ);
 
     ImVec2 GetImageMin() const { return m_imageMin; }
     ImVec2 GetImageMax() const { return m_imageMax; }

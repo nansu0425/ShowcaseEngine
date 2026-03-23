@@ -1,8 +1,8 @@
 #include <showcase/editor/ViewportPanel.h>
 
-#include <showcase/graphics/RenderContext.h>
 #include <showcase/core/Input.h>
 #include <showcase/core/Log.h>
+#include <showcase/graphics/RenderContext.h>
 
 #include <imgui.h>
 
@@ -17,8 +17,7 @@ bool ViewportPanel::Init(RenderContext& ctx, uint32_t initialWidth, uint32_t ini
     // Set up camera aspect ratio update on resize
     m_offscreenTarget.SetResizeCallback([this](uint32_t w, uint32_t h) {
         float aspect = h > 0 ? static_cast<float>(w) / h : 1.0f;
-        m_camera.SetPerspective(m_camera.GetFovY(), aspect,
-                                m_camera.GetNearZ(), m_camera.GetFarZ());
+        m_camera.SetPerspective(m_camera.GetFovY(), aspect, m_camera.GetNearZ(), m_camera.GetFarZ());
     });
 
     return m_offscreenTarget.Init(ctx, initialWidth, initialHeight);
@@ -82,10 +81,9 @@ void ViewportPanel::OnImGui(float fps, float deltaTime) {
             snprintf(fpsText, sizeof(fpsText), "FPS: %.1f\nFrame: %.2f ms", fps, deltaTime * 1000.0f);
             ImVec2 textSize = ImGui::CalcTextSize(fpsText);
             ImVec2 padding(6, 4);
-            drawList->AddRectFilled(
-                ImVec2(textPos.x - padding.x, textPos.y - padding.y),
-                ImVec2(textPos.x + textSize.x + padding.x, textPos.y + textSize.y + padding.y),
-                IM_COL32(0, 0, 0, 128), 4.0f);
+            drawList->AddRectFilled(ImVec2(textPos.x - padding.x, textPos.y - padding.y),
+                                    ImVec2(textPos.x + textSize.x + padding.x, textPos.y + textSize.y + padding.y),
+                                    IM_COL32(0, 0, 0, 128), 4.0f);
             drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), fpsText);
         }
     }
@@ -96,9 +94,7 @@ void ViewportPanel::OnImGui(float fps, float deltaTime) {
 
 // ── Camera ────────────────────────────────────────────────────────
 
-void ViewportPanel::InitCamera(const Vector3& position,
-                               const Vector3& lookAt,
-                               float fovY, float nearZ, float farZ) {
+void ViewportPanel::InitCamera(const Vector3& position, const Vector3& lookAt, float fovY, float nearZ, float farZ) {
     m_camera.SetPosition(position);
     m_camera.SetLookAt(lookAt);
     m_camera.SetPerspective(fovY, GetAspectRatio(), nearZ, farZ);
@@ -106,8 +102,7 @@ void ViewportPanel::InitCamera(const Vector3& position,
     m_firstCameraUpdate = true;
 }
 
-void ViewportPanel::InitCamera(const Vector3& position, float yaw, float pitch,
-                               float fovY, float nearZ, float farZ) {
+void ViewportPanel::InitCamera(const Vector3& position, float yaw, float pitch, float fovY, float nearZ, float farZ) {
     m_yaw = yaw;
     m_pitch = pitch;
     m_firstCameraUpdate = false;
@@ -122,7 +117,7 @@ void ViewportPanel::InitCamera(const Vector3& position, float yaw, float pitch,
     m_camera.UpdateViewMatrix();
 }
 
-void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
+void ViewportPanel::UpdateCamera(const Input& input, float deltaTime, bool playMode) {
     // Initialize yaw/pitch from current camera direction on first update
     if (m_firstCameraUpdate) {
         Vector3 fwd = m_camera.GetForward();
@@ -131,8 +126,11 @@ void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
         m_firstCameraUpdate = false;
     }
 
-    // Mouse look (right-click drag to avoid ImGui conflict)
-    if (input.IsMouseButtonDown(1)) {
+    // In play mode: always active. In edit mode: right-click to control.
+    bool canControl = playMode || input.IsMouseButtonDown(1);
+
+    // Mouse look
+    if (canControl) {
         m_yaw += input.GetMouseDeltaX() * cameraLookSpeed;
         m_pitch -= input.GetMouseDeltaY() * cameraLookSpeed;
         m_pitch = std::clamp(m_pitch, -kPiOver2 * 0.98f, kPiOver2 * 0.98f);
@@ -146,15 +144,27 @@ void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
     Vector3 right = worldUp.Cross(forward);
     right.Normalize();
 
-    // WASD + QE movement (only while right-click held, to avoid conflict with gizmo shortcuts)
+    // WASD + QE movement
     Vector3 move(0.0f, 0.0f, 0.0f);
-    if (input.IsMouseButtonDown(1)) {
-        if (input.IsKeyDown('W')) move += forward;
-        if (input.IsKeyDown('S')) move -= forward;
-        if (input.IsKeyDown('D')) move += right;
-        if (input.IsKeyDown('A')) move -= right;
-        if (input.IsKeyDown('E')) move += worldUp;
-        if (input.IsKeyDown('Q')) move -= worldUp;
+    if (canControl) {
+        if (input.IsKeyDown('W')) {
+            move += forward;
+        }
+        if (input.IsKeyDown('S')) {
+            move -= forward;
+        }
+        if (input.IsKeyDown('D')) {
+            move += right;
+        }
+        if (input.IsKeyDown('A')) {
+            move -= right;
+        }
+        if (input.IsKeyDown('E')) {
+            move += worldUp;
+        }
+        if (input.IsKeyDown('Q')) {
+            move -= worldUp;
+        }
     }
 
     if (move.LengthSquared() > 0.0f) {
@@ -163,7 +173,9 @@ void ViewportPanel::UpdateCamera(const Input& input, float deltaTime) {
 
     // Shift to boost speed
     float speed = cameraMoveSpeed;
-    if (input.IsKeyDown(Key::kShift)) speed *= 3.0f;
+    if (input.IsKeyDown(Key::kShift)) {
+        speed *= 3.0f;
+    }
 
     Vector3 pos = m_camera.GetPosition() + move * speed * deltaTime;
 
@@ -176,8 +188,7 @@ void ViewportPanel::SetResizeCallback(ResizeCallback callback) {
     // Chain with existing internal resize callback (camera update)
     m_offscreenTarget.SetResizeCallback([this, externalCb = std::move(callback)](uint32_t w, uint32_t h) {
         float aspect = h > 0 ? static_cast<float>(w) / h : 1.0f;
-        m_camera.SetPerspective(m_camera.GetFovY(), aspect,
-                                m_camera.GetNearZ(), m_camera.GetFarZ());
+        m_camera.SetPerspective(m_camera.GetFovY(), aspect, m_camera.GetNearZ(), m_camera.GetFarZ());
         if (externalCb) {
             externalCb(w, h);
         }

@@ -24,6 +24,12 @@ public:
     int GetMouseDeltaY() const { return m_mouseY - m_prevMouseY; }
     int GetMouseWheelDelta() const { return m_wheelDelta; }
 
+    void SetMousePosition(int x, int y) {
+        m_mouseX = x;
+        m_mouseY = y;
+        m_prevMouseX = x;
+        m_prevMouseY = y;
+    }
     void OnMouseWheel(int delta) { m_wheelDelta = delta; }
     void OnMouseMove(int x, int y);
 
@@ -41,10 +47,12 @@ private:
 };
 
 namespace Key {
+constexpr int kEscape = 0x1B;  // VK_ESCAPE
 constexpr int kShift = 0x10;   // VK_SHIFT
 constexpr int kControl = 0x11; // VK_CONTROL
 constexpr int kAlt = 0x12;     // VK_MENU
 constexpr int kDelete = 0x2E;  // VK_DELETE
+constexpr int kF5 = 0x74;      // VK_F5
 } // namespace Key
 
 } // namespace showcase
