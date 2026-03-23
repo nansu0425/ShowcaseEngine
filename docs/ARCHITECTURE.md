@@ -335,6 +335,7 @@ Model (shared asset)
 | Constant buffers | Offset-based upload heap | Prevents aliasing/flickering with per-object slots |
 | glTF loading | tinygltf (header-only) | Lightweight, glTF 2.0 only, minimal dependencies |
 | Editor UI | ImGui docking + ImGuizmo | Rapid iteration, built-in docking layout, 3D gizmos |
+| Unit system | 1 unit = 1 meter | Intuitive for non-dev audience, matches glTF standard, clean physics values (gravity = 9.8) |
 | Scene serialization | JSON via `JsonDocument` | Human-readable `.scene` files; model references via `modelSource` strings; editor camera saved per-scene |
 
 ---
