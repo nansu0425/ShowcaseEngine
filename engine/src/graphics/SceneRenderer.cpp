@@ -10,8 +10,6 @@
 
 namespace showcase {
 
-using namespace DirectX;
-
 struct alignas(256) PerFrameData {
     Matrix viewProjection;
     Vector3 cameraPosition;
@@ -90,14 +88,14 @@ void SceneRenderer::CreateCubeModel(RenderContext& ctx, Model& outModel) {
         return;
     }
     prim.indexCount = _countof(indices);
-    prim.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(0.5f, 0.5f, 0.5f));
+    prim.localAABB = BoundingBox(Vector3(0.f, 0.f, 0.f), Vector3(0.5f, 0.5f, 0.5f));
 
     Mesh mesh;
     mesh.name = "Cube";
     mesh.primitives.push_back(std::move(prim));
 
     outModel.meshes.push_back(std::move(mesh));
-    outModel.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(0.5f, 0.5f, 0.5f));
+    outModel.localAABB = BoundingBox(Vector3(0.f, 0.f, 0.f), Vector3(0.5f, 0.5f, 0.5f));
 }
 
 // ── Ray picking ──────────────────────────────────────────────────────
@@ -118,11 +116,12 @@ int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, cons
     Matrix vp = camera.GetViewProjectionMatrix();
     Matrix invVP = vp.Invert();
 
-    XMVECTOR nearPt = XMVector3TransformCoord(XMVectorSet(ndcX, ndcY, 0.0f, 1.0f), invVP);
-    XMVECTOR farPt = XMVector3TransformCoord(XMVectorSet(ndcX, ndcY, 1.0f, 1.0f), invVP);
+    Vector3 nearPt = Vector3::Transform(Vector3(ndcX, ndcY, 0.0f), invVP);
+    Vector3 farPt = Vector3::Transform(Vector3(ndcX, ndcY, 1.0f), invVP);
 
-    XMVECTOR rayOrigin = nearPt;
-    XMVECTOR rayDir = XMVector3Normalize(XMVectorSubtract(farPt, nearPt));
+    Vector3 rayOrigin = nearPt;
+    Vector3 rayDir = farPt - nearPt;
+    rayDir.Normalize();
 
     int closestId = -1;
     float closestDist = FLT_MAX;
@@ -133,15 +132,16 @@ int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, cons
 
         // Transform ray into object local space for accurate rotated picking
         Matrix invWorld = obj.worldTransform.Invert();
-        XMVECTOR localOrigin = XMVector3TransformCoord(rayOrigin, invWorld);
-        XMVECTOR localDir = XMVector3Normalize(XMVector3TransformNormal(rayDir, invWorld));
+        Vector3 localOrigin = Vector3::Transform(rayOrigin, invWorld);
+        Vector3 localDir = Vector3::TransformNormal(rayDir, invWorld);
+        localDir.Normalize();
 
         float dist = 0.0f;
         if (obj.model->localAABB.Intersects(localOrigin, localDir, dist)) {
             // Convert local-space hit point back to world-space distance
-            XMVECTOR localHit = XMVectorAdd(localOrigin, XMVectorScale(localDir, dist));
-            XMVECTOR worldHit = XMVector3TransformCoord(localHit, obj.worldTransform);
-            float worldDist = XMVectorGetX(XMVector3Length(XMVectorSubtract(worldHit, rayOrigin)));
+            Vector3 localHit = localOrigin + localDir * dist;
+            Vector3 worldHit = Vector3::Transform(localHit, obj.worldTransform);
+            float worldDist = (worldHit - rayOrigin).Length();
 
             if (worldDist < closestDist) {
                 closestDist = worldDist;

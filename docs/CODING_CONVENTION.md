@@ -369,6 +369,27 @@ float3 LambertDiffuse(float3 normal, float3 lightDir)
 #endif
 ```
 
+## 13. Math Abstraction
+
+All math in `engine/` must go through `<showcase/core/Math.h>` or the C++ standard library (`<cmath>`, `<algorithm>`, etc.).
+
+**Allowed:**
+
+- `showcase::` math types and functions defined in `Math.h` (`Vector3`, `Matrix`, `CreateAABB`, `ToRadians`, …)
+- `SimpleMath` member functions accessed through the aliased types (e.g., `Vector3::Transform`, `Matrix::Invert`)
+- Standard library math (`std::abs`, `std::min`, `std::max`, `<cmath>` functions)
+
+**Prohibited in engine source files:**
+
+- Direct `DirectX::XM*` function calls (`XMVector3TransformCoord`, `XMMatrixLookAtLH`, …)
+- DirectX SIMD types (`XMVECTOR`, `XMFLOAT3`, `XMFLOAT4X4`, …)
+- `using namespace DirectX;`
+- Direct `#include <SimpleMath.h>`, `<DirectXMath.h>`, or `<DirectXCollision.h>` — include `<showcase/core/Math.h>` instead
+
+**When a needed operation has no Math.h wrapper:** add a wrapper to `Math.h` first, then use the wrapper. `Math.h` is the only file permitted to include DirectX math headers directly.
+
+`editor/` code may use DirectX types directly when interfacing with ImGui/ImGuizmo, but should prefer `Math.h` types where practical.
+
 ### 12.8 Comments
 
 - **Why, not what** — same principle as C++ code.

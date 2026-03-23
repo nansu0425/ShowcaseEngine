@@ -1,7 +1,7 @@
 #include <showcase/graphics/Model.h>
 
-#include <showcase/graphics/RenderContext.h>
 #include <showcase/core/Log.h>
+#include <showcase/graphics/RenderContext.h>
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -28,10 +28,9 @@ void Model::Shutdown(RenderContext& ctx) {
 }
 
 // ── Texture loading ──────────────────────────────────────────────────
-static bool LoadTextures(const tinygltf::Model& gltfModel,
-                         RenderContext& ctx,
-                         std::vector<Texture>& outTextures) {
-    if (gltfModel.images.empty()) return true;
+static bool LoadTextures(const tinygltf::Model& gltfModel, RenderContext& ctx, std::vector<Texture>& outTextures) {
+    if (gltfModel.images.empty())
+        return true;
 
     auto* device = ctx.GetDevice().GetDevice();
     auto* allocator = ctx.GetDevice().GetAllocator();
@@ -53,12 +52,9 @@ static bool LoadTextures(const tinygltf::Model& gltfModel,
             continue;
         }
 
-        if (!outTextures[i].InitFromMemory(
-                device, allocator, cmdList.Get(), ctx.GetSrvHeap(),
-                image.image.data(),
-                static_cast<uint32_t>(image.width),
-                static_cast<uint32_t>(image.height),
-                static_cast<uint32_t>(image.component))) {
+        if (!outTextures[i].InitFromMemory(device, allocator, cmdList.Get(), ctx.GetSrvHeap(), image.image.data(),
+                                           static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height),
+                                           static_cast<uint32_t>(image.component))) {
             SE_LOG_ERROR("Failed to load texture at index {}", i);
             return false;
         }
@@ -77,8 +73,7 @@ static bool LoadTextures(const tinygltf::Model& gltfModel,
 }
 
 // ── Material loading ─────────────────────────────────────────────────
-static void LoadMaterials(const tinygltf::Model& gltfModel,
-                          std::vector<Material>& outMaterials) {
+static void LoadMaterials(const tinygltf::Model& gltfModel, std::vector<Material>& outMaterials) {
     outMaterials.resize(gltfModel.materials.size());
 
     for (size_t i = 0; i < gltfModel.materials.size(); ++i) {
@@ -86,11 +81,9 @@ static void LoadMaterials(const tinygltf::Model& gltfModel,
         auto& mat = outMaterials[i];
 
         const auto& pbr = gltfMat.pbrMetallicRoughness;
-        mat.baseColorFactor = Vector4(
-            static_cast<float>(pbr.baseColorFactor[0]),
-            static_cast<float>(pbr.baseColorFactor[1]),
-            static_cast<float>(pbr.baseColorFactor[2]),
-            static_cast<float>(pbr.baseColorFactor[3]));
+        mat.baseColorFactor =
+            Vector4(static_cast<float>(pbr.baseColorFactor[0]), static_cast<float>(pbr.baseColorFactor[1]),
+                    static_cast<float>(pbr.baseColorFactor[2]), static_cast<float>(pbr.baseColorFactor[3]));
 
         if (pbr.baseColorTexture.index >= 0) {
             const auto& texInfo = gltfModel.textures[pbr.baseColorTexture.index];
@@ -100,29 +93,26 @@ static void LoadMaterials(const tinygltf::Model& gltfModel,
 }
 
 // ── Mesh extraction ──────────────────────────────────────────────────
-static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel,
-                                      const tinygltf::Primitive& gltfPrim,
-                                      std::vector<ModelVertex>& vertices,
-                                      std::vector<uint32_t>& indices) {
+static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel, const tinygltf::Primitive& gltfPrim,
+                                      std::vector<ModelVertex>& vertices, std::vector<uint32_t>& indices) {
     // Position
     const auto posIt = gltfPrim.attributes.find("POSITION");
-    if (posIt == gltfPrim.attributes.end()) return;
+    if (posIt == gltfPrim.attributes.end())
+        return;
 
     const auto& posAccessor = gltfModel.accessors[posIt->second];
     const auto& posView = gltfModel.bufferViews[posAccessor.bufferView];
     const auto& posBuffer = gltfModel.buffers[posView.buffer];
-    const auto* posData = reinterpret_cast<const float*>(
-        posBuffer.data.data() + posView.byteOffset + posAccessor.byteOffset);
+    const auto* posData =
+        reinterpret_cast<const float*>(posBuffer.data.data() + posView.byteOffset + posAccessor.byteOffset);
 
     const size_t vertexCount = posAccessor.count;
     vertices.resize(vertexCount);
 
     const size_t posStride = posView.byteStride ? posView.byteStride / sizeof(float) : 3;
     for (size_t i = 0; i < vertexCount; ++i) {
-        vertices[i].position = Vector3(
-            posData[i * posStride + 0],
-            posData[i * posStride + 1],
-            posData[i * posStride + 2]);
+        vertices[i].position =
+            Vector3(posData[i * posStride + 0], posData[i * posStride + 1], posData[i * posStride + 2]);
     }
 
     // Normal
@@ -131,15 +121,13 @@ static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel,
         const auto& normAccessor = gltfModel.accessors[normIt->second];
         const auto& normView = gltfModel.bufferViews[normAccessor.bufferView];
         const auto& normBuffer = gltfModel.buffers[normView.buffer];
-        const auto* normData = reinterpret_cast<const float*>(
-            normBuffer.data.data() + normView.byteOffset + normAccessor.byteOffset);
+        const auto* normData =
+            reinterpret_cast<const float*>(normBuffer.data.data() + normView.byteOffset + normAccessor.byteOffset);
 
         const size_t normStride = normView.byteStride ? normView.byteStride / sizeof(float) : 3;
         for (size_t i = 0; i < vertexCount; ++i) {
-            vertices[i].normal = Vector3(
-                normData[i * normStride + 0],
-                normData[i * normStride + 1],
-                normData[i * normStride + 2]);
+            vertices[i].normal =
+                Vector3(normData[i * normStride + 0], normData[i * normStride + 1], normData[i * normStride + 2]);
         }
     } else {
         for (size_t i = 0; i < vertexCount; ++i) {
@@ -153,14 +141,12 @@ static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel,
         const auto& texAccessor = gltfModel.accessors[texIt->second];
         const auto& texView = gltfModel.bufferViews[texAccessor.bufferView];
         const auto& texBuffer = gltfModel.buffers[texView.buffer];
-        const auto* texData = reinterpret_cast<const float*>(
-            texBuffer.data.data() + texView.byteOffset + texAccessor.byteOffset);
+        const auto* texData =
+            reinterpret_cast<const float*>(texBuffer.data.data() + texView.byteOffset + texAccessor.byteOffset);
 
         const size_t texStride = texView.byteStride ? texView.byteStride / sizeof(float) : 2;
         for (size_t i = 0; i < vertexCount; ++i) {
-            vertices[i].texCoord = Vector2(
-                texData[i * texStride + 0],
-                texData[i * texStride + 1]);
+            vertices[i].texCoord = Vector2(texData[i * texStride + 0], texData[i * texStride + 1]);
         }
     } else {
         for (size_t i = 0; i < vertexCount; ++i) {
@@ -194,29 +180,24 @@ static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel,
 }
 
 // ── AABB computation ─────────────────────────────────────────────────
-static DirectX::BoundingBox ComputeAABB(const std::vector<ModelVertex>& vertices) {
+static BoundingBox ComputeLocalAABB(const std::vector<ModelVertex>& vertices) {
     if (vertices.empty()) {
-        return DirectX::BoundingBox({0, 0, 0}, {0, 0, 0});
+        return BoundingBox(Vector3(0.f, 0.f, 0.f), Vector3(0.f, 0.f, 0.f));
     }
 
-    DirectX::XMVECTOR vMin = DirectX::XMLoadFloat3(&vertices[0].position);
-    DirectX::XMVECTOR vMax = vMin;
+    Vector3 vMin = vertices[0].position;
+    Vector3 vMax = vMin;
 
     for (size_t i = 1; i < vertices.size(); ++i) {
-        DirectX::XMVECTOR v = DirectX::XMLoadFloat3(&vertices[i].position);
-        vMin = DirectX::XMVectorMin(vMin, v);
-        vMax = DirectX::XMVectorMax(vMax, v);
+        vMin = Vector3::Min(vMin, vertices[i].position);
+        vMax = Vector3::Max(vMax, vertices[i].position);
     }
 
-    DirectX::BoundingBox aabb;
-    DirectX::BoundingBox::CreateFromPoints(aabb, vMin, vMax);
-    return aabb;
+    return CreateAABB(vMin, vMax);
 }
 
 // ── glTF loading ─────────────────────────────────────────────────────
-bool ModelLoader::LoadGLTF(RenderContext& ctx,
-                           const std::string& filepath,
-                           Model& outModel) {
+bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Model& outModel) {
     auto* device = ctx.GetDevice().GetDevice();
     auto* allocator = ctx.GetDevice().GetAllocator();
     tinygltf::Model gltfModel;
@@ -230,8 +211,10 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx,
         result = loader.LoadASCIIFromFile(&gltfModel, &err, &warn, filepath);
     }
 
-    if (!warn.empty()) SE_LOG_WARN("glTF warning: {}", warn);
-    if (!err.empty()) SE_LOG_ERROR("glTF error: {}", err);
+    if (!warn.empty())
+        SE_LOG_WARN("glTF warning: {}", warn);
+    if (!err.empty())
+        SE_LOG_ERROR("glTF error: {}", err);
     if (!result) {
         SE_LOG_ERROR("Failed to load glTF: {}", filepath);
         return false;
@@ -248,8 +231,8 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx,
     // Load meshes
     outModel.meshes.resize(gltfModel.meshes.size());
 
-    DirectX::XMVECTOR modelMin = DirectX::XMVectorReplicate(FLT_MAX);
-    DirectX::XMVECTOR modelMax = DirectX::XMVectorReplicate(-FLT_MAX);
+    Vector3 modelMin(FLT_MAX, FLT_MAX, FLT_MAX);
+    Vector3 modelMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
     for (size_t mi = 0; mi < gltfModel.meshes.size(); ++mi) {
         const auto& gltfMesh = gltfModel.meshes[mi];
@@ -265,12 +248,13 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx,
             std::vector<uint32_t> indices;
             ExtractVerticesAndIndices(gltfModel, gltfPrim, vertices, indices);
 
-            if (vertices.empty()) continue;
+            if (vertices.empty())
+                continue;
 
             // Create vertex buffer
             const uint32_t vbSize = static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex));
-            if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator,
-                    vertices.data(), vbSize, sizeof(ModelVertex))) {
+            if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices.data(), vbSize,
+                                                      sizeof(ModelVertex))) {
                 SE_LOG_ERROR("Failed to create vertex buffer for mesh '{}'", mesh.name);
                 return false;
             }
@@ -279,33 +263,28 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx,
             prim.indexCount = static_cast<uint32_t>(indices.size());
             if (!indices.empty()) {
                 const uint32_t ibSize = static_cast<uint32_t>(indices.size() * sizeof(uint32_t));
-                if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator,
-                        indices.data(), ibSize, DXGI_FORMAT_R32_UINT)) {
+                if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices.data(), ibSize,
+                                                        DXGI_FORMAT_R32_UINT)) {
                     SE_LOG_ERROR("Failed to create index buffer for mesh '{}'", mesh.name);
                     return false;
                 }
             }
 
             prim.materialIndex = gltfPrim.material;
-            prim.localAABB = ComputeAABB(vertices);
+            prim.localAABB = ComputeLocalAABB(vertices);
 
             // Expand model AABB
-            DirectX::XMVECTOR primMin = DirectX::XMVectorSubtract(
-                DirectX::XMLoadFloat3(&prim.localAABB.Center),
-                DirectX::XMLoadFloat3(&prim.localAABB.Extents));
-            DirectX::XMVECTOR primMax = DirectX::XMVectorAdd(
-                DirectX::XMLoadFloat3(&prim.localAABB.Center),
-                DirectX::XMLoadFloat3(&prim.localAABB.Extents));
-            modelMin = DirectX::XMVectorMin(modelMin, primMin);
-            modelMax = DirectX::XMVectorMax(modelMax, primMax);
+            Vector3 center(prim.localAABB.Center);
+            Vector3 extents(prim.localAABB.Extents);
+            modelMin = Vector3::Min(modelMin, center - extents);
+            modelMax = Vector3::Max(modelMax, center + extents);
         }
     }
 
-    DirectX::BoundingBox::CreateFromPoints(outModel.localAABB, modelMin, modelMax);
+    outModel.localAABB = CreateAABB(modelMin, modelMax);
 
-    SE_LOG_INFO("Loaded glTF: {} ({} meshes, {} materials, {} textures)",
-                filepath, outModel.meshes.size(), outModel.materials.size(),
-                outModel.textures.size());
+    SE_LOG_INFO("Loaded glTF: {} ({} meshes, {} materials, {} textures)", filepath, outModel.meshes.size(),
+                outModel.materials.size(), outModel.textures.size());
     return true;
 }
 
