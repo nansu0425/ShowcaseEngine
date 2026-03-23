@@ -7,6 +7,7 @@
 #include <showcase/graphics/RootSignature.h>
 
 #include <cfloat>
+#include <cmath>
 
 namespace showcase {
 
@@ -16,6 +17,10 @@ struct alignas(256) PerFrameData {
     Matrix viewProjection;
     Vector3 cameraPosition;
     float _pad0;
+    float gridFadeStart;
+    float gridFadeEnd;
+    float gridOpacity;
+    float _pad1;
 };
 
 struct alignas(256) PerObjectData {
@@ -32,6 +37,11 @@ struct alignas(256) PerMaterialData {
 static_assert(sizeof(PerFrameData) <= 256);
 static_assert(sizeof(PerObjectData) <= 256);
 static_assert(sizeof(PerMaterialData) <= 256);
+
+struct GridVertex {
+    Vector3 position;
+    Vector4 color;
+};
 
 // ── Procedural geometry ──────────────────────────────────────────────
 
@@ -73,14 +83,14 @@ void SceneRenderer::CreateGridModel(RenderContext& ctx, Model& outModel) {
     }
 
     MeshPrimitive prim;
-    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator,
-        vertices.data(), static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex)),
-        sizeof(ModelVertex))) {
+    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices.data(),
+                                              static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex)),
+                                              sizeof(ModelVertex))) {
         SE_LOG_ERROR("Failed to create grid vertex buffer");
         return;
     }
-    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator,
-        indices.data(), static_cast<uint32_t>(indices.size() * sizeof(uint32_t)))) {
+    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices.data(),
+                                            static_cast<uint32_t>(indices.size() * sizeof(uint32_t)))) {
         SE_LOG_ERROR("Failed to create grid index buffer");
         return;
     }
@@ -100,54 +110,52 @@ void SceneRenderer::CreateCubeModel(RenderContext& ctx, Model& outModel) {
     auto* allocator = ctx.GetDevice().GetAllocator();
     ModelVertex vertices[] = {
         // Front face (z = +0.5)
-        {{-0.5f, -0.5f,  0.5f}, { 0, 0, 1}, {0, 1}},
-        {{ 0.5f, -0.5f,  0.5f}, { 0, 0, 1}, {1, 1}},
-        {{ 0.5f,  0.5f,  0.5f}, { 0, 0, 1}, {1, 0}},
-        {{-0.5f,  0.5f,  0.5f}, { 0, 0, 1}, {0, 0}},
+        {{-0.5f, -0.5f, 0.5f}, {0, 0, 1}, {0, 1}},
+        {{0.5f, -0.5f, 0.5f}, {0, 0, 1}, {1, 1}},
+        {{0.5f, 0.5f, 0.5f}, {0, 0, 1}, {1, 0}},
+        {{-0.5f, 0.5f, 0.5f}, {0, 0, 1}, {0, 0}},
         // Back face (z = -0.5)
-        {{ 0.5f, -0.5f, -0.5f}, { 0, 0,-1}, {0, 1}},
-        {{-0.5f, -0.5f, -0.5f}, { 0, 0,-1}, {1, 1}},
-        {{-0.5f,  0.5f, -0.5f}, { 0, 0,-1}, {1, 0}},
-        {{ 0.5f,  0.5f, -0.5f}, { 0, 0,-1}, {0, 0}},
+        {{0.5f, -0.5f, -0.5f}, {0, 0, -1}, {0, 1}},
+        {{-0.5f, -0.5f, -0.5f}, {0, 0, -1}, {1, 1}},
+        {{-0.5f, 0.5f, -0.5f}, {0, 0, -1}, {1, 0}},
+        {{0.5f, 0.5f, -0.5f}, {0, 0, -1}, {0, 0}},
         // Top face (y = +0.5)
-        {{-0.5f,  0.5f,  0.5f}, { 0, 1, 0}, {0, 1}},
-        {{ 0.5f,  0.5f,  0.5f}, { 0, 1, 0}, {1, 1}},
-        {{ 0.5f,  0.5f, -0.5f}, { 0, 1, 0}, {1, 0}},
-        {{-0.5f,  0.5f, -0.5f}, { 0, 1, 0}, {0, 0}},
+        {{-0.5f, 0.5f, 0.5f}, {0, 1, 0}, {0, 1}},
+        {{0.5f, 0.5f, 0.5f}, {0, 1, 0}, {1, 1}},
+        {{0.5f, 0.5f, -0.5f}, {0, 1, 0}, {1, 0}},
+        {{-0.5f, 0.5f, -0.5f}, {0, 1, 0}, {0, 0}},
         // Bottom face (y = -0.5)
-        {{-0.5f, -0.5f, -0.5f}, { 0,-1, 0}, {0, 1}},
-        {{ 0.5f, -0.5f, -0.5f}, { 0,-1, 0}, {1, 1}},
-        {{ 0.5f, -0.5f,  0.5f}, { 0,-1, 0}, {1, 0}},
-        {{-0.5f, -0.5f,  0.5f}, { 0,-1, 0}, {0, 0}},
+        {{-0.5f, -0.5f, -0.5f}, {0, -1, 0}, {0, 1}},
+        {{0.5f, -0.5f, -0.5f}, {0, -1, 0}, {1, 1}},
+        {{0.5f, -0.5f, 0.5f}, {0, -1, 0}, {1, 0}},
+        {{-0.5f, -0.5f, 0.5f}, {0, -1, 0}, {0, 0}},
         // Right face (x = +0.5)
-        {{ 0.5f, -0.5f,  0.5f}, { 1, 0, 0}, {0, 1}},
-        {{ 0.5f, -0.5f, -0.5f}, { 1, 0, 0}, {1, 1}},
-        {{ 0.5f,  0.5f, -0.5f}, { 1, 0, 0}, {1, 0}},
-        {{ 0.5f,  0.5f,  0.5f}, { 1, 0, 0}, {0, 0}},
+        {{0.5f, -0.5f, 0.5f}, {1, 0, 0}, {0, 1}},
+        {{0.5f, -0.5f, -0.5f}, {1, 0, 0}, {1, 1}},
+        {{0.5f, 0.5f, -0.5f}, {1, 0, 0}, {1, 0}},
+        {{0.5f, 0.5f, 0.5f}, {1, 0, 0}, {0, 0}},
         // Left face (x = -0.5)
         {{-0.5f, -0.5f, -0.5f}, {-1, 0, 0}, {0, 1}},
-        {{-0.5f, -0.5f,  0.5f}, {-1, 0, 0}, {1, 1}},
-        {{-0.5f,  0.5f,  0.5f}, {-1, 0, 0}, {1, 0}},
-        {{-0.5f,  0.5f, -0.5f}, {-1, 0, 0}, {0, 0}},
+        {{-0.5f, -0.5f, 0.5f}, {-1, 0, 0}, {1, 1}},
+        {{-0.5f, 0.5f, 0.5f}, {-1, 0, 0}, {1, 0}},
+        {{-0.5f, 0.5f, -0.5f}, {-1, 0, 0}, {0, 0}},
     };
 
     uint32_t indices[] = {
-         0,  1,  2,   0,  2,  3,   // front
-         4,  5,  6,   4,  6,  7,   // back
-         8,  9, 10,   8, 10, 11,   // top
-        12, 13, 14,  12, 14, 15,   // bottom
-        16, 17, 18,  16, 18, 19,   // right
-        20, 21, 22,  20, 22, 23,   // left
+        0,  1,  2,  0,  2,  3,  // front
+        4,  5,  6,  4,  6,  7,  // back
+        8,  9,  10, 8,  10, 11, // top
+        12, 13, 14, 12, 14, 15, // bottom
+        16, 17, 18, 16, 18, 19, // right
+        20, 21, 22, 20, 22, 23, // left
     };
 
     MeshPrimitive prim;
-    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator,
-        vertices, sizeof(vertices), sizeof(ModelVertex))) {
+    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices, sizeof(vertices), sizeof(ModelVertex))) {
         SE_LOG_ERROR("Failed to create cube vertex buffer");
         return;
     }
-    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator,
-        indices, sizeof(indices))) {
+    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices, sizeof(indices))) {
         SE_LOG_ERROR("Failed to create cube index buffer");
         return;
     }
@@ -164,11 +172,12 @@ void SceneRenderer::CreateCubeModel(RenderContext& ctx, Model& outModel) {
 
 // ── Ray picking ──────────────────────────────────────────────────────
 
-int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene,
-                              float vpMinX, float vpMinY, float vpMaxX, float vpMaxY) const {
+int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene, float vpMinX,
+                              float vpMinY, float vpMaxX, float vpMaxY) const {
     float vpWidth = vpMaxX - vpMinX;
     float vpHeight = vpMaxY - vpMinY;
-    if (vpWidth <= 0 || vpHeight <= 0) return -1;
+    if (vpWidth <= 0 || vpHeight <= 0)
+        return -1;
 
     float localX = static_cast<float>(mouseX) - vpMinX;
     float localY = static_cast<float>(mouseY) - vpMinY;
@@ -179,10 +188,8 @@ int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, cons
     Matrix vp = camera.GetViewProjectionMatrix();
     Matrix invVP = vp.Invert();
 
-    XMVECTOR nearPt = XMVector3TransformCoord(
-        XMVectorSet(ndcX, ndcY, 0.0f, 1.0f), invVP);
-    XMVECTOR farPt = XMVector3TransformCoord(
-        XMVectorSet(ndcX, ndcY, 1.0f, 1.0f), invVP);
+    XMVECTOR nearPt = XMVector3TransformCoord(XMVectorSet(ndcX, ndcY, 0.0f, 1.0f), invVP);
+    XMVECTOR farPt = XMVector3TransformCoord(XMVectorSet(ndcX, ndcY, 1.0f, 1.0f), invVP);
 
     XMVECTOR rayOrigin = nearPt;
     XMVECTOR rayDir = XMVector3Normalize(XMVectorSubtract(farPt, nearPt));
@@ -191,7 +198,8 @@ int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, cons
     float closestDist = FLT_MAX;
 
     for (const auto& obj : scene.GetObjects()) {
-        if (!obj.model) continue;
+        if (!obj.model)
+            continue;
 
         // Transform ray into object local space for accurate rotated picking
         Matrix invWorld = obj.worldTransform.Invert();
@@ -224,13 +232,13 @@ void SceneRenderer::Init(RenderContext& ctx) {
     // Root signature: CBV b0 (PerFrame), CBV b1 (PerObject), CBV b2 (PerMaterial),
     //                 DescriptorTable(SRV t0), StaticSampler s0
     m_rootSignature = RootSignatureBuilder()
-        .AddCBV(0)                                                    // slot 0: PerFrame
-        .AddCBV(1)                                                    // slot 1: PerObject
-        .AddCBV(2)                                                    // slot 2: PerMaterial
-        .AddDescriptorTable(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0)   // slot 3: baseColorTex t0
-        .AddStaticSampler(0)                                          // s0: linear wrap
-        .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
-        .Build(device);
+                          .AddCBV(0)                                                 // slot 0: PerFrame
+                          .AddCBV(1)                                                 // slot 1: PerObject
+                          .AddCBV(2)                                                 // slot 2: PerMaterial
+                          .AddDescriptorTable(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0) // slot 3: baseColorTex t0
+                          .AddStaticSampler(0)                                       // s0: linear wrap
+                          .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
+                          .Build(device);
 
     // Load shaders
     D3D12_SHADER_BYTECODE vs = ctx.GetShaderManager().LoadShader("shaders/mesh_vs_vs.cso");
@@ -242,12 +250,9 @@ void SceneRenderer::Init(RenderContext& ctx) {
     psoDesc.vertexShader = vs;
     psoDesc.pixelShader = ps;
     psoDesc.inputLayout = {
-        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
-         D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12,
-         D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24,
-         D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
     };
     psoDesc.rtvFormat = ctx.GetSwapChain().GetFormat();
     psoDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
@@ -275,8 +280,8 @@ void SceneRenderer::Init(RenderContext& ctx) {
         texCmdList.Reset();
 
         uint8_t whitePixel[] = {255, 255, 255, 255};
-        if (!m_defaultWhiteTex.InitFromMemory(device, allocator, texCmdList.Get(),
-            ctx.GetSrvHeap(), whitePixel, 1, 1, 4)) {
+        if (!m_defaultWhiteTex.InitFromMemory(device, allocator, texCmdList.Get(), ctx.GetSrvHeap(), whitePixel, 1, 1,
+                                              4)) {
             SE_LOG_ERROR("Failed to create default white texture");
             texCmdList.Shutdown();
             return;
@@ -289,10 +294,141 @@ void SceneRenderer::Init(RenderContext& ctx) {
         texCmdList.Shutdown();
     }
 
+    // Grid/axis shared shader + blend/depth settings
+    D3D12_SHADER_BYTECODE gridVS = ctx.GetShaderManager().LoadShader("shaders/grid_vs_vs.cso");
+    D3D12_SHADER_BYTECODE gridPS = ctx.GetShaderManager().LoadShader("shaders/grid_ps_ps.cso");
+
+    D3D12_BLEND_DESC gridBlend = DefaultBlendDesc();
+    gridBlend.RenderTarget[0].BlendEnable = TRUE;
+    gridBlend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    gridBlend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+    gridBlend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+
+    D3D12_DEPTH_STENCIL_DESC gridDS = DefaultDepthStencilDesc();
+    gridDS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+    std::vector<D3D12_INPUT_ELEMENT_DESC> gridInputLayout = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+    };
+
+    // Grid quad PSO (TRIANGLE topology, procedural grid in PS)
+    GraphicsPipelineDesc gridPsoDesc;
+    gridPsoDesc.rootSignature = m_rootSignature.Get();
+    gridPsoDesc.vertexShader = gridVS;
+    gridPsoDesc.pixelShader = gridPS;
+    gridPsoDesc.inputLayout = gridInputLayout;
+    gridPsoDesc.primitiveTopology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    gridPsoDesc.rtvFormat = ctx.GetSwapChain().GetFormat();
+    gridPsoDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+    gridPsoDesc.blendState = gridBlend;
+    gridPsoDesc.depthStencilState = gridDS;
+    gridPsoDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    m_gridPSO = PipelineState::CreateGraphicsPSO(device, gridPsoDesc);
+
+    // Axis line PSO (LINE topology)
+    GraphicsPipelineDesc axisPsoDesc;
+    axisPsoDesc.rootSignature = m_rootSignature.Get();
+    axisPsoDesc.vertexShader = gridVS;
+    axisPsoDesc.pixelShader = gridPS;
+    axisPsoDesc.inputLayout = gridInputLayout;
+    axisPsoDesc.primitiveTopology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    axisPsoDesc.rtvFormat = ctx.GetSwapChain().GetFormat();
+    axisPsoDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+    axisPsoDesc.blendState = gridBlend;
+    axisPsoDesc.depthStencilState = gridDS;
+    axisPsoDesc.rasterizerState.AntialiasedLineEnable = TRUE;
+    axisPsoDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    m_axisLinePSO = PipelineState::CreateGraphicsPSO(device, axisPsoDesc);
+
+    CreateGridQuad(device, allocator, 200.0f);
+    CreateAxisLines(device, allocator);
+
+    // Grid offset CB: 2 slots (grid camera offset + axis identity)
+    if (!m_gridOffsetCB.InitAsUploadBuffer(device, allocator, 256 * 2)) {
+        SE_LOG_ERROR("Failed to create grid offset constant buffer");
+        return;
+    }
+
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
+void SceneRenderer::CreateGridQuad(ID3D12Device* device, D3D12MA::Allocator* allocator, float halfExtent) {
+    const Vector4 quadColor(0.0f, 0.0f, 0.0f, 0.0f); // alpha=0 signals procedural mode in PS
+
+    GridVertex vertices[] = {
+        {Vector3(-halfExtent, 0.0f, -halfExtent), quadColor}, {Vector3(-halfExtent, 0.0f, halfExtent), quadColor},
+        {Vector3(halfExtent, 0.0f, halfExtent), quadColor},   {Vector3(-halfExtent, 0.0f, -halfExtent), quadColor},
+        {Vector3(halfExtent, 0.0f, halfExtent), quadColor},   {Vector3(halfExtent, 0.0f, -halfExtent), quadColor},
+    };
+
+    m_gridVertexCount = 6;
+    if (!m_gridVertexBuffer.InitAsVertexBuffer(device, allocator, vertices, sizeof(vertices), sizeof(GridVertex))) {
+        SE_LOG_ERROR("Failed to create grid quad vertex buffer");
+    }
+}
+
+void SceneRenderer::CreateAxisLines(ID3D12Device* device, D3D12MA::Allocator* allocator) {
+    const float len = 10000.0f;
+    const Vector4 xColor(0.7f, 0.2f, 0.2f, 0.8f);
+    const Vector4 yColor(0.2f, 0.7f, 0.2f, 0.8f);
+    const Vector4 zColor(0.2f, 0.2f, 0.7f, 0.8f);
+
+    GridVertex vertices[] = {
+        {Vector3(-len, 0.0f, 0.0f), xColor}, {Vector3(len, 0.0f, 0.0f), xColor},  {Vector3(0.0f, -len, 0.0f), yColor},
+        {Vector3(0.0f, len, 0.0f), yColor},  {Vector3(0.0f, 0.0f, -len), zColor}, {Vector3(0.0f, 0.0f, len), zColor},
+    };
+    m_axisVertexCount = 6;
+    if (!m_axisVertexBuffer.InitAsVertexBuffer(device, allocator, vertices, sizeof(vertices), sizeof(GridVertex))) {
+        SE_LOG_ERROR("Failed to create axis line vertex buffer");
+    }
+}
+
+void SceneRenderer::RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera) {
+    if (m_gridVertexCount == 0)
+        return;
+
+    struct alignas(256) GridWorldData {
+        Matrix world;
+    };
+    static_assert(sizeof(GridWorldData) == 256);
+
+    // Slot 0: grid offset — snap camera XZ to 1m grid spacing
+    Vector3 camPos = camera.GetPosition();
+    GridWorldData gridData{Matrix::CreateTranslation(std::floor(camPos.x), 0.0f, std::floor(camPos.z))};
+    m_gridOffsetCB.UpdateDataAtOffset(&gridData, sizeof(gridData), 0);
+
+    // Slot 1: identity — axis lines at world origin
+    GridWorldData axisData{Matrix()};
+    m_gridOffsetCB.UpdateDataAtOffset(&axisData, sizeof(axisData), sizeof(GridWorldData));
+
+    auto cbBase = m_gridOffsetCB.GetResource()->GetGPUVirtualAddress();
+
+    // Draw procedural grid quad (TRIANGLE topology)
+    cmdList->SetPipelineState(m_gridPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->SetGraphicsRootConstantBufferView(1, cbBase);
+    D3D12_VERTEX_BUFFER_VIEW gridVB = m_gridVertexBuffer.GetVertexBufferView();
+    cmdList->IASetVertexBuffers(0, 1, &gridVB);
+    cmdList->DrawInstanced(m_gridVertexCount, 1, 0, 0);
+
+    // Draw axis lines (LINE topology, fixed at world origin)
+    if (m_axisVertexCount > 0) {
+        cmdList->SetPipelineState(m_axisLinePSO.Get());
+        cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+        cmdList->SetGraphicsRootConstantBufferView(1, cbBase + sizeof(GridWorldData));
+        D3D12_VERTEX_BUFFER_VIEW axisVB = m_axisVertexBuffer.GetVertexBufferView();
+        cmdList->IASetVertexBuffers(0, 1, &axisVB);
+        cmdList->DrawInstanced(m_axisVertexCount, 1, 0, 0);
+    }
+}
+
 void SceneRenderer::Shutdown() {
+    m_axisVertexBuffer.Shutdown();
+    m_gridOffsetCB.Shutdown();
+    m_gridVertexBuffer.Shutdown();
+    m_gridPSO.Reset();
+    m_axisLinePSO.Reset();
     if (m_srvHeap) {
         m_defaultWhiteTex.Shutdown(*m_srvHeap);
     }
@@ -320,21 +456,35 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     PerFrameData frameData;
     frameData.viewProjection = camera.GetViewProjectionMatrix();
     frameData.cameraPosition = camera.GetPosition();
+    frameData.gridFadeStart = m_gridSettings.fadeStart;
+    frameData.gridFadeEnd = m_gridSettings.fadeEnd;
+    frameData.gridOpacity = m_gridSettings.opacity;
     m_perFrameCB.UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB.GetResource()->GetGPUVirtualAddress());
+
+    // Draw grid lines (depth write OFF — objects will paint over)
+    if (m_gridSettings.visible) {
+        RenderGrid(cmdList, camera);
+    }
+
+    // Restore mesh pipeline state
+    cmdList->SetPipelineState(m_pipelineState.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     uint32_t objectIndex = 0;
     D3D12_GPU_VIRTUAL_ADDRESS objCbBase = m_perObjectCB.GetResource()->GetGPUVirtualAddress();
     D3D12_GPU_VIRTUAL_ADDRESS matCbBase = m_perMaterialCB.GetResource()->GetGPUVirtualAddress();
 
     for (const auto& sceneObj : scene.GetObjects()) {
-        if (!sceneObj.model) continue;
+        if (!sceneObj.model)
+            continue;
 
         bool isSelected = (static_cast<int>(sceneObj.id) == selectedObjectId);
 
         for (const auto& mesh : sceneObj.model->meshes) {
             for (const auto& prim : mesh.primitives) {
-                if (prim.indexCount == 0 || objectIndex >= kMaxObjects) continue;
+                if (prim.indexCount == 0 || objectIndex >= kMaxObjects)
+                    continue;
 
                 // Per-object transform
                 PerObjectData objData;
@@ -356,8 +506,8 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                     if (mat.baseColorTextureIndex >= 0 &&
                         mat.baseColorTextureIndex < static_cast<int>(sceneObj.model->textures.size())) {
                         matData.hasTexture = 1;
-                        cmdList->SetGraphicsRootDescriptorTable(3,
-                            sceneObj.model->textures[mat.baseColorTextureIndex].GetSRVHandle().gpu);
+                        cmdList->SetGraphicsRootDescriptorTable(
+                            3, sceneObj.model->textures[mat.baseColorTextureIndex].GetSRVHandle().gpu);
                     } else {
                         cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
                     }

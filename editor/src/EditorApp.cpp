@@ -58,7 +58,7 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
 
     m_viewport.SetResizeCallback([this](uint32_t w, uint32_t h) { m_sceneRenderer.OnResize(w, h); });
 
-    m_viewport.SetToolbarCallback([this]() { m_editorController.RenderToolbar(m_viewport); });
+    m_viewport.SetToolbarCallback([this]() { m_editorController.RenderToolbar(m_viewport, m_sceneRenderer); });
 
     // Set resize callback
     m_window.SetResizeCallback([this](uint32_t w, uint32_t h) {
@@ -172,6 +172,13 @@ void EditorApp::SaveEditorConfig() {
     g["snapRotate"].Set(m_editorController.GetSnapRotate());
     g["snapScale"].Set(m_editorController.GetSnapScale());
 
+    // Grid settings
+    auto grid = doc["grid"];
+    grid["visible"].Set(m_sceneRenderer.GetGridSettings().visible);
+    grid["opacity"].Set(m_sceneRenderer.GetGridSettings().opacity);
+    grid["fadeStart"].Set(m_sceneRenderer.GetGridSettings().fadeStart);
+    grid["fadeEnd"].Set(m_sceneRenderer.GetGridSettings().fadeEnd);
+
     // Console settings
     auto con = doc["console"];
     con["levelFilter"].Set(m_console.GetLevelFilter());
@@ -226,6 +233,18 @@ void EditorApp::LoadEditorConfig() {
     if (g.Contains("snapScale")) {
         m_editorController.SetSnapScale(g["snapScale"].GetFloat());
     }
+
+    // Grid settings
+    auto grid = doc["grid"];
+    auto& gs = m_sceneRenderer.GetGridSettings();
+    if (grid.Contains("visible"))
+        gs.visible = grid["visible"].GetBool();
+    if (grid.Contains("opacity"))
+        gs.opacity = grid["opacity"].GetFloat();
+    if (grid.Contains("fadeStart"))
+        gs.fadeStart = grid["fadeStart"].GetFloat();
+    if (grid.Contains("fadeEnd"))
+        gs.fadeEnd = grid["fadeEnd"].GetFloat();
 
     // Console settings
     auto con = doc["console"];

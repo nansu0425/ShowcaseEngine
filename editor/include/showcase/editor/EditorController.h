@@ -17,7 +17,7 @@ class EditorController {
 public:
     void Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport);
     void RenderUI(Scene& scene, ViewportPanel& viewport);
-    void RenderToolbar(ViewportPanel& viewport);
+    void RenderToolbar(ViewportPanel& viewport, SceneRenderer& renderer);
 
     int GetSelectedObjectId() const { return m_selectedObjectId; }
     void ClearSelection() { m_selectedObjectId = -1; }

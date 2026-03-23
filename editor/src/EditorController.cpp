@@ -214,7 +214,7 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
 
 // ── Toolbar ───────────────────────────────────────────────────────
 
-void EditorController::RenderToolbar(ViewportPanel& viewport) {
+void EditorController::RenderToolbar(ViewportPanel& viewport, SceneRenderer& renderer) {
     Camera& camera = viewport.GetCamera();
 
     if (ImGui::RadioButton("Translate", m_gizmoOperation == ImGuizmo::TRANSLATE)) {
@@ -289,6 +289,26 @@ void EditorController::RenderToolbar(ViewportPanel& viewport) {
                     camera.GetPosition().z);
         ImGui::SliderFloat("Move Speed", &viewport.cameraMoveSpeed, 1.0f, 50.0f);
         ImGui::SliderFloat("Look Sensitivity", &viewport.cameraLookSpeed, 0.001f, 0.01f);
+        ImGui::EndPopup();
+    }
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    if (ImGui::Button("Grid")) {
+        ImGui::OpenPopup("GridSettings");
+    }
+
+    if (ImGui::BeginPopup("GridSettings")) {
+        auto& grid = renderer.GetGridSettings();
+        ImGui::Checkbox("Visible", &grid.visible);
+        ImGui::SliderFloat("Opacity", &grid.opacity, 0.0f, 1.0f);
+        ImGui::SliderFloat("Fade Start", &grid.fadeStart, 5.0f, 200.0f);
+        ImGui::SliderFloat("Fade End", &grid.fadeEnd, 10.0f, 200.0f);
+        if (grid.fadeStart >= grid.fadeEnd) {
+            grid.fadeEnd = grid.fadeStart + 1.0f;
+        }
         ImGui::EndPopup();
     }
 }

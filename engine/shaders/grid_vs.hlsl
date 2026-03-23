@@ -14,15 +14,13 @@ cbuffer PerObject : register(b1) {
 
 struct VSInput {
     float3 position : POSITION;
-    float3 normal : NORMAL;
-    float2 texCoord : TEXCOORD;
+    float4 color : COLOR;
 };
 
 struct VSOutput {
     float4 position : SV_POSITION;
-    float3 worldNorm : NORMAL;
+    float4 color : COLOR;
     float3 worldPos : TEXCOORD0;
-    float2 texCoord : TEXCOORD1;
 };
 
 VSOutput main(VSInput input) {
@@ -31,8 +29,6 @@ VSOutput main(VSInput input) {
     float4 worldPos = mul(float4(input.position, 1.0), world);
     output.position = mul(worldPos, viewProjection);
     output.worldPos = worldPos.xyz;
-    output.worldNorm = normalize(mul(input.normal, (float3x3)world));
-    output.texCoord = input.texCoord;
-
+    output.color = input.color;
     return output;
 }

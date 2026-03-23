@@ -4,6 +4,7 @@
 #include <showcase/graphics/Camera.h>
 #include <showcase/graphics/Model.h>
 #include <showcase/graphics/Scene.h>
+
 #include <d3d12.h>
 #include <wrl/client.h>
 
@@ -13,6 +14,13 @@ namespace showcase {
 
 class RenderContext;
 
+struct GridSettings {
+    bool visible = true;
+    float opacity = 0.7f;
+    float fadeStart = 25.0f;
+    float fadeEnd = 50.0f;
+};
+
 class SceneRenderer {
 public:
     void Init(RenderContext& ctx);
@@ -21,14 +29,16 @@ public:
     void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId);
 
     /// Casts a ray from screen coordinates and returns the closest hit object ID, or -1 if none.
-    int PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene,
-                   float vpMinX, float vpMinY, float vpMaxX, float vpMaxY) const;
+    int PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene, float vpMinX, float vpMinY,
+                   float vpMaxX, float vpMaxY) const;
 
     // Procedural geometry helpers
     void CreateGridModel(RenderContext& ctx, Model& outModel);
     void CreateCubeModel(RenderContext& ctx, Model& outModel);
 
     Texture& GetDefaultWhiteTexture() { return m_defaultWhiteTex; }
+
+    GridSettings& GetGridSettings() { return m_gridSettings; }
 
 private:
     static constexpr uint32_t kMaxObjects = 64;
@@ -49,6 +59,23 @@ private:
     DescriptorHeap* m_srvHeap = nullptr;
 
     float m_aspectRatio = 16.0f / 9.0f;
+
+    // Grid quad (procedural)
+    ComPtr<ID3D12PipelineState> m_gridPSO;
+    Buffer m_gridVertexBuffer;
+    uint32_t m_gridVertexCount = 0;
+    Buffer m_gridOffsetCB;
+
+    // Axis lines (fixed at world origin)
+    ComPtr<ID3D12PipelineState> m_axisLinePSO;
+    Buffer m_axisVertexBuffer;
+    uint32_t m_axisVertexCount = 0;
+
+    GridSettings m_gridSettings;
+
+    void CreateGridQuad(ID3D12Device* device, D3D12MA::Allocator* allocator, float halfExtent);
+    void CreateAxisLines(ID3D12Device* device, D3D12MA::Allocator* allocator);
+    void RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera);
 };
 
 } // namespace showcase
