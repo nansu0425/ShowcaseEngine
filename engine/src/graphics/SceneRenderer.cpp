@@ -408,15 +408,6 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     m_perFrameCB.UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB.GetResource()->GetGPUVirtualAddress());
 
-    // Draw grid lines (depth write OFF — objects will paint over)
-    if (m_gridSettings.visible) {
-        RenderGrid(cmdList, camera);
-    }
-
-    // Restore mesh pipeline state
-    cmdList->SetPipelineState(m_pipelineState.Get());
-    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
     uint32_t objectIndex = 0;
     D3D12_GPU_VIRTUAL_ADDRESS objCbBase = m_perObjectCB.GetResource()->GetGPUVirtualAddress();
     D3D12_GPU_VIRTUAL_ADDRESS matCbBase = m_perMaterialCB.GetResource()->GetGPUVirtualAddress();
@@ -472,6 +463,12 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                 objectIndex++;
             }
         }
+    }
+
+    // Draw grid after scene objects so depth testing correctly occludes
+    // grid lines behind objects while showing lines in front
+    if (m_gridSettings.visible) {
+        RenderGrid(cmdList, camera);
     }
 }
 

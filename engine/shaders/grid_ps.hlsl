@@ -96,5 +96,6 @@ float4 main(PSInput input) : SV_TARGET {
     gridAlpha *= (1.0 - axisPresence);
     float alpha = max(gridAlpha, axisPresence) * gridOpacity;
 
+    clip(alpha - 0.01);
     return float4(finalColor, alpha);
 }
