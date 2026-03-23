@@ -17,8 +17,6 @@ class RenderContext;
 struct GridSettings {
     bool visible = true;
     float opacity = 0.7f;
-    float fadeStart = 25.0f;
-    float fadeEnd = 50.0f;
 };
 
 class SceneRenderer {

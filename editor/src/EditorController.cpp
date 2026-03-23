@@ -304,11 +304,6 @@ void EditorController::RenderToolbar(ViewportPanel& viewport, SceneRenderer& ren
         auto& grid = renderer.GetGridSettings();
         ImGui::Checkbox("Visible", &grid.visible);
         ImGui::SliderFloat("Opacity", &grid.opacity, 0.0f, 1.0f);
-        ImGui::SliderFloat("Fade Start", &grid.fadeStart, 5.0f, 200.0f);
-        ImGui::SliderFloat("Fade End", &grid.fadeEnd, 10.0f, 200.0f);
-        if (grid.fadeStart >= grid.fadeEnd) {
-            grid.fadeEnd = grid.fadeStart + 1.0f;
-        }
         ImGui::EndPopup();
     }
 }

@@ -176,8 +176,6 @@ void EditorApp::SaveEditorConfig() {
     auto grid = doc["grid"];
     grid["visible"].Set(m_sceneRenderer.GetGridSettings().visible);
     grid["opacity"].Set(m_sceneRenderer.GetGridSettings().opacity);
-    grid["fadeStart"].Set(m_sceneRenderer.GetGridSettings().fadeStart);
-    grid["fadeEnd"].Set(m_sceneRenderer.GetGridSettings().fadeEnd);
 
     // Console settings
     auto con = doc["console"];
@@ -241,10 +239,6 @@ void EditorApp::LoadEditorConfig() {
         gs.visible = grid["visible"].GetBool();
     if (grid.Contains("opacity"))
         gs.opacity = grid["opacity"].GetFloat();
-    if (grid.Contains("fadeStart"))
-        gs.fadeStart = grid["fadeStart"].GetFloat();
-    if (grid.Contains("fadeEnd"))
-        gs.fadeEnd = grid["fadeEnd"].GetFloat();
 
     // Console settings
     auto con = doc["console"];

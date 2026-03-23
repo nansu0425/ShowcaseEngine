@@ -16,11 +16,7 @@ using namespace DirectX;
 struct alignas(256) PerFrameData {
     Matrix viewProjection;
     Vector3 cameraPosition;
-    float _pad0;
-    float gridFadeStart;
-    float gridFadeEnd;
     float gridOpacity;
-    float _pad1;
 };
 
 struct alignas(256) PerObjectData {
@@ -326,7 +322,7 @@ void SceneRenderer::Init(RenderContext& ctx) {
     gridPsoDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     m_gridPSO = PipelineState::CreateGraphicsPSO(device, gridPsoDesc);
 
-    CreateGridQuad(device, allocator, 200.0f);
+    CreateGridQuad(device, allocator, 1500.0f);
 
     // Grid offset CB: 1 slot (grid camera offset)
     if (!m_gridOffsetCB.InitAsUploadBuffer(device, allocator, 256)) {
@@ -408,8 +404,6 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     PerFrameData frameData;
     frameData.viewProjection = camera.GetViewProjectionMatrix();
     frameData.cameraPosition = camera.GetPosition();
-    frameData.gridFadeStart = m_gridSettings.fadeStart;
-    frameData.gridFadeEnd = m_gridSettings.fadeEnd;
     frameData.gridOpacity = m_gridSettings.opacity;
     m_perFrameCB.UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB.GetResource()->GetGPUVirtualAddress());
