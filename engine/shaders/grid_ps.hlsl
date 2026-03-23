@@ -17,14 +17,14 @@ struct PSInput {
 // Pristine Grid: anti-aliased grid pattern at any scale.
 // coord:    world position divided by grid spacing
 // uvDeriv:  screen-space derivatives at that scale
-// lineWidth: line thickness as fraction of cell (0-0.5)
-float PristineGrid(float2 coord, float2 uvDeriv, float lineWidth, float fadeWidth) {
-    float2 drawWidth = clamp(float2(lineWidth, lineWidth), uvDeriv, 0.5);
+// lineWidth: per-axis line thickness as fraction of cell (0-0.5)
+float PristineGrid(float2 coord, float2 uvDeriv, float2 lineWidth, float2 fadeWidth) {
+    float2 drawWidth = clamp(lineWidth, uvDeriv, 0.5);
     float2 lineAA = uvDeriv * 1.5;
     float2 gridUV = 1.0 - abs(frac(coord) * 2.0 - 1.0);
     float2 grid2 = smoothstep(drawWidth + lineAA, drawWidth - lineAA, gridUV);
     grid2 *= saturate(fadeWidth / drawWidth);
-    grid2 = lerp(grid2, float2(lineWidth, lineWidth), saturate(uvDeriv * 2.0 - 1.0));
+    grid2 = lerp(grid2, lineWidth, saturate(uvDeriv * 2.0 - 1.0));
     return lerp(grid2.x, 1.0, grid2.y);
 }
 
@@ -38,22 +38,19 @@ float LODFade(float2 scaledDeriv) {
 
 // Axis line: same as PristineGrid but for the origin line (abs(coord) instead of frac-based).
 // Returns per-component intensity for x=0 and z=0 lines.
-float2 AxisLine(float2 coord, float2 uvDeriv, float lineWidth, float fadeWidth) {
+float2 AxisLine(float2 coord, float2 uvDeriv, float2 lineWidth, float2 fadeWidth) {
     float2 axisUV = abs(coord);
-    float2 drawWidth = clamp(float2(lineWidth, lineWidth), uvDeriv, 0.5);
+    float2 drawWidth = clamp(lineWidth, uvDeriv, 0.5);
     float2 lineAA = uvDeriv * 1.5;
     float2 grid2 = smoothstep(drawWidth + lineAA, drawWidth - lineAA, axisUV);
     grid2 *= saturate(fadeWidth / drawWidth);
-    grid2 = lerp(grid2, float2(lineWidth, lineWidth), saturate(uvDeriv * 2.0 - 1.0));
+    grid2 = lerp(grid2, lineWidth, saturate(uvDeriv * 2.0 - 1.0));
     return grid2;
 }
 
 float4 main(PSInput input) : SV_TARGET {
     float2 coord = input.worldPos.xz;
-    float lineWidth0 = 0.04;   // 1m grid:   4cm
-    float lineWidth1 = 0.008;  // 10m grid:  8cm
-    float lineWidth2 = 0.0016; // 100m grid: 16cm
-    float fadeWidth = 0.04;    // shared fade distance (decoupled from visual thickness)
+    float pixelWidth = 1.0; // grid line thickness in pixels (screen-space constant)
 
     // Screen-space derivatives (shared across all LOD levels)
     float2 uvDDX = ddx(coord);
@@ -64,26 +61,29 @@ float4 main(PSInput input) : SV_TARGET {
     // Opacity hierarchy: coarser grids are brighter for visual scale distinction
     static const float3 opacities = float3(0.6, 0.8, 1.0);
 
-    // LOD 0: 1m grid
+    // LOD 0: 1m grid — per-axis lineWidth for correct anisotropic scaling
     float2 deriv0 = uvDeriv;
-    float alpha0 = PristineGrid(coord, deriv0, lineWidth0, fadeWidth) * opacities.x * LODFade(deriv0);
+    float2 lineWidth0 = min(deriv0 * pixelWidth, 0.15);
+    float alpha0 = PristineGrid(coord, deriv0, lineWidth0, lineWidth0) * opacities.x * LODFade(deriv0);
 
     // LOD 1: 10m grid
     float2 deriv1 = uvDeriv / 10.0;
-    float alpha1 = PristineGrid(coord / 10.0, deriv1, lineWidth1, fadeWidth) * opacities.y * LODFade(deriv1);
+    float2 lineWidth1 = min(deriv1 * pixelWidth, 0.15);
+    float alpha1 = PristineGrid(coord / 10.0, deriv1, lineWidth1, lineWidth1) * opacities.y * LODFade(deriv1);
 
     // LOD 2: 100m grid — no LODFade (coarsest level, nothing to fall back to)
     // Pristine Grid's own Nyquist fade handles sub-pixel gracefully
     float2 deriv2 = uvDeriv / 100.0;
-    float alpha2 = PristineGrid(coord / 100.0, deriv2, lineWidth2, fadeWidth) * opacities.z;
+    float2 lineWidth2 = min(deriv2 * pixelWidth, 0.15);
+    float alpha2 = PristineGrid(coord / 100.0, deriv2, lineWidth2, lineWidth2) * opacities.z;
 
     // Composite: max() prevents double-darkening where lines overlap
     float gridAlpha = max(max(alpha0, alpha1), alpha2);
 
     // --- Axis coloring (x=0 red, z=0 blue) — matches grid width at every LOD ---
-    float2 axis0 = AxisLine(coord, deriv0, lineWidth0, fadeWidth) * opacities.x * LODFade(deriv0);
-    float2 axis1 = AxisLine(coord / 10.0, deriv1, lineWidth1, fadeWidth) * opacities.y * LODFade(deriv1);
-    float2 axis2 = AxisLine(coord / 100.0, deriv2, lineWidth2, fadeWidth) * opacities.z;
+    float2 axis0 = AxisLine(coord, deriv0, lineWidth0, lineWidth0) * opacities.x * LODFade(deriv0);
+    float2 axis1 = AxisLine(coord / 10.0, deriv1, lineWidth1, lineWidth1) * opacities.y * LODFade(deriv1);
+    float2 axis2 = AxisLine(coord / 100.0, deriv2, lineWidth2, lineWidth2) * opacities.z;
 
     float xAxisIntensity = max(max(axis0.y, axis1.y), axis2.y); // z=0 line -> X-axis (red)
     float zAxisIntensity = max(max(axis0.x, axis1.x), axis2.x); // x=0 line -> Z-axis (blue)
