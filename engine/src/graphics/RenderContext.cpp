@@ -12,20 +12,27 @@ bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
     bool enableDebug = false;
 #endif
 
-    if (!m_device.Init(enableDebug)) return false;
+    if (!m_device.Init(enableDebug))
+        return false;
 
     auto* device = m_device.GetDevice();
 
-    if (!m_directQueue.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT)) return false;
-    if (!m_swapChain.Init(device, m_device.GetFactory(), m_directQueue, hwnd, width, height)) return false;
+    if (!m_directQueue.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT))
+        return false;
+    if (!m_swapChain.Init(device, m_device.GetFactory(), m_directQueue, hwnd, width, height))
+        return false;
 
     // Shader-visible SRV heap (for ImGui and general use)
-    if (!m_srvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 256, true)) return false;
+    if (!m_srvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 256, true))
+        return false;
 
-    if (!m_depthBuffer.Init(device, m_device.GetAllocator(), width, height)) return false;
+    if (!m_depthBuffer.Init(device, m_device.GetAllocator(), width, height))
+        return false;
 
-    if (!m_frameResource.Init(device)) return false;
-    if (!m_commandList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT)) return false;
+    if (!m_frameResource.Init(device))
+        return false;
+    if (!m_commandList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT))
+        return false;
 
     m_width = width;
     m_height = height;
@@ -37,7 +44,7 @@ bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
 
 void RenderContext::Shutdown() {
     m_directQueue.Flush();
-    m_depthBuffer.Shutdown();
+    m_depthBuffer.Shutdown(m_srvHeap);
     m_shaderManager.Clear();
     m_commandList.Shutdown();
     m_frameResource.Shutdown();
@@ -61,7 +68,7 @@ void RenderContext::BeginFrame() {
     m_commandList.Get()->Reset(allocator, nullptr);
 
     // Bind SRV heap once per frame so all passes can use descriptor tables
-    ID3D12DescriptorHeap* heaps[] = { m_srvHeap.GetHeap() };
+    ID3D12DescriptorHeap* heaps[] = {m_srvHeap.GetHeap()};
     m_commandList.Get()->SetDescriptorHeaps(1, heaps);
 }
 
@@ -77,7 +84,8 @@ void RenderContext::EndFrame() {
 
 // ── Resize ───────────────────────────────────────────────────────────
 void RenderContext::Resize(uint32_t width, uint32_t height) {
-    if (width == 0 || height == 0) return;
+    if (width == 0 || height == 0)
+        return;
 
     m_width = width;
     m_height = height;
@@ -92,8 +100,7 @@ void RenderContext::BeginBackBufferPass(const float clearColor[4]) {
 
     // Transition back buffer to render target
     auto* backBuffer = m_swapChain.GetCurrentBackBuffer();
-    m_commandList.TransitionBarrier(backBuffer,
-        D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    m_commandList.TransitionBarrier(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     // Clear and bind render target
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_swapChain.GetCurrentRTV();
@@ -115,8 +122,7 @@ void RenderContext::BeginBackBufferPass(const float clearColor[4]) {
 
 void RenderContext::EndBackBufferPass() {
     auto* backBuffer = m_swapChain.GetCurrentBackBuffer();
-    m_commandList.TransitionBarrier(backBuffer,
-        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+    m_commandList.TransitionBarrier(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 }
 
 } // namespace showcase

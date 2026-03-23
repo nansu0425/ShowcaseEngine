@@ -17,6 +17,8 @@ struct alignas(256) PerFrameData {
     Matrix viewProjection;
     Vector3 cameraPosition;
     float gridOpacity;
+    float nearPlane;
+    float farPlane;
 };
 
 struct alignas(256) PerObjectData {
@@ -226,12 +228,13 @@ void SceneRenderer::Init(RenderContext& ctx) {
     auto* allocator = ctx.GetDevice().GetAllocator();
 
     // Root signature: CBV b0 (PerFrame), CBV b1 (PerObject), CBV b2 (PerMaterial),
-    //                 DescriptorTable(SRV t0), StaticSampler s0
+    //                 DescriptorTable(SRV t0), DescriptorTable(SRV t1), StaticSampler s0
     m_rootSignature = RootSignatureBuilder()
                           .AddCBV(0)                                                 // slot 0: PerFrame
                           .AddCBV(1)                                                 // slot 1: PerObject
                           .AddCBV(2)                                                 // slot 2: PerMaterial
                           .AddDescriptorTable(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0) // slot 3: baseColorTex t0
+                          .AddDescriptorTable(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1) // slot 4: sceneDepth t1
                           .AddStaticSampler(0)                                       // s0: linear wrap
                           .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
                           .Build(device);
@@ -300,7 +303,8 @@ void SceneRenderer::Init(RenderContext& ctx) {
     gridBlend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
     gridBlend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 
-    D3D12_DEPTH_STENCIL_DESC gridDS = DefaultDepthStencilDesc();
+    D3D12_DEPTH_STENCIL_DESC gridDS = {};
+    gridDS.DepthEnable = FALSE;
     gridDS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> gridInputLayout = {
@@ -316,7 +320,7 @@ void SceneRenderer::Init(RenderContext& ctx) {
     gridPsoDesc.inputLayout = gridInputLayout;
     gridPsoDesc.primitiveTopology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     gridPsoDesc.rtvFormat = ctx.GetSwapChain().GetFormat();
-    gridPsoDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+    gridPsoDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
     gridPsoDesc.blendState = gridBlend;
     gridPsoDesc.depthStencilState = gridDS;
     gridPsoDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
@@ -348,7 +352,8 @@ void SceneRenderer::CreateGridQuad(ID3D12Device* device, D3D12MA::Allocator* all
     }
 }
 
-void SceneRenderer::RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera) {
+void SceneRenderer::RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera, DepthBuffer* sceneDepth,
+                               D3D12_CPU_DESCRIPTOR_HANDLE activeRtv) {
     if (m_gridVertexCount == 0)
         return;
 
@@ -364,13 +369,45 @@ void SceneRenderer::RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera&
 
     auto cbBase = m_gridOffsetCB.GetResource()->GetGPUVirtualAddress();
 
+    // Transition depth buffer for shader sampling (manual depth comparison)
+    if (sceneDepth) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = sceneDepth->GetResource();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrier.Transition.StateAfter =
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+
+        // Unbind DSV — grid PSO has no depth test, and depth resource is now SRV
+        cmdList->OMSetRenderTargets(1, &activeRtv, FALSE, nullptr);
+    }
+
     // Draw procedural grid quad (TRIANGLE topology)
     cmdList->SetPipelineState(m_gridPSO.Get());
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     cmdList->SetGraphicsRootConstantBufferView(1, cbBase);
+
+    if (sceneDepth) {
+        cmdList->SetGraphicsRootDescriptorTable(4, sceneDepth->GetSRV().gpu);
+    }
+
     D3D12_VERTEX_BUFFER_VIEW gridVB = m_gridVertexBuffer.GetVertexBufferView();
     cmdList->IASetVertexBuffers(0, 1, &gridVB);
     cmdList->DrawInstanced(m_gridVertexCount, 1, 0, 0);
+
+    // Transition depth buffer back to DEPTH_WRITE for next frame
+    if (sceneDepth) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = sceneDepth->GetResource();
+        barrier.Transition.StateBefore =
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+    }
 }
 
 void SceneRenderer::Shutdown() {
@@ -393,7 +430,8 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
 
 // ── Render ───────────────────────────────────────────────────────────
 
-void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId) {
+void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
+                           DepthBuffer* sceneDepth, D3D12_CPU_DESCRIPTOR_HANDLE activeRtv) {
     auto* cmdList = ctx.GetCommandList().Get();
 
     cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
@@ -405,6 +443,8 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     frameData.viewProjection = camera.GetViewProjectionMatrix();
     frameData.cameraPosition = camera.GetPosition();
     frameData.gridOpacity = m_gridSettings.opacity;
+    frameData.nearPlane = camera.GetNearZ();
+    frameData.farPlane = camera.GetFarZ();
     m_perFrameCB.UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB.GetResource()->GetGPUVirtualAddress());
 
@@ -468,7 +508,7 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     // Draw grid after scene objects so depth testing correctly occludes
     // grid lines behind objects while showing lines in front
     if (m_gridSettings.visible) {
-        RenderGrid(cmdList, camera);
+        RenderGrid(cmdList, camera, sceneDepth, activeRtv);
     }
 }
 

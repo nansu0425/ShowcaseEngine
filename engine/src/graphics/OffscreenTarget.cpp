@@ -1,7 +1,7 @@
 #include <showcase/graphics/OffscreenTarget.h>
 
-#include <showcase/graphics/RenderContext.h>
 #include <showcase/core/Log.h>
+#include <showcase/graphics/RenderContext.h>
 
 namespace showcase {
 
@@ -19,6 +19,7 @@ bool OffscreenTarget::Init(RenderContext& ctx, uint32_t initialWidth, uint32_t i
     if (!m_depthBuffer.Init(device, allocator, initialWidth, initialHeight)) {
         return false;
     }
+    m_depthBuffer.CreateSRV(device, ctx.GetSrvHeap());
 
     m_width = initialWidth;
     m_height = initialHeight;
@@ -29,7 +30,7 @@ bool OffscreenTarget::Init(RenderContext& ctx, uint32_t initialWidth, uint32_t i
 
 void OffscreenTarget::Shutdown(RenderContext& ctx) {
     m_renderTarget.Shutdown(ctx.GetSrvHeap());
-    m_depthBuffer.Shutdown();
+    m_depthBuffer.Shutdown(ctx.GetSrvHeap());
 }
 
 // ── Rendering ────────────────────────────────────────────────────────
@@ -41,9 +42,8 @@ void OffscreenTarget::BeginRender(CommandList& cmdList) {
     }
 
     // Transition render target: SRV -> RT
-    cmdList.TransitionBarrier(m_renderTarget.GetResource(),
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        D3D12_RESOURCE_STATE_RENDER_TARGET);
+    cmdList.TransitionBarrier(m_renderTarget.GetResource(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                              D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     auto rtv = m_renderTarget.GetRTV();
     auto dsv = m_depthBuffer.GetDSV();
@@ -66,9 +66,8 @@ void OffscreenTarget::BeginRender(CommandList& cmdList) {
 
 void OffscreenTarget::EndRender(CommandList& cmdList) {
     // Transition render target: RT -> SRV
-    cmdList.TransitionBarrier(m_renderTarget.GetResource(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    cmdList.TransitionBarrier(m_renderTarget.GetResource(), D3D12_RESOURCE_STATE_RENDER_TARGET,
+                              D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
 // ── Resize ───────────────────────────────────────────────────────────
@@ -86,6 +85,7 @@ void OffscreenTarget::Resize(uint32_t width, uint32_t height) {
     m_ctx->GetDirectQueue().Flush();
     m_renderTarget.Resize(device, allocator, m_ctx->GetSrvHeap(), width, height);
     m_depthBuffer.Resize(device, allocator, width, height);
+    m_depthBuffer.CreateSRV(device, m_ctx->GetSrvHeap());
     m_width = width;
     m_height = height;
 

@@ -2,7 +2,11 @@ cbuffer PerFrame : register(b0) {
     row_major float4x4 viewProjection;
     float3 cameraPosition;
     float gridOpacity;
+    float nearPlane;
+    float farPlane;
 };
+
+Texture2D<float> sceneDepth : register(t1);
 
 struct PSInput {
     float4 position : SV_POSITION;
@@ -95,6 +99,25 @@ float4 main(PSInput input) : SV_TARGET {
     float axisPresence = max(xAxisIntensity, zAxisIntensity);
     gridAlpha *= (1.0 - axisPresence);
     float alpha = max(gridAlpha, axisPresence) * gridOpacity;
+
+    // Manual depth comparison in linear space: distance-invariant occlusion.
+    // NDC depth is nonlinear (1/z) — a fixed epsilon fails at distance.
+    // Converting to linear view-space depth lets us use a world-space tolerance (1cm).
+    float depth = sceneDepth.Load(int3(input.position.xy, 0));
+    // Recompute grid depth analytically from world position.
+    // input.position.z suffers from GPU near-plane clipping noise on the 3000m quad;
+    // reproject from worldPos (precise TEXCOORD interpolation) instead.
+    float4 gridClip = mul(float4(input.worldPos.x, 0.0, input.worldPos.z, 1.0), viewProjection);
+    float gridDepth = gridClip.z / gridClip.w;
+    float linearScene = nearPlane * farPlane / (farPlane - depth * (farPlane - nearPlane));
+    float linearGrid = nearPlane * farPlane / (farPlane - gridDepth * (farPlane - nearPlane));
+    // Adaptive epsilon: NDC interpolation noise scales as z² in linear space.
+    // noiseEpsilon tracks this growth; 0.005m floor for close-range precision.
+    float noiseEpsilon = 0.0002 * linearGrid * linearGrid / (nearPlane * farPlane);
+    float epsilon = max(noiseEpsilon, 0.005);
+    if (linearScene <= linearGrid + epsilon) {
+        discard;
+    }
 
     clip(alpha - 0.01);
     return float4(finalColor, alpha);

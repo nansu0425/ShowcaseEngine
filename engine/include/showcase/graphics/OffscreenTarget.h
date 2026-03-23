@@ -1,8 +1,8 @@
 #pragma once
 
-#include <showcase/graphics/RenderTarget.h>
-#include <showcase/graphics/DepthBuffer.h>
 #include <showcase/graphics/CommandList.h>
+#include <showcase/graphics/DepthBuffer.h>
+#include <showcase/graphics/RenderTarget.h>
 
 #include <cstdint>
 #include <functional>
@@ -27,6 +27,7 @@ public:
 
     RenderTarget& GetRenderTarget() { return m_renderTarget; }
     const RenderTarget& GetRenderTarget() const { return m_renderTarget; }
+    DepthBuffer& GetDepthBuffer() { return m_depthBuffer; }
 
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }

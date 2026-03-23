@@ -563,8 +563,10 @@ int EditorApp::Run() {
 
         // Phase 1: Render scene to off-screen viewport render target
         m_viewport.BeginRender(m_renderContext.GetCommandList());
+        OffscreenTarget& offscreen = m_viewport.GetOffscreenTarget();
         m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
-                               m_editorController.GetSelectedObjectId());
+                               m_editorController.GetSelectedObjectId(), &offscreen.GetDepthBuffer(),
+                               offscreen.GetRenderTarget().GetRTV());
         m_viewport.EndRender(m_renderContext.GetCommandList());
 
         // Phase 2: Render ImGui to back buffer

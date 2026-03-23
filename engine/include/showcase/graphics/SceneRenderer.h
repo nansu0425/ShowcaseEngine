@@ -2,6 +2,7 @@
 
 #include <showcase/graphics/Buffer.h>
 #include <showcase/graphics/Camera.h>
+#include <showcase/graphics/DepthBuffer.h>
 #include <showcase/graphics/Model.h>
 #include <showcase/graphics/Scene.h>
 
@@ -24,7 +25,8 @@ public:
     void Init(RenderContext& ctx);
     void Shutdown();
     void OnResize(uint32_t width, uint32_t height);
-    void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId);
+    void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
+                DepthBuffer* sceneDepth = nullptr, D3D12_CPU_DESCRIPTOR_HANDLE activeRtv = {});
 
     /// Casts a ray from screen coordinates and returns the closest hit object ID, or -1 if none.
     int PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene, float vpMinX, float vpMinY,
@@ -67,7 +69,8 @@ private:
     GridSettings m_gridSettings;
 
     void CreateGridQuad(ID3D12Device* device, D3D12MA::Allocator* allocator, float halfExtent);
-    void RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera);
+    void RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera, DepthBuffer* sceneDepth,
+                    D3D12_CPU_DESCRIPTOR_HANDLE activeRtv);
 };
 
 } // namespace showcase

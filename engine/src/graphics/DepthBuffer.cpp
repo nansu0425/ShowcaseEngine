@@ -5,8 +5,8 @@
 namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
-bool DepthBuffer::Init(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                       uint32_t width, uint32_t height, DXGI_FORMAT format) {
+bool DepthBuffer::Init(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t width, uint32_t height,
+                       DXGI_FORMAT format) {
     m_format = format;
 
     if (!m_dsvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false)) {
@@ -22,15 +22,33 @@ bool DepthBuffer::Init(ID3D12Device* device, D3D12MA::Allocator* allocator,
     return true;
 }
 
-void DepthBuffer::Shutdown() {
+void DepthBuffer::Shutdown(DescriptorHeap& srvHeap) {
+    if (m_srvHandle.IsValid()) {
+        srvHeap.Free(m_srvHandle);
+        m_srvHandle = {};
+    }
     m_resource.Reset();
     m_allocation.Reset();
     m_dsvHeap.Shutdown();
 }
 
+// ── SRV ─────────────────────────────────────────────────────────────
+void DepthBuffer::CreateSRV(ID3D12Device* device, DescriptorHeap& srvHeap) {
+    if (!m_srvHandle.IsValid()) {
+        m_srvHandle = srvHeap.Allocate();
+    }
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    device->CreateShaderResourceView(m_resource.Get(), &srvDesc, m_srvHandle.cpu);
+}
+
 // ── Resize ───────────────────────────────────────────────────────────
-void DepthBuffer::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                          uint32_t width, uint32_t height) {
+void DepthBuffer::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t width, uint32_t height) {
     m_resource.Reset();
     m_allocation.Reset();
     CreateResources(device, allocator, width, height);
@@ -38,8 +56,8 @@ void DepthBuffer::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator,
 }
 
 // ── Internal ─────────────────────────────────────────────────────────
-bool DepthBuffer::CreateResources(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                                   uint32_t width, uint32_t height) {
+bool DepthBuffer::CreateResources(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t width,
+                                  uint32_t height) {
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = m_format;
     clearValue.DepthStencil.Depth = 1.0f;
@@ -58,12 +76,8 @@ bool DepthBuffer::CreateResources(ID3D12Device* device, D3D12MA::Allocator* allo
     D3D12MA::ALLOCATION_DESC allocDesc = {};
     allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 
-    HRESULT hr = allocator->CreateResource(
-        &allocDesc, &resourceDesc,
-        D3D12_RESOURCE_STATE_DEPTH_WRITE,
-        &clearValue,
-        &m_allocation,
-        IID_PPV_ARGS(&m_resource));
+    HRESULT hr = allocator->CreateResource(&allocDesc, &resourceDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearValue,
+                                           &m_allocation, IID_PPV_ARGS(&m_resource));
 
     if (FAILED(hr)) {
         SE_LOG_ERROR("Failed to create depth buffer resource");
