@@ -1,27 +1,32 @@
-cbuffer PerFrame : register(b0) {
+cbuffer PerFrame : register(b0)
+{
     row_major float4x4 viewProjection;
     float3 cameraPosition;
     float _pad0;
 };
 
-cbuffer PerObject : register(b1) {
+cbuffer PerObject : register(b1)
+{
     row_major float4x4 world;
 };
 
-struct VSInput {
+struct VSInput
+{
     float3 position : POSITION;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD;
 };
 
-struct VSOutput {
+struct VSOutput
+{
     float4 position : SV_POSITION;
     float3 worldNorm : NORMAL;
     float3 worldPos : TEXCOORD0;
     float2 texCoord : TEXCOORD1;
 };
 
-VSOutput main(VSInput input) {
+VSOutput main(VSInput input)
+{
     VSOutput output;
 
     float4 worldPos = mul(float4(input.position, 1.0), world);

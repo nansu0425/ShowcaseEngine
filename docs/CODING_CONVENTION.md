@@ -247,3 +247,139 @@ Use for compile-time invariants:
 
 - `std::optional` — prefer sentinels when the domain allows (e.g., `-1` index)
 - Lambdas — ≤5 lines and ≤3 captures OK inline; beyond that, extract to a named function
+
+## 12. HLSL Shaders
+
+Compiled with DXC (Shader Model 6.0), `-WX` warnings-as-errors. Entry point is always `main()`.
+
+### 12.1 File Naming
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Vertex shader | `{purpose}_vs.hlsl` | `mesh_vs.hlsl` |
+| Pixel shader | `{purpose}_ps.hlsl` | `mesh_ps.hlsl` |
+| Compute shader | `{purpose}_cs.hlsl` | `cull_cs.hlsl` |
+| Shared header | `{purpose}.hlsli` | `lighting.hlsli` |
+
+- C++ files use PascalCase (matching the primary type), but shaders use **lowercase_underscore** — shader file names identify **purpose + pipeline stage**, not a type. This follows the standard DX12 / game-engine convention.
+- `{purpose}` is a short lowercase noun describing what the shader draws or computes.
+- Compiled output: `{NAME_WE}_{type}.cso` (e.g. `mesh_vs.hlsl` → `mesh_vs_vs.cso`).
+
+### 12.2 Naming
+
+| Target | Rule | Example |
+|--------|------|---------|
+| Cbuffer names | PascalCase | `PerFrame`, `PerMaterial` |
+| Cbuffer fields | camelCase | `viewProjection`, `baseColorFactor` |
+| I/O structs | Stage prefix + `Input` / `Output` | `VSInput`, `VSOutput`, `PSInput` |
+| Struct fields | camelCase | `worldPos`, `texCoord` |
+| Helper functions | PascalCase | `PristineGrid()`, `LODFade()` |
+| Local variables | camelCase | `ndl`, `color` |
+| Static constants | UPPERCASE_SNAKE_CASE | `LIGHT_DIR`, `AMBIENT` |
+| Padding fields | `_pad` + index | `_pad0`, `_pad1` |
+| Textures / samplers | camelCase, descriptive | `baseColorTex`, `linearSampler` |
+
+### 12.3 Formatting
+
+Formatting is enforced automatically by the `slevesque.shader` VSCode extension with `editor.formatOnSave` enabled. Save the file (Ctrl+S) to apply.
+
+- 4-space indentation (no tabs).
+- **Allman brace style** — opening brace on the **next** line. This differs from C++ (K&R) because the HLSL formatter applies Allman by default.
+- One blank line between cbuffer / struct / function blocks.
+
+```hlsl
+Texture2D baseColorTex : register(t0);
+SamplerState linearSampler : register(s0);
+```
+
+### 12.4 Constant Buffers
+
+Order cbuffers by update frequency, one register per frequency tier:
+
+| Register | Name | Updated |
+|----------|------|---------|
+| `b0` | `PerFrame` | Once per frame (camera, time, lighting) |
+| `b1` | `PerObject` | Once per draw call (world matrix) |
+| `b2` | `PerMaterial` | Once per material switch |
+
+Rules:
+- **Always declare matrices as `row_major float4x4`.** SimpleMath stores row-major; omitting this qualifier silently produces wrong transforms.
+- Pad to 16-byte alignment explicitly with `_pad0`, `_pad1`, etc. Do not rely on implicit padding.
+- Keep each cbuffer as small as possible — only include fields the shader actually reads.
+
+```hlsl
+cbuffer PerFrame : register(b0)
+{
+    row_major float4x4 viewProjection;
+    float3 cameraPosition;
+    float _pad0;                       // explicit 16-byte alignment
+};
+```
+
+### 12.5 Input / Output Structs
+
+- Vertex shader input: **`VSInput`** with standard semantics (`POSITION`, `NORMAL`, `TEXCOORD`).
+- Vertex shader output / pixel shader input: **`VSOutput`** and **`PSInput`** (duplicate the struct in each file until shared headers are introduced).
+- Pixel shader output: return `float4 : SV_TARGET` directly from `main()`. Introduce a `PSOutput` struct only when writing to multiple render targets.
+
+```hlsl
+struct VSInput
+{
+    float3 position : POSITION;
+    float3 normal : NORMAL;
+    float2 texCoord : TEXCOORD;
+};
+
+struct VSOutput
+{
+    float4 position : SV_POSITION;
+    float3 worldNorm : NORMAL;
+    float3 worldPos : TEXCOORD0;
+    float2 texCoord : TEXCOORD1;
+};
+```
+
+### 12.6 Register Binding
+
+All resources must have explicit register annotations — never rely on implicit assignment.
+
+| Type | Prefix | Slot range |
+|------|--------|------------|
+| Constant buffers | `b` | `b0` – `b2` (expand as needed) |
+| Textures (SRV) | `t` | `t0`+ |
+| Samplers | `s` | `s0`+ |
+| UAVs | `u` | `u0`+ |
+
+### 12.7 Shared Headers (.hlsli)
+
+Use `.hlsli` files to share struct definitions or utility functions across shader stages. Guard with `#ifndef` / `#define` since HLSL `#pragma once` support is compiler-dependent:
+
+```hlsl
+#ifndef SHOWCASE_LIGHTING_HLSLI
+#define SHOWCASE_LIGHTING_HLSLI
+
+// Guard name: SHOWCASE_{FILENAME}_HLSLI
+
+float3 LambertDiffuse(float3 normal, float3 lightDir)
+{
+    return saturate(dot(normal, -lightDir));
+}
+
+#endif
+```
+
+### 12.8 Comments
+
+- **Why, not what** — same principle as C++ code.
+- Brief `//` comment above non-trivial helper functions explaining purpose and parameters.
+- Inline comments for GPU-specific reasoning (alignment tricks, precision choices, derivative usage).
+
+```hlsl
+// Pristine Grid: anti-aliased grid pattern at any scale.
+// coord:    world position divided by grid spacing
+// uvDeriv:  screen-space derivatives at that scale
+float PristineGrid(float2 coord, float2 uvDeriv, float2 lineWidth)
+{
+    ...
+}
+```
