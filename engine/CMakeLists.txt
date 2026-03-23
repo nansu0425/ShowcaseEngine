@@ -81,7 +81,5 @@ target_compile_definitions(showcase_engine PUBLIC UNICODE _UNICODE NOMINMAX WIN3
 # Compile shaders
 target_compile_shaders(showcase_engine
     VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh_vs.hlsl
-           ${CMAKE_CURRENT_SOURCE_DIR}/shaders/grid_vs.hlsl
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh_ps.hlsl
-           ${CMAKE_CURRENT_SOURCE_DIR}/shaders/grid_ps.hlsl
 )

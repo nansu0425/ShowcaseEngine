@@ -58,7 +58,7 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
 
     m_viewport.SetResizeCallback([this](uint32_t w, uint32_t h) { m_sceneRenderer.OnResize(w, h); });
 
-    m_viewport.SetToolbarCallback([this]() { m_editorController.RenderToolbar(m_viewport, m_sceneRenderer); });
+    m_viewport.SetToolbarCallback([this]() { m_editorController.RenderToolbar(m_viewport); });
 
     // Set resize callback
     m_window.SetResizeCallback([this](uint32_t w, uint32_t h) {
@@ -105,11 +105,9 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
 // ── Scene setup ──────────────────────────────────────────────────
 
 void EditorApp::BuildDefaultScene() {
-    m_sceneRenderer.CreateGridModel(m_renderContext, m_gridModel);
     m_sceneRenderer.CreateCubeModel(m_renderContext, m_cubeModel);
 
     m_scene.Clear();
-    m_scene.AddObject(&m_gridModel, "Ground Grid", Vector3(0, 0, 0)).modelSource = "builtin:grid";
     m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2)).modelSource =
         "builtin:cube";
     m_scene.AddObject(&m_cubeModel, "Cube 2", Vector3(5, 0.75f, 3), Vector3(0, 0, 0), Vector3(1.5f, 1.5f, 1.5f))
@@ -172,11 +170,6 @@ void EditorApp::SaveEditorConfig() {
     g["snapRotate"].Set(m_editorController.GetSnapRotate());
     g["snapScale"].Set(m_editorController.GetSnapScale());
 
-    // Grid settings
-    auto grid = doc["grid"];
-    grid["visible"].Set(m_sceneRenderer.GetGridSettings().visible);
-    grid["opacity"].Set(m_sceneRenderer.GetGridSettings().opacity);
-
     // Console settings
     auto con = doc["console"];
     con["levelFilter"].Set(m_console.GetLevelFilter());
@@ -232,14 +225,6 @@ void EditorApp::LoadEditorConfig() {
         m_editorController.SetSnapScale(g["snapScale"].GetFloat());
     }
 
-    // Grid settings
-    auto grid = doc["grid"];
-    auto& gs = m_sceneRenderer.GetGridSettings();
-    if (grid.Contains("visible"))
-        gs.visible = grid["visible"].GetBool();
-    if (grid.Contains("opacity"))
-        gs.opacity = grid["opacity"].GetFloat();
-
     // Console settings
     auto con = doc["console"];
     if (con.Contains("levelFilter")) {
@@ -256,7 +241,6 @@ void EditorApp::LoadEditorConfig() {
 
 void EditorApp::BuildModelRegistry() {
     m_modelRegistry.clear();
-    m_modelRegistry["builtin:grid"] = &m_gridModel;
     m_modelRegistry["builtin:cube"] = &m_cubeModel;
     if (m_modelLoaded && !m_testModelSource.empty()) {
         m_modelRegistry[m_testModelSource] = &m_testModel;
@@ -320,13 +304,6 @@ void EditorApp::NewScene() {
         m_modelLoaded = false;
         m_testModelSource.clear();
     }
-    for (auto& mesh : m_gridModel.meshes) {
-        for (auto& prim : mesh.primitives) {
-            prim.vertexBuffer.Shutdown();
-            prim.indexBuffer.Shutdown();
-        }
-    }
-    m_gridModel.meshes.clear();
     for (auto& mesh : m_cubeModel.meshes) {
         for (auto& prim : mesh.primitives) {
             prim.vertexBuffer.Shutdown();
@@ -487,19 +464,12 @@ void EditorApp::Shutdown() {
     }
 
     // Shutdown procedural model buffers
-    for (auto& mesh : m_gridModel.meshes) {
-        for (auto& prim : mesh.primitives) {
-            prim.vertexBuffer.Shutdown();
-            prim.indexBuffer.Shutdown();
-        }
-    }
     for (auto& mesh : m_cubeModel.meshes) {
         for (auto& prim : mesh.primitives) {
             prim.vertexBuffer.Shutdown();
             prim.indexBuffer.Shutdown();
         }
     }
-    m_gridModel.meshes.clear();
     m_cubeModel.meshes.clear();
 
     m_scene.Clear();
@@ -563,10 +533,8 @@ int EditorApp::Run() {
 
         // Phase 1: Render scene to off-screen viewport render target
         m_viewport.BeginRender(m_renderContext.GetCommandList());
-        OffscreenTarget& offscreen = m_viewport.GetOffscreenTarget();
         m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
-                               m_editorController.GetSelectedObjectId(), &offscreen.GetDepthBuffer(),
-                               offscreen.GetRenderTarget().GetRTV());
+                               m_editorController.GetSelectedObjectId());
         m_viewport.EndRender(m_renderContext.GetCommandList());
 
         // Phase 2: Render ImGui to back buffer

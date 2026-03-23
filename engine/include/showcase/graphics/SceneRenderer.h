@@ -2,7 +2,6 @@
 
 #include <showcase/graphics/Buffer.h>
 #include <showcase/graphics/Camera.h>
-#include <showcase/graphics/DepthBuffer.h>
 #include <showcase/graphics/Model.h>
 #include <showcase/graphics/Scene.h>
 
@@ -15,30 +14,21 @@ namespace showcase {
 
 class RenderContext;
 
-struct GridSettings {
-    bool visible = true;
-    float opacity = 0.7f;
-};
-
 class SceneRenderer {
 public:
     void Init(RenderContext& ctx);
     void Shutdown();
     void OnResize(uint32_t width, uint32_t height);
-    void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
-                DepthBuffer* sceneDepth = nullptr, D3D12_CPU_DESCRIPTOR_HANDLE activeRtv = {});
+    void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId);
 
     /// Casts a ray from screen coordinates and returns the closest hit object ID, or -1 if none.
     int PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene, float vpMinX, float vpMinY,
                    float vpMaxX, float vpMaxY) const;
 
     // Procedural geometry helpers
-    void CreateGridModel(RenderContext& ctx, Model& outModel);
     void CreateCubeModel(RenderContext& ctx, Model& outModel);
 
     Texture& GetDefaultWhiteTexture() { return m_defaultWhiteTex; }
-
-    GridSettings& GetGridSettings() { return m_gridSettings; }
 
 private:
     static constexpr uint32_t kMaxObjects = 64;
@@ -59,18 +49,6 @@ private:
     DescriptorHeap* m_srvHeap = nullptr;
 
     float m_aspectRatio = 16.0f / 9.0f;
-
-    // Grid quad (procedural)
-    ComPtr<ID3D12PipelineState> m_gridPSO;
-    Buffer m_gridVertexBuffer;
-    uint32_t m_gridVertexCount = 0;
-    Buffer m_gridOffsetCB;
-
-    GridSettings m_gridSettings;
-
-    void CreateGridQuad(ID3D12Device* device, D3D12MA::Allocator* allocator, float halfExtent);
-    void RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera, DepthBuffer* sceneDepth,
-                    D3D12_CPU_DESCRIPTOR_HANDLE activeRtv);
 };
 
 } // namespace showcase

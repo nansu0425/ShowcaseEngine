@@ -248,7 +248,7 @@ The same pattern applies to the per-material constant buffer.
 
 ```
 Root[0]  CBV  b0   Per-frame data (view-projection matrix, camera position)
-Root[1]  CBV  b1   Per-object data (world matrix, object ID) — offset per object
+Root[1]  CBV  b1   Per-object data (world matrix) — offset per object
 Root[2]  CBV  b2   Per-material data (base color, texture flag) — offset per object
 Root[3]  Table     SRV t0  Base color texture (or default white)
          Static sampler s0  Linear wrap
@@ -287,7 +287,7 @@ Scenes are saved/loaded as `.scene` JSON files. `Scene::Serialize()` / `Scene::D
 
 - **Save** serializes each object's `name`, `modelSource`, `position`, `rotation`, `scale`, plus an optional `camera` section (editor viewport position/yaw/pitch)
 - **Load** deserializes into `SceneObject` structs with `model = nullptr`; the editor resolves `modelSource` strings back to `Model*` pointers via a model registry. Editor camera is restored from the `camera` section if present
-- **Model sources**: `"builtin:grid"`, `"builtin:cube"` for procedural geometry, `"file:relative/path.gltf"` for glTF assets
+- **Model sources**: `"builtin:cube"` for procedural geometry, `"file:relative/path.gltf"` for glTF assets
 - **Editor UI**: File menu bar (New Scene, Open, Save, Save As) with Ctrl+N/O/S/Shift+S shortcuts
 - **Dirty tracking**: `EditorController` notifies `EditorApp` on gizmo/inspector changes; window title shows `*` for unsaved state
 

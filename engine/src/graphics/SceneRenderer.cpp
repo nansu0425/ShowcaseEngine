@@ -7,7 +7,6 @@
 #include <showcase/graphics/RootSignature.h>
 
 #include <cfloat>
-#include <cmath>
 
 namespace showcase {
 
@@ -16,9 +15,7 @@ using namespace DirectX;
 struct alignas(256) PerFrameData {
     Matrix viewProjection;
     Vector3 cameraPosition;
-    float gridOpacity;
-    float nearPlane;
-    float farPlane;
+    float _pad0;
 };
 
 struct alignas(256) PerObjectData {
@@ -36,72 +33,7 @@ static_assert(sizeof(PerFrameData) <= 256);
 static_assert(sizeof(PerObjectData) <= 256);
 static_assert(sizeof(PerMaterialData) <= 256);
 
-struct GridVertex {
-    Vector3 position;
-    Vector4 color;
-};
-
 // ── Procedural geometry ──────────────────────────────────────────────
-
-void SceneRenderer::CreateGridModel(RenderContext& ctx, Model& outModel) {
-    auto* device = ctx.GetDevice().GetDevice();
-    auto* allocator = ctx.GetDevice().GetAllocator();
-    const int gridSize = 20;
-    const float cellSize = 2.0f;
-    const float halfExtent = gridSize * cellSize * 0.5f;
-
-    std::vector<ModelVertex> vertices;
-    std::vector<uint32_t> indices;
-
-    for (int z = 0; z <= gridSize; ++z) {
-        for (int x = 0; x <= gridSize; ++x) {
-            ModelVertex v;
-            v.position = Vector3(x * cellSize - halfExtent, 0.0f, z * cellSize - halfExtent);
-            v.normal = Vector3(0.0f, 1.0f, 0.0f);
-            v.texCoord = Vector2(static_cast<float>(x) / gridSize, static_cast<float>(z) / gridSize);
-            vertices.push_back(v);
-        }
-    }
-
-    for (int z = 0; z < gridSize; ++z) {
-        for (int x = 0; x < gridSize; ++x) {
-            uint32_t topLeft = z * (gridSize + 1) + x;
-            uint32_t topRight = topLeft + 1;
-            uint32_t bottomLeft = (z + 1) * (gridSize + 1) + x;
-            uint32_t bottomRight = bottomLeft + 1;
-
-            indices.push_back(topLeft);
-            indices.push_back(bottomLeft);
-            indices.push_back(topRight);
-
-            indices.push_back(topRight);
-            indices.push_back(bottomLeft);
-            indices.push_back(bottomRight);
-        }
-    }
-
-    MeshPrimitive prim;
-    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices.data(),
-                                              static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex)),
-                                              sizeof(ModelVertex))) {
-        SE_LOG_ERROR("Failed to create grid vertex buffer");
-        return;
-    }
-    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices.data(),
-                                            static_cast<uint32_t>(indices.size() * sizeof(uint32_t)))) {
-        SE_LOG_ERROR("Failed to create grid index buffer");
-        return;
-    }
-    prim.indexCount = static_cast<uint32_t>(indices.size());
-    prim.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(halfExtent, 0.01f, halfExtent));
-
-    Mesh mesh;
-    mesh.name = "Grid";
-    mesh.primitives.push_back(std::move(prim));
-
-    outModel.meshes.push_back(std::move(mesh));
-    outModel.localAABB = BoundingBox(XMFLOAT3(0, 0, 0), XMFLOAT3(halfExtent, 0.01f, halfExtent));
-}
 
 void SceneRenderer::CreateCubeModel(RenderContext& ctx, Model& outModel) {
     auto* device = ctx.GetDevice().GetDevice();
@@ -234,7 +166,6 @@ void SceneRenderer::Init(RenderContext& ctx) {
                           .AddCBV(1)                                                 // slot 1: PerObject
                           .AddCBV(2)                                                 // slot 2: PerMaterial
                           .AddDescriptorTable(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0) // slot 3: baseColorTex t0
-                          .AddDescriptorTable(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1) // slot 4: sceneDepth t1
                           .AddStaticSampler(0)                                       // s0: linear wrap
                           .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
                           .Build(device);
@@ -293,127 +224,10 @@ void SceneRenderer::Init(RenderContext& ctx) {
         texCmdList.Shutdown();
     }
 
-    // Grid/axis shared shader + blend/depth settings
-    D3D12_SHADER_BYTECODE gridVS = ctx.GetShaderManager().LoadShader("shaders/grid_vs_vs.cso");
-    D3D12_SHADER_BYTECODE gridPS = ctx.GetShaderManager().LoadShader("shaders/grid_ps_ps.cso");
-
-    D3D12_BLEND_DESC gridBlend = DefaultBlendDesc();
-    gridBlend.RenderTarget[0].BlendEnable = TRUE;
-    gridBlend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-    gridBlend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-    gridBlend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-
-    D3D12_DEPTH_STENCIL_DESC gridDS = {};
-    gridDS.DepthEnable = FALSE;
-    gridDS.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-
-    std::vector<D3D12_INPUT_ELEMENT_DESC> gridInputLayout = {
-        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-        {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-    };
-
-    // Grid quad PSO (TRIANGLE topology, procedural grid in PS)
-    GraphicsPipelineDesc gridPsoDesc;
-    gridPsoDesc.rootSignature = m_rootSignature.Get();
-    gridPsoDesc.vertexShader = gridVS;
-    gridPsoDesc.pixelShader = gridPS;
-    gridPsoDesc.inputLayout = gridInputLayout;
-    gridPsoDesc.primitiveTopology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    gridPsoDesc.rtvFormat = ctx.GetSwapChain().GetFormat();
-    gridPsoDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
-    gridPsoDesc.blendState = gridBlend;
-    gridPsoDesc.depthStencilState = gridDS;
-    gridPsoDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-    m_gridPSO = PipelineState::CreateGraphicsPSO(device, gridPsoDesc);
-
-    CreateGridQuad(device, allocator, 1500.0f);
-
-    // Grid offset CB: 1 slot (grid camera offset)
-    if (!m_gridOffsetCB.InitAsUploadBuffer(device, allocator, 256)) {
-        SE_LOG_ERROR("Failed to create grid offset constant buffer");
-        return;
-    }
-
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
-void SceneRenderer::CreateGridQuad(ID3D12Device* device, D3D12MA::Allocator* allocator, float halfExtent) {
-    const Vector4 quadColor(0.0f, 0.0f, 0.0f, 0.0f); // alpha=0 signals procedural mode in PS
-
-    GridVertex vertices[] = {
-        {Vector3(-halfExtent, 0.0f, -halfExtent), quadColor}, {Vector3(-halfExtent, 0.0f, halfExtent), quadColor},
-        {Vector3(halfExtent, 0.0f, halfExtent), quadColor},   {Vector3(-halfExtent, 0.0f, -halfExtent), quadColor},
-        {Vector3(halfExtent, 0.0f, halfExtent), quadColor},   {Vector3(halfExtent, 0.0f, -halfExtent), quadColor},
-    };
-
-    m_gridVertexCount = 6;
-    if (!m_gridVertexBuffer.InitAsVertexBuffer(device, allocator, vertices, sizeof(vertices), sizeof(GridVertex))) {
-        SE_LOG_ERROR("Failed to create grid quad vertex buffer");
-    }
-}
-
-void SceneRenderer::RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera, DepthBuffer* sceneDepth,
-                               D3D12_CPU_DESCRIPTOR_HANDLE activeRtv) {
-    if (m_gridVertexCount == 0)
-        return;
-
-    struct alignas(256) GridWorldData {
-        Matrix world;
-    };
-    static_assert(sizeof(GridWorldData) == 256);
-
-    // Slot 0: grid offset — snap camera XZ to 1m grid spacing
-    Vector3 camPos = camera.GetPosition();
-    GridWorldData gridData{Matrix::CreateTranslation(std::floor(camPos.x), 0.0f, std::floor(camPos.z))};
-    m_gridOffsetCB.UpdateDataAtOffset(&gridData, sizeof(gridData), 0);
-
-    auto cbBase = m_gridOffsetCB.GetResource()->GetGPUVirtualAddress();
-
-    // Transition depth buffer for shader sampling (manual depth comparison)
-    if (sceneDepth) {
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = sceneDepth->GetResource();
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        barrier.Transition.StateAfter =
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        cmdList->ResourceBarrier(1, &barrier);
-
-        // Unbind DSV — grid PSO has no depth test, and depth resource is now SRV
-        cmdList->OMSetRenderTargets(1, &activeRtv, FALSE, nullptr);
-    }
-
-    // Draw procedural grid quad (TRIANGLE topology)
-    cmdList->SetPipelineState(m_gridPSO.Get());
-    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    cmdList->SetGraphicsRootConstantBufferView(1, cbBase);
-
-    if (sceneDepth) {
-        cmdList->SetGraphicsRootDescriptorTable(4, sceneDepth->GetSRV().gpu);
-    }
-
-    D3D12_VERTEX_BUFFER_VIEW gridVB = m_gridVertexBuffer.GetVertexBufferView();
-    cmdList->IASetVertexBuffers(0, 1, &gridVB);
-    cmdList->DrawInstanced(m_gridVertexCount, 1, 0, 0);
-
-    // Transition depth buffer back to DEPTH_WRITE for next frame
-    if (sceneDepth) {
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = sceneDepth->GetResource();
-        barrier.Transition.StateBefore =
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        cmdList->ResourceBarrier(1, &barrier);
-    }
-}
-
 void SceneRenderer::Shutdown() {
-    m_gridOffsetCB.Shutdown();
-    m_gridVertexBuffer.Shutdown();
-    m_gridPSO.Reset();
     if (m_srvHeap) {
         m_defaultWhiteTex.Shutdown(*m_srvHeap);
     }
@@ -430,8 +244,7 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
 
 // ── Render ───────────────────────────────────────────────────────────
 
-void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
-                           DepthBuffer* sceneDepth, D3D12_CPU_DESCRIPTOR_HANDLE activeRtv) {
+void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId) {
     auto* cmdList = ctx.GetCommandList().Get();
 
     cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
@@ -442,9 +255,6 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     PerFrameData frameData;
     frameData.viewProjection = camera.GetViewProjectionMatrix();
     frameData.cameraPosition = camera.GetPosition();
-    frameData.gridOpacity = m_gridSettings.opacity;
-    frameData.nearPlane = camera.GetNearZ();
-    frameData.farPlane = camera.GetFarZ();
     m_perFrameCB.UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB.GetResource()->GetGPUVirtualAddress());
 
@@ -503,12 +313,6 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                 objectIndex++;
             }
         }
-    }
-
-    // Draw grid after scene objects so depth testing correctly occludes
-    // grid lines behind objects while showing lines in front
-    if (m_gridSettings.visible) {
-        RenderGrid(cmdList, camera, sceneDepth, activeRtv);
     }
 }
 

@@ -1,16 +1,16 @@
 #pragma once
 
-#include <showcase/core/Window.h>
-#include <showcase/core/Timer.h>
 #include <showcase/core/Input.h>
-#include <showcase/graphics/RenderContext.h>
+#include <showcase/core/Timer.h>
+#include <showcase/core/Window.h>
+#include <showcase/editor/Console.h>
+#include <showcase/editor/EditorController.h>
+#include <showcase/editor/ImGuiLayer.h>
+#include <showcase/editor/ViewportPanel.h>
 #include <showcase/graphics/Model.h>
+#include <showcase/graphics/RenderContext.h>
 #include <showcase/graphics/Scene.h>
 #include <showcase/graphics/SceneRenderer.h>
-#include <showcase/editor/ImGuiLayer.h>
-#include <showcase/editor/Console.h>
-#include <showcase/editor/ViewportPanel.h>
-#include <showcase/editor/EditorController.h>
 
 #include <memory>
 #include <unordered_map>
@@ -61,7 +61,6 @@ private:
     EditorController m_editorController;
 
     // Procedural models
-    Model m_gridModel;
     Model m_cubeModel;
 
     // glTF model
@@ -80,7 +79,11 @@ private:
     std::vector<std::unique_ptr<Model>> m_dynamicModels;
 
     // Deferred scene actions (menu items run mid-frame; GPU resource changes must happen between frames)
-    enum class PendingAction { None, NewScene, OpenScene };
+    enum class PendingAction {
+        None,
+        NewScene,
+        OpenScene
+    };
     PendingAction m_pendingAction = PendingAction::None;
 };
 

@@ -2,10 +2,6 @@ cbuffer PerFrame : register(b0) {
     row_major float4x4 viewProjection;
     float3 cameraPosition;
     float _pad0;
-    float gridFadeStart;
-    float gridFadeEnd;
-    float gridOpacity;
-    float _pad1;
 };
 
 cbuffer PerObject : register(b1) {
