@@ -1,5 +1,5 @@
 add_executable(ShowcaseEditor WIN32
-    src/main.cpp
+    src/Main.cpp
     src/EditorApp.cpp
     src/ImGuiLayer.cpp
     src/Console.cpp

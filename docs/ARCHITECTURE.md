@@ -43,9 +43,9 @@ The project is split into two CMake targets with a strict dependency direction:
 
 **Key principles:**
 - The engine has **zero ImGui dependency**. All UI lives in the editor.
-- **Dependency policy:** The editor depends only on **ImGui/ImGuizmo** (external) and **engine public API**. All other external libraries (spdlog, tinygltf, D3D12MA, etc.) and low-level APIs (Win32, D3D12) are owned by the engine, which exposes abstractions for editor use (e.g., `LogListener` for log capture, `Platform.h` for OS utilities, `Key::` constants for input).
-- **Accepted boundary exceptions:** `ImGuiLayer` is the designated platform integration point where ImGui backends (`imgui_impl_win32`, `imgui_impl_dx12`) necessarily touch Win32/D3D12 types.
-- **Entry point:** `EntryPoint.h` provides the `SE_MAIN` macro, which encapsulates WinMain boilerplate so that `main.cpp` needs no direct `<Windows.h>` include.
+- **Dependency policy:** The editor depends only on **ImGui/ImGuizmo** (external) and **engine public API**. All other external libraries (spdlog, tinygltf, D3D12MA, etc.) and D3D12 APIs are owned by the engine, which exposes abstractions for editor use (e.g., `LogListener` for log capture, `Platform.h` for OS utilities, `Key::` constants for input). Win32 APIs may be used directly in the editor where needed — the editor is a Windows-native application and the engine–editor boundary exists to keep the engine ImGui-free, not to abstract the OS from the editor.
+- **Accepted boundary exceptions:** `ImGuiLayer` is the designated platform integration point where ImGui backends (`imgui_impl_dx12`) necessarily touch D3D12 types.
+- **Entry point:** `editor/src/Main.cpp` contains the `WinMain` entry point directly.
 
 ---
 
@@ -62,7 +62,6 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Log` | `Log.h` | spdlog wrapper with `SE_LOG_*` macros |
 | `LogListener` | `LogListener.h` | Abstract log listener interface (`LogLevel`, `LogMessage`) for non-spdlog consumers |
 | `Platform` | `Platform.h` | OS utilities (`GetExecutableDir()`, `SleepMs()`, `ShowErrorDialog()`, `OpenFileDialog()`, `SaveFileDialog()`) |
-| `EntryPoint` | `EntryPoint.h` | `SE_MAIN` macro — WinMain boilerplate for editor/app entry points |
 
 ### 2.2 Graphics Module — `engine/include/showcase/graphics/`
 

@@ -3,21 +3,19 @@ param(
     [string]$EditorDir
 )
 
-# Forbidden include patterns (editor must use engine abstractions instead)
-# Permitted editor-side external dependencies (NOT forbidden):
+# Forbidden include patterns (editor must not touch D3D12 or engine-internal libraries)
+# Permitted editor-side dependencies (NOT forbidden):
+#   Win32 headers (Windows.h, commdlg.h, etc.) — editor is a native Win32 app
 #   ImGuizmo.h  — editor-only UI gizmo lib, no engine abstraction needed
-#   imgui.h / imgui_internal.h — editor UI framework
+#   imgui.h / imgui_internal.h / imgui_impl_win32.h — editor UI framework
 $ForbiddenPatterns = @(
-    # Win32 / D3D12
-    '[Ww]indows\.h'
+    # D3D12 (editor must not touch rendering internals)
     'd3d12\.h'
     'dxgi\S*\.h'
     'd3dcompiler\.h'
     'wrl/.*'
     'D3D12MemAlloc\.h'
-    'commdlg\.h'
-    # ImGui platform backends
-    'imgui_impl_win32\.h'
+    # ImGui DX12 backend (exception: ImGuiLayer.cpp)
     'imgui_impl_dx12\.h'
     # External libraries (use engine API wrappers)
     'spdlog/.*'
@@ -61,8 +59,8 @@ foreach ($file in $files) {
 if ($violations.Count -gt 0) {
     Write-Host ""
     Write-Host "ERROR: Editor include policy violation(s) detected!" -ForegroundColor Red
-    Write-Host "Editor files must not directly include platform or engine-only library headers." -ForegroundColor Red
-    Write-Host "Use engine abstractions instead. Exception: ImGuiLayer.cpp" -ForegroundColor Red
+    Write-Host "Editor files must not directly include D3D12 or engine-internal library headers." -ForegroundColor Red
+    Write-Host "Use engine abstractions instead. D3D12 exception: ImGuiLayer.cpp" -ForegroundColor Red
     Write-Host ""
     foreach ($v in $violations) {
         Write-Host "  $($v.File):$($v.Line)" -ForegroundColor Yellow -NoNewline
