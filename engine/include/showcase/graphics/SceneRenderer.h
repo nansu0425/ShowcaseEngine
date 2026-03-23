@@ -66,15 +66,9 @@ private:
     uint32_t m_gridVertexCount = 0;
     Buffer m_gridOffsetCB;
 
-    // Axis lines (fixed at world origin)
-    ComPtr<ID3D12PipelineState> m_axisLinePSO;
-    Buffer m_axisVertexBuffer;
-    uint32_t m_axisVertexCount = 0;
-
     GridSettings m_gridSettings;
 
     void CreateGridQuad(ID3D12Device* device, D3D12MA::Allocator* allocator, float halfExtent);
-    void CreateAxisLines(ID3D12Device* device, D3D12MA::Allocator* allocator);
     void RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera);
 };
 

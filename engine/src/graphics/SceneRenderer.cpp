@@ -326,26 +326,10 @@ void SceneRenderer::Init(RenderContext& ctx) {
     gridPsoDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     m_gridPSO = PipelineState::CreateGraphicsPSO(device, gridPsoDesc);
 
-    // Axis line PSO (LINE topology)
-    GraphicsPipelineDesc axisPsoDesc;
-    axisPsoDesc.rootSignature = m_rootSignature.Get();
-    axisPsoDesc.vertexShader = gridVS;
-    axisPsoDesc.pixelShader = gridPS;
-    axisPsoDesc.inputLayout = gridInputLayout;
-    axisPsoDesc.primitiveTopology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
-    axisPsoDesc.rtvFormat = ctx.GetSwapChain().GetFormat();
-    axisPsoDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
-    axisPsoDesc.blendState = gridBlend;
-    axisPsoDesc.depthStencilState = gridDS;
-    axisPsoDesc.rasterizerState.AntialiasedLineEnable = TRUE;
-    axisPsoDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-    m_axisLinePSO = PipelineState::CreateGraphicsPSO(device, axisPsoDesc);
-
     CreateGridQuad(device, allocator, 200.0f);
-    CreateAxisLines(device, allocator);
 
-    // Grid offset CB: 2 slots (grid camera offset + axis identity)
-    if (!m_gridOffsetCB.InitAsUploadBuffer(device, allocator, 256 * 2)) {
+    // Grid offset CB: 1 slot (grid camera offset)
+    if (!m_gridOffsetCB.InitAsUploadBuffer(device, allocator, 256)) {
         SE_LOG_ERROR("Failed to create grid offset constant buffer");
         return;
     }
@@ -368,22 +352,6 @@ void SceneRenderer::CreateGridQuad(ID3D12Device* device, D3D12MA::Allocator* all
     }
 }
 
-void SceneRenderer::CreateAxisLines(ID3D12Device* device, D3D12MA::Allocator* allocator) {
-    const float len = 10000.0f;
-    const Vector4 xColor(0.7f, 0.2f, 0.2f, 0.8f);
-    const Vector4 yColor(0.2f, 0.7f, 0.2f, 0.8f);
-    const Vector4 zColor(0.2f, 0.2f, 0.7f, 0.8f);
-
-    GridVertex vertices[] = {
-        {Vector3(-len, 0.0f, 0.0f), xColor}, {Vector3(len, 0.0f, 0.0f), xColor},  {Vector3(0.0f, -len, 0.0f), yColor},
-        {Vector3(0.0f, len, 0.0f), yColor},  {Vector3(0.0f, 0.0f, -len), zColor}, {Vector3(0.0f, 0.0f, len), zColor},
-    };
-    m_axisVertexCount = 6;
-    if (!m_axisVertexBuffer.InitAsVertexBuffer(device, allocator, vertices, sizeof(vertices), sizeof(GridVertex))) {
-        SE_LOG_ERROR("Failed to create axis line vertex buffer");
-    }
-}
-
 void SceneRenderer::RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera& camera) {
     if (m_gridVertexCount == 0)
         return;
@@ -398,10 +366,6 @@ void SceneRenderer::RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera&
     GridWorldData gridData{Matrix::CreateTranslation(std::floor(camPos.x), 0.0f, std::floor(camPos.z))};
     m_gridOffsetCB.UpdateDataAtOffset(&gridData, sizeof(gridData), 0);
 
-    // Slot 1: identity — axis lines at world origin
-    GridWorldData axisData{Matrix()};
-    m_gridOffsetCB.UpdateDataAtOffset(&axisData, sizeof(axisData), sizeof(GridWorldData));
-
     auto cbBase = m_gridOffsetCB.GetResource()->GetGPUVirtualAddress();
 
     // Draw procedural grid quad (TRIANGLE topology)
@@ -411,24 +375,12 @@ void SceneRenderer::RenderGrid(ID3D12GraphicsCommandList* cmdList, const Camera&
     D3D12_VERTEX_BUFFER_VIEW gridVB = m_gridVertexBuffer.GetVertexBufferView();
     cmdList->IASetVertexBuffers(0, 1, &gridVB);
     cmdList->DrawInstanced(m_gridVertexCount, 1, 0, 0);
-
-    // Draw axis lines (LINE topology, fixed at world origin)
-    if (m_axisVertexCount > 0) {
-        cmdList->SetPipelineState(m_axisLinePSO.Get());
-        cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
-        cmdList->SetGraphicsRootConstantBufferView(1, cbBase + sizeof(GridWorldData));
-        D3D12_VERTEX_BUFFER_VIEW axisVB = m_axisVertexBuffer.GetVertexBufferView();
-        cmdList->IASetVertexBuffers(0, 1, &axisVB);
-        cmdList->DrawInstanced(m_axisVertexCount, 1, 0, 0);
-    }
 }
 
 void SceneRenderer::Shutdown() {
-    m_axisVertexBuffer.Shutdown();
     m_gridOffsetCB.Shutdown();
     m_gridVertexBuffer.Shutdown();
     m_gridPSO.Reset();
-    m_axisLinePSO.Reset();
     if (m_srvHeap) {
         m_defaultWhiteTex.Shutdown(*m_srvHeap);
     }
