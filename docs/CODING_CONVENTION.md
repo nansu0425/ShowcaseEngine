@@ -176,7 +176,7 @@ Two distinct error paths — choose based on cause:
 
 | Situation | Cause | Action | Macro |
 |-----------|-------|--------|-------|
-| Expected failure | External (file missing, GPU error, bad `HRESULT`) | Log + `return false` | `SE_LOG_ERROR` |
+| Expected failure | External (file missing, GPU error, bad `HRESULT`) | Log + **debug break** + `return false` | `SE_LOG_ERROR` |
 | Programmer mistake | Internal (broken invariant, bad argument, impossible state) | Halt immediately in Debug | `SE_ASSERT` |
 
 ### Expected Failures
@@ -184,6 +184,7 @@ Two distinct error paths — choose based on cause:
 - Use the `Init()` / `Shutdown()` pattern. `Init()` returns `bool`.
 - Use `SE_LOG_*` macros for diagnostics.
 - No exceptions.
+- `SE_LOG_ERROR` triggers `__debugbreak()` in Debug builds so the debugger stops at the exact failure point with the full call stack. In Release builds it logs only. Cascading breaks (child fails → parent also logs error → breaks again) are expected — the first break is always the root cause.
 
 ### Assertions (`SE_ASSERT`)
 
