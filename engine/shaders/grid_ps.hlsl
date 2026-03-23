@@ -14,12 +14,12 @@ struct PSInput {
 // coord:    world position divided by grid spacing
 // uvDeriv:  screen-space derivatives at that scale
 // lineWidth: line thickness as fraction of cell (0-0.5)
-float PristineGrid(float2 coord, float2 uvDeriv, float lineWidth) {
+float PristineGrid(float2 coord, float2 uvDeriv, float lineWidth, float fadeWidth) {
     float2 drawWidth = clamp(float2(lineWidth, lineWidth), uvDeriv, 0.5);
     float2 lineAA = uvDeriv * 1.5;
     float2 gridUV = 1.0 - abs(frac(coord) * 2.0 - 1.0);
     float2 grid2 = smoothstep(drawWidth + lineAA, drawWidth - lineAA, gridUV);
-    grid2 *= saturate(lineWidth / drawWidth);
+    grid2 *= saturate(fadeWidth / drawWidth);
     grid2 = lerp(grid2, float2(lineWidth, lineWidth), saturate(uvDeriv * 2.0 - 1.0));
     return lerp(grid2.x, 1.0, grid2.y);
 }
@@ -34,7 +34,10 @@ float LODFade(float2 scaledDeriv) {
 
 float4 main(PSInput input) : SV_TARGET {
     float2 coord = input.worldPos.xz;
-    float lineWidth = 0.04;
+    float lineWidth0 = 0.04;   // 1m grid:   4cm
+    float lineWidth1 = 0.008;  // 10m grid:  8cm
+    float lineWidth2 = 0.0016; // 100m grid: 16cm
+    float fadeWidth = 0.04;    // shared fade distance (decoupled from visual thickness)
 
     // Screen-space derivatives (shared across all LOD levels)
     float2 uvDDX = ddx(coord);
@@ -47,26 +50,26 @@ float4 main(PSInput input) : SV_TARGET {
 
     // LOD 0: 1m grid
     float2 deriv0 = uvDeriv;
-    float alpha0 = PristineGrid(coord, deriv0, lineWidth) * opacities.x * LODFade(deriv0);
+    float alpha0 = PristineGrid(coord, deriv0, lineWidth0, fadeWidth) * opacities.x * LODFade(deriv0);
 
     // LOD 1: 10m grid
     float2 deriv1 = uvDeriv / 10.0;
-    float alpha1 = PristineGrid(coord / 10.0, deriv1, lineWidth) * opacities.y * LODFade(deriv1);
+    float alpha1 = PristineGrid(coord / 10.0, deriv1, lineWidth1, fadeWidth) * opacities.y * LODFade(deriv1);
 
     // LOD 2: 100m grid — no LODFade (coarsest level, nothing to fall back to)
     // Pristine Grid's own Nyquist fade handles sub-pixel gracefully
     float2 deriv2 = uvDeriv / 100.0;
-    float alpha2 = PristineGrid(coord / 100.0, deriv2, lineWidth) * opacities.z;
+    float alpha2 = PristineGrid(coord / 100.0, deriv2, lineWidth2, fadeWidth) * opacities.z;
 
     // Composite: max() prevents double-darkening where lines overlap
     float gridAlpha = max(max(alpha0, alpha1), alpha2);
 
     // --- Axis coloring (x=0 red, z=0 blue) — visible at all distances ---
     float2 axisUV = abs(coord);
-    float2 drawWidth = clamp(float2(lineWidth, lineWidth), uvDeriv, 0.5);
+    float2 drawWidth = clamp(float2(lineWidth0, lineWidth0), uvDeriv, 0.5);
     float2 lineAA = uvDeriv * 1.5;
     float2 axisGrid = smoothstep(drawWidth + lineAA, drawWidth - lineAA, axisUV);
-    axisGrid *= saturate(lineWidth / drawWidth);
+    axisGrid *= saturate(lineWidth0 / drawWidth);
     float xAxisIntensity = axisGrid.y; // z=0 line -> X-axis (red)
     float zAxisIntensity = axisGrid.x; // x=0 line -> Z-axis (blue)
 

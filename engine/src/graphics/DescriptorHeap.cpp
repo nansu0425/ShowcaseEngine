@@ -6,8 +6,8 @@
 namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
-bool DescriptorHeap::Init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
-                           uint32_t numDescriptors, bool shaderVisible) {
+bool DescriptorHeap::Init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors,
+                          bool shaderVisible) {
     m_type = type;
     m_numDescriptors = numDescriptors;
     m_shaderVisible = shaderVisible;
@@ -15,8 +15,7 @@ bool DescriptorHeap::Init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
     D3D12_DESCRIPTOR_HEAP_DESC desc = {};
     desc.Type = type;
     desc.NumDescriptors = numDescriptors;
-    desc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
-                               : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    desc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     desc.NodeMask = 0;
 
     if (FAILED(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_heap)))) {
