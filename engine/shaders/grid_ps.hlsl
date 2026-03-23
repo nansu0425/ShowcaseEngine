@@ -32,6 +32,18 @@ float LODFade(float2 scaledDeriv) {
     return 1.0 - smoothstep(0.15, 0.5, density);
 }
 
+// Axis line: same as PristineGrid but for the origin line (abs(coord) instead of frac-based).
+// Returns per-component intensity for x=0 and z=0 lines.
+float2 AxisLine(float2 coord, float2 uvDeriv, float lineWidth, float fadeWidth) {
+    float2 axisUV = abs(coord);
+    float2 drawWidth = clamp(float2(lineWidth, lineWidth), uvDeriv, 0.5);
+    float2 lineAA = uvDeriv * 1.5;
+    float2 grid2 = smoothstep(drawWidth + lineAA, drawWidth - lineAA, axisUV);
+    grid2 *= saturate(fadeWidth / drawWidth);
+    grid2 = lerp(grid2, float2(lineWidth, lineWidth), saturate(uvDeriv * 2.0 - 1.0));
+    return grid2;
+}
+
 float4 main(PSInput input) : SV_TARGET {
     float2 coord = input.worldPos.xz;
     float lineWidth0 = 0.04;   // 1m grid:   4cm
@@ -64,14 +76,13 @@ float4 main(PSInput input) : SV_TARGET {
     // Composite: max() prevents double-darkening where lines overlap
     float gridAlpha = max(max(alpha0, alpha1), alpha2);
 
-    // --- Axis coloring (x=0 red, z=0 blue) — visible at all distances ---
-    float2 axisUV = abs(coord);
-    float2 drawWidth = clamp(float2(lineWidth0, lineWidth0), uvDeriv, 0.5);
-    float2 lineAA = uvDeriv * 1.5;
-    float2 axisGrid = smoothstep(drawWidth + lineAA, drawWidth - lineAA, axisUV);
-    axisGrid *= saturate(lineWidth0 / drawWidth);
-    float xAxisIntensity = axisGrid.y; // z=0 line -> X-axis (red)
-    float zAxisIntensity = axisGrid.x; // x=0 line -> Z-axis (blue)
+    // --- Axis coloring (x=0 red, z=0 blue) — matches grid width at every LOD ---
+    float2 axis0 = AxisLine(coord, deriv0, lineWidth0, fadeWidth) * opacities.x * LODFade(deriv0);
+    float2 axis1 = AxisLine(coord / 10.0, deriv1, lineWidth1, fadeWidth) * opacities.y * LODFade(deriv1);
+    float2 axis2 = AxisLine(coord / 100.0, deriv2, lineWidth2, fadeWidth) * opacities.z;
+
+    float xAxisIntensity = max(max(axis0.y, axis1.y), axis2.y); // z=0 line -> X-axis (red)
+    float zAxisIntensity = max(max(axis0.x, axis1.x), axis2.x); // x=0 line -> Z-axis (blue)
 
     float3 gridColor = float3(0.35, 0.35, 0.35);
     float3 xAxisColor = float3(0.7, 0.2, 0.2);
