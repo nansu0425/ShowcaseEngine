@@ -275,11 +275,24 @@ Use for compile-time invariants:
 - `std::optional` — prefer sentinels when the domain allows (e.g., `-1` index)
 - Lambdas — ≤5 lines and ≤3 captures OK inline; beyond that, extract to a named function
 
-## 12. HLSL Shaders
+## 12. Editor UI (ImGui)
+
+- **Shortcut display policy**: Never show keyboard shortcuts inline in menu items or buttons. Instead, display shortcuts as tooltips on mouse hover using `ImGui::IsItemHovered()` + `ImGui::SetTooltip()`.
+
+```cpp
+// Good — shortcut shown on hover
+if (ImGui::MenuItem("Save")) { SaveScene(); }
+if (ImGui::IsItemHovered()) ImGui::SetTooltip("Ctrl+S");
+
+// Bad — shortcut shown inline
+if (ImGui::MenuItem("Save", "Ctrl+S")) { SaveScene(); }
+```
+
+## 13. HLSL Shaders
 
 Compiled with DXC (Shader Model 6.0), `-WX` warnings-as-errors. Entry point is always `main()`.
 
-### 12.1 File Naming
+### 13.1 File Naming
 
 | Type | Pattern | Example |
 |------|---------|---------|
@@ -292,7 +305,7 @@ Compiled with DXC (Shader Model 6.0), `-WX` warnings-as-errors. Entry point is a
 - `{purpose}` is a short lowercase noun describing what the shader draws or computes.
 - Compiled output: `{NAME_WE}_{type}.cso` (e.g. `mesh_vs.hlsl` → `mesh_vs_vs.cso`).
 
-### 12.2 Naming
+### 13.2 Naming
 
 | Target | Rule | Example |
 |--------|------|---------|
@@ -306,7 +319,7 @@ Compiled with DXC (Shader Model 6.0), `-WX` warnings-as-errors. Entry point is a
 | Padding fields | `_pad` + index | `_pad0`, `_pad1` |
 | Textures / samplers | camelCase, descriptive | `baseColorTex`, `linearSampler` |
 
-### 12.3 Formatting
+### 13.3 Formatting
 
 Formatting is enforced automatically by the `slevesque.shader` VSCode extension with `editor.formatOnSave` enabled. Save the file (Ctrl+S) to apply.
 
@@ -319,7 +332,7 @@ Texture2D baseColorTex : register(t0);
 SamplerState linearSampler : register(s0);
 ```
 
-### 12.4 Constant Buffers
+### 13.4 Constant Buffers
 
 Order cbuffers by update frequency, one register per frequency tier:
 
@@ -343,7 +356,7 @@ cbuffer PerFrame : register(b0)
 };
 ```
 
-### 12.5 Input / Output Structs
+### 13.5 Input / Output Structs
 
 - Vertex shader input: **`VSInput`** with standard semantics (`POSITION`, `NORMAL`, `TEXCOORD`).
 - Vertex shader output / pixel shader input: **`VSOutput`** and **`PSInput`** (duplicate the struct in each file until shared headers are introduced).
@@ -366,7 +379,7 @@ struct VSOutput
 };
 ```
 
-### 12.6 Register Binding
+### 13.6 Register Binding
 
 All resources must have explicit register annotations — never rely on implicit assignment.
 
@@ -377,7 +390,7 @@ All resources must have explicit register annotations — never rely on implicit
 | Samplers | `s` | `s0`+ |
 | UAVs | `u` | `u0`+ |
 
-### 12.7 Shared Headers (.hlsli)
+### 13.7 Shared Headers (.hlsli)
 
 Use `.hlsli` files to share struct definitions or utility functions across shader stages. Guard with `#ifndef` / `#define` since HLSL `#pragma once` support is compiler-dependent:
 
@@ -395,7 +408,7 @@ float3 LambertDiffuse(float3 normal, float3 lightDir)
 #endif
 ```
 
-## 13. Math Abstraction
+## 14. Math Abstraction
 
 All math in `engine/` must go through `<showcase/core/Math.h>` or the C++ standard library (`<cmath>`, `<algorithm>`, etc.).
 
@@ -416,7 +429,7 @@ All math in `engine/` must go through `<showcase/core/Math.h>` or the C++ standa
 
 `editor/` code may use DirectX types directly when interfacing with ImGui/ImGuizmo, but should prefer `Math.h` types where practical.
 
-### 12.8 Comments
+### 13.8 Comments
 
 - **Why, not what** — same principle as C++ code.
 - Brief `//` comment above non-trivial helper functions explaining purpose and parameters.

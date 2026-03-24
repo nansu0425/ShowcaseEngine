@@ -424,19 +424,27 @@ void EditorApp::UpdateWindowTitle() {
 void EditorApp::RenderMainMenuBar() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
+            if (ImGui::MenuItem("New Scene")) {
                 m_pendingAction = PendingAction::NewScene;
             }
-            if (ImGui::MenuItem("Open...", "Ctrl+O")) {
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Ctrl+N");
+            if (ImGui::MenuItem("Open...")) {
                 m_pendingAction = PendingAction::OpenScene;
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Ctrl+O");
             ImGui::Separator();
-            if (ImGui::MenuItem("Save", "Ctrl+S")) {
+            if (ImGui::MenuItem("Save")) {
                 SaveScene();
             }
-            if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Ctrl+S");
+            if (ImGui::MenuItem("Save As...")) {
                 SaveSceneAs();
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Ctrl+Shift+S");
             ImGui::Separator();
             if (ImGui::MenuItem("Import Asset...")) {
                 ImportAsset();
