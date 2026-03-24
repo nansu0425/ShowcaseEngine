@@ -451,6 +451,46 @@ void EditorApp::RenderMainMenuBar() {
             }
             ImGui::EndMenu();
         }
+        // ── Window control buttons (right-aligned, fullscreen only) ──
+        if (m_window.IsFullscreen()) {
+            const HWND hwnd = m_window.GetHandle();
+
+            const float buttonW = ImGui::GetFrameHeight() * 1.4f;
+            const float spacing = ImGui::GetStyle().ItemSpacing.x;
+            const float totalW = buttonW * 3.0f + spacing * 3.0f;
+            ImGui::SetCursorPosX(ImGui::GetWindowWidth() - totalW);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 0.8f));
+
+            if (ImGui::Button("_##min", ImVec2(buttonW, 0))) {
+                ::ShowWindow(hwnd, SW_MINIMIZE);
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Minimize");
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("[=]##restore", ImVec2(buttonW, 0))) {
+                m_window.ToggleFullscreen();
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Restore");
+            }
+
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 0.8f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0.1f, 0.1f, 1.0f));
+            if (ImGui::Button("X##close", ImVec2(buttonW, 0))) {
+                ::PostMessage(hwnd, WM_CLOSE, 0, 0);
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Close");
+            }
+            ImGui::PopStyleColor(5);
+        }
+
         ImGui::EndMainMenuBar();
     }
 }
