@@ -38,7 +38,7 @@
           "modelSource": "builtin:cube"
         }
       },
-      "name": "glTF Model",
+      "name": "obj2",
       "position": [
         9.029518127441406,
         -0.01747317612171173,
@@ -61,7 +61,7 @@
           "modelSource": "builtin:cube"
         }
       },
-      "name": "Cube",
+      "name": "obj2",
       "position": [
         3.984034538269043,
         1.0,
@@ -84,7 +84,7 @@
           "modelSource": "builtin:cube"
         }
       },
-      "name": "Cube",
+      "name": "smile",
       "position": [
         8.0,
         1.0,

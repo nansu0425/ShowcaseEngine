@@ -176,7 +176,13 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
         SceneObject* selected =
             (m_selectedObjectId > 0) ? scene.FindById(static_cast<uint32_t>(m_selectedObjectId)) : nullptr;
         if (selected) {
-            ImGui::Text("Name: %s", selected->name.c_str());
+            char nameBuf[256];
+            strncpy_s(nameBuf, selected->name.c_str(), sizeof(nameBuf) - 1);
+            if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf))) {
+                selected->name = nameBuf;
+                if (m_dirtyCallback)
+                    m_dirtyCallback();
+            }
             ImGui::SameLine();
             ImGui::TextDisabled("ID: %u", selected->id);
             ImGui::Separator();
