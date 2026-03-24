@@ -1,0 +1,90 @@
+{
+  "camera": {
+    "pitch": -0.6667511463165283,
+    "position": [
+      16.103036880493164,
+      7.620426654815674,
+      -4.994833946228027
+    ],
+    "yaw": -1.4010035991668701
+  },
+  "objects": [
+    {
+      "modelSource": "builtin:cube",
+      "name": "Cube 4",
+      "position": [
+        8.0,
+        0.5,
+        -7.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "modelSource": "file:assets/models/BoxTextured.glb",
+      "name": "glTF Model",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "modelSource": "builtin:cube",
+      "name": "Cube",
+      "position": [
+        4.0,
+        1.0,
+        0.0
+      ],
+      "rotation": [
+        -0.0,
+        0.0,
+        -0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "modelSource": "builtin:cube",
+      "name": "Cube",
+      "position": [
+        8.0,
+        1.0,
+        0.0
+      ],
+      "rotation": [
+        -0.0,
+        0.0,
+        -0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "version": 1
+}

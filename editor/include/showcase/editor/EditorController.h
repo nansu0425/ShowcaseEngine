@@ -21,6 +21,7 @@ public:
 
     int GetSelectedObjectId() const { return m_selectedObjectId; }
     void ClearSelection() { m_selectedObjectId = -1; }
+    void SetSelection(uint32_t id) { m_selectedObjectId = static_cast<int>(id); }
 
     using DirtyCallback = std::function<void()>;
     void SetDirtyCallback(DirtyCallback cb) { m_dirtyCallback = std::move(cb); }

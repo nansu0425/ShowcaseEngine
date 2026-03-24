@@ -94,6 +94,30 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
         return &obj;
     });
 
+    // Asset browser
+    m_assetBrowser.Init(m_window.GetHandle());
+    m_assetBrowser.SetAddToSceneCallback([this](const std::string& modelSource) {
+        Model* model = ResolveModel(modelSource);
+        if (!model) {
+            SE_LOG_WARN("Failed to load asset: {}", modelSource);
+            return;
+        }
+        // Extract display name from modelSource (e.g. "file:assets/models/Box.glb" -> "Box")
+        std::string name = modelSource;
+        size_t lastSlash = name.find_last_of('/');
+        if (lastSlash != std::string::npos)
+            name = name.substr(lastSlash + 1);
+        size_t dot = name.find_last_of('.');
+        if (dot != std::string::npos)
+            name = name.substr(0, dot);
+
+        SceneObject& obj = m_scene.AddObject(model, name, Vector3(0, 0, 0));
+        obj.modelSource = modelSource;
+        m_editorController.SetSelection(obj.id);
+        m_sceneDirty = true;
+        UpdateWindowTitle();
+    });
+
     UpdateWindowTitle();
 
     m_timer.Reset();
@@ -582,6 +606,7 @@ int EditorApp::Run() {
                     ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.5f, &dockRightBottom, &dockRightTop);
 
                     ImGui::DockBuilderDockWindow("Console", dockBottom);
+                    ImGui::DockBuilderDockWindow("Asset Browser", dockBottom);
                     ImGui::DockBuilderDockWindow("Viewport", dockCenter);
                     ImGui::DockBuilderDockWindow("Scene Hierarchy", dockRightTop);
                     ImGui::DockBuilderDockWindow("Inspector", dockRightBottom);
@@ -594,6 +619,7 @@ int EditorApp::Run() {
 
             m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
             m_editorController.RenderUI(m_scene, m_viewport);
+            m_assetBrowser.Render();
             m_console.Render();
             m_imguiLayer.EndFrame(m_renderContext.GetCommandList());
 

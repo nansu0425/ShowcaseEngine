@@ -3,6 +3,7 @@
 #include <showcase/core/Input.h>
 #include <showcase/core/Timer.h>
 #include <showcase/core/Window.h>
+#include <showcase/editor/AssetBrowserPanel.h>
 #include <showcase/editor/Console.h>
 #include <showcase/editor/EditorController.h>
 #include <showcase/editor/ImGuiLayer.h>
@@ -58,6 +59,7 @@ private:
     RenderContext m_renderContext;
     ImGuiLayer m_imguiLayer;
     Console m_console;
+    AssetBrowserPanel m_assetBrowser;
     ViewportPanel m_viewport;
 
     // Scene rendering
