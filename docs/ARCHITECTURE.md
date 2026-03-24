@@ -17,7 +17,7 @@ The project is split into two CMake targets with a strict dependency direction:
 │                                              │
 │  EditorApp          ViewportPanel            │
 │  EditorController   ImGuiLayer               │
-│  Console            AssetBrowserPanel        │
+│  Console                                     │
 │                                              │
 │  Links: ImGui (docking), ImGuizmo            │
 └──────────────────┬───────────────────────────┘
@@ -100,6 +100,7 @@ The project is split into two CMake targets with a strict dependency direction:
 |-------|------|---------|
 | `Camera` | `Camera.h` | View/projection matrices, frustum extraction |
 | `Model` | `Model.h` | Meshes, materials, textures, local AABB; glTF loading via `ModelLoader` |
+| `MeshComponent` | `Scene.h` | Optional component: `modelSource` string + resolved `Model*` pointer |
 | `Scene` | `Scene.h` | Flat collection of `SceneObject` with auto-incrementing IDs |
 | `SceneRenderer` | `SceneRenderer.h` | Root signature, PSO, constant buffers, draw loop, object picking |
 
@@ -111,8 +112,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `ViewportPanel` | `ViewportPanel.h` | 3D viewport: owns `OffscreenTarget` and `Camera`, handles FPS camera |
 | `ImGuiLayer` | `ImGuiLayer.h` | ImGui context init, DX12 backend, frame begin/end |
 | `Console` | `Console.h` | Log viewer (via `LogListener`), command system, circular buffer (2048 entries) |
-| `EditorController` | `EditorController.h` | Object picking, ImGuizmo gizmos (W/E/R), Scene Hierarchy + Inspector panels |
-| `AssetBrowserPanel` | `AssetBrowserPanel.h` | Asset directory browser, import flow, add-to-scene |
+| `EditorController` | `EditorController.h` | Object picking, ImGuizmo gizmos (W/E/R), Scene Hierarchy + Inspector panels (component-based UI) |
 
 ---
 
@@ -196,10 +196,10 @@ EditorApp::Run()
 │   ├── ImGuiLayer::BeginFrame()               // ImGui::NewFrame()
 │   ├── EditorApp::RenderMainMenuBar()        // File menu (New/Open/Save)
 │   ├── DockSpace setup (one-time layout)
-│   │   ├── Viewport panel    (center, 75%)
-│   │   ├── Scene Hierarchy   (right-top)
-│   │   ├── Inspector         (right-bottom)
-│   │   └── Console           (bottom, 25%)
+│   │   ├── Viewport panel       (center, 75%)
+│   │   ├── Scene Hierarchy      (right-top)
+│   │   ├── Inspector            (right-bottom, component UI)
+│   │   └── Console              (bottom, 25%)
 │   ├── ViewportPanel::OnImGui()               // ImGui::Image(offscreen SRV)
 │   ├── EditorController::RenderUI()           // hierarchy, inspector, gizmo
 │   ├── Console::Render()                      // log entries
@@ -265,11 +265,14 @@ Max objects: `kMaxObjects = 64`.
 The engine uses a **flat scene graph** — `Scene` holds a `vector<SceneObject>` with no parent-child hierarchy.
 
 ```cpp
+struct MeshComponent {
+    string modelSource;        // model reference ("builtin:cube", "file:path.gltf")
+    Model* model;              // shared reference (not owned), resolved at runtime
+};
+
 struct SceneObject {
     uint32_t id;               // auto-incrementing ID
     string name;
-    string modelSource;        // model reference ("builtin:cube", "file:path.gltf")
-    Model* model;              // shared reference (not owned), resolved at runtime
     Vector3 position;          // local-space position
     Vector3 rotation;          // Euler degrees (Y → X → Z order)
     Vector3 scale;
@@ -278,15 +281,19 @@ struct SceneObject {
     bool frustumCulled;
     bool occlusionCulled;
     int lodLevel;
+    optional<MeshComponent> mesh;  // present if object has renderable geometry
+    bool HasMesh() const;      // mesh.has_value() && mesh->model != nullptr
 };
 ```
+
+Components use `std::optional` rather than polymorphic base classes — simple, debuggable, and sufficient for a focused set of component types. Transform stays directly on `SceneObject` since every object has one.
 
 ### Scene serialization
 
 Scenes are saved/loaded as `.scene` JSON files. `Scene::Serialize()` / `Scene::Deserialize()` handle object data, while `EditorApp` manages file I/O and injects editor-specific sections:
 
-- **Save** serializes each object's `name`, `modelSource`, `position`, `rotation`, `scale`, plus an optional `camera` section (editor viewport position/yaw/pitch)
-- **Load** deserializes into `SceneObject` structs with `model = nullptr`; the editor resolves `modelSource` strings back to `Model*` pointers via a model registry. Editor camera is restored from the `camera` section if present
+- **Format version 2**: serializes `name`, `position`, `rotation`, `scale`, and `components.mesh.modelSource` (if mesh component present). Version 1 (legacy) stored `modelSource` at top level and is migrated on load
+- **Load** deserializes into `SceneObject` structs with `mesh->model = nullptr`; the editor resolves `modelSource` strings back to `Model*` pointers via a model registry. Editor camera is restored from the `camera` section if present
 - **Model sources**: `"builtin:cube"` for procedural geometry, `"file:relative/path.gltf"` for glTF assets
 - **Editor UI**: File menu bar (New Scene, Open, Save, Save As) with Ctrl+N/O/S/Shift+S shortcuts
 - **Dirty tracking**: `EditorController` notifies `EditorApp` on gizmo/inspector changes; window title shows `*` for unsaved state

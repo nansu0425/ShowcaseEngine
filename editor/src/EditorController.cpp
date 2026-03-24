@@ -137,6 +137,16 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
         if (!hasSelection)
             ImGui::EndDisabled();
         if (ImGui::BeginPopup("AddObjectPopup")) {
+            if (ImGui::MenuItem("Empty Object")) {
+                if (m_addObjectCallback) {
+                    SceneObject* newObj = m_addObjectCallback("");
+                    if (newObj) {
+                        m_selectedObjectId = static_cast<int>(newObj->id);
+                        if (m_dirtyCallback)
+                            m_dirtyCallback();
+                    }
+                }
+            }
             if (ImGui::MenuItem("Cube")) {
                 if (m_addObjectCallback) {
                     SceneObject* newObj = m_addObjectCallback("builtin:cube");
@@ -183,26 +193,97 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
             (m_selectedObjectId > 0) ? scene.FindById(static_cast<uint32_t>(m_selectedObjectId)) : nullptr;
         if (selected) {
             ImGui::Text("Name: %s", selected->name.c_str());
-            ImGui::Text("ID: %u", selected->id);
+            ImGui::SameLine();
+            ImGui::TextDisabled("ID: %u", selected->id);
             ImGui::Separator();
 
-            bool changed = false;
-            if (ImGui::DragFloat3("Position", &selected->position.x, 0.1f)) {
-                changed = true;
-            }
-            if (ImGui::DragFloat3("Rotation", &selected->rotation.x, 1.0f)) {
-                changed = true;
-            }
-            if (ImGui::DragFloat3("Scale", &selected->scale.x, 0.1f, 0.01f, 100.0f)) {
-                selected->scale = ClampScale(selected->scale);
-                changed = true;
+            // ── Transform (always shown) ──
+            if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+                bool changed = false;
+                if (ImGui::DragFloat3("Position", &selected->position.x, 0.1f)) {
+                    changed = true;
+                }
+                if (ImGui::DragFloat3("Rotation", &selected->rotation.x, 1.0f)) {
+                    changed = true;
+                }
+                if (ImGui::DragFloat3("Scale", &selected->scale.x, 0.1f, 0.01f, 100.0f)) {
+                    selected->scale = ClampScale(selected->scale);
+                    changed = true;
+                }
+
+                if (changed) {
+                    selected->RecomputeWorldTransform();
+                    selected->UpdateAABB();
+                    if (m_dirtyCallback)
+                        m_dirtyCallback();
+                }
             }
 
-            if (changed) {
-                selected->RecomputeWorldTransform();
-                selected->UpdateAABB();
-                if (m_dirtyCallback)
-                    m_dirtyCallback();
+            // ── Mesh Component ──
+            if (selected->mesh.has_value()) {
+                bool headerOpen = true;
+                if (ImGui::CollapsingHeader("Mesh Component", &headerOpen, ImGuiTreeNodeFlags_DefaultOpen)) {
+                    std::string currentSource = selected->mesh->modelSource;
+                    const char* preview = currentSource.empty() ? "(none)" : currentSource.c_str();
+
+                    if (ImGui::BeginCombo("Model", preview)) {
+                        // "(none)" option to clear model
+                        if (ImGui::Selectable("(none)", currentSource.empty())) {
+                            selected->mesh->modelSource.clear();
+                            selected->mesh->model = nullptr;
+                            if (m_dirtyCallback)
+                                m_dirtyCallback();
+                        }
+
+                        // List available assets
+                        if (m_assetListCallback) {
+                            auto sources = m_assetListCallback();
+                            for (const auto& src : sources) {
+                                bool isSelected = (src == currentSource);
+                                if (ImGui::Selectable(src.c_str(), isSelected)) {
+                                    selected->mesh->modelSource = src;
+                                    if (m_resolveModelCallback) {
+                                        selected->mesh->model = m_resolveModelCallback(src);
+                                    }
+                                    selected->UpdateAABB();
+                                    if (m_dirtyCallback)
+                                        m_dirtyCallback();
+                                }
+                                if (isSelected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                }
+
+                // Remove component if header close button was clicked
+                if (!headerOpen) {
+                    selected->mesh = std::nullopt;
+                    if (m_dirtyCallback)
+                        m_dirtyCallback();
+                }
+            }
+
+            // ── Add Component button ──
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            if (ImGui::Button("+ Add Component")) {
+                ImGui::OpenPopup("AddComponentPopup");
+            }
+            if (ImGui::BeginPopup("AddComponentPopup")) {
+                if (!selected->mesh.has_value()) {
+                    if (ImGui::MenuItem("Mesh")) {
+                        selected->mesh = MeshComponent{};
+                        if (m_dirtyCallback)
+                            m_dirtyCallback();
+                    }
+                } else {
+                    ImGui::TextDisabled("All components added");
+                }
+                ImGui::EndPopup();
             }
 
         } else {

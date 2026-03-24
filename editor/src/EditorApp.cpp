@@ -6,6 +6,7 @@
 
 #include <imgui_internal.h>
 
+#include <algorithm>
 #include <filesystem>
 
 namespace {
@@ -86,37 +87,33 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
     });
 
     m_editorController.SetAddObjectCallback([this](const std::string& modelSource) -> SceneObject* {
+        if (modelSource.empty()) {
+            SceneObject& obj = m_scene.AddObject(nullptr, "Empty", Vector3(0, 1, 0));
+            return &obj;
+        }
         Model* model = ResolveModel(modelSource);
         if (!model)
             return nullptr;
         SceneObject& obj = m_scene.AddObject(model, "Cube", Vector3(0, 1, 0));
-        obj.modelSource = modelSource;
+        obj.mesh->modelSource = modelSource;
         return &obj;
     });
 
-    // Asset browser
-    m_assetBrowser.Init(m_window.GetHandle());
-    m_assetBrowser.SetAddToSceneCallback([this](const std::string& modelSource) {
-        Model* model = ResolveModel(modelSource);
-        if (!model) {
-            SE_LOG_WARN("Failed to load asset: {}", modelSource);
-            return;
-        }
-        // Extract display name from modelSource (e.g. "file:assets/models/Box.glb" -> "Box")
-        std::string name = modelSource;
-        size_t lastSlash = name.find_last_of('/');
-        if (lastSlash != std::string::npos)
-            name = name.substr(lastSlash + 1);
-        size_t dot = name.find_last_of('.');
-        if (dot != std::string::npos)
-            name = name.substr(0, dot);
-
-        SceneObject& obj = m_scene.AddObject(model, name, Vector3(0, 0, 0));
-        obj.modelSource = modelSource;
-        m_editorController.SetSelection(obj.id);
-        m_sceneDirty = true;
-        UpdateWindowTitle();
+    m_editorController.SetAssetListCallback([this]() -> std::vector<std::string> {
+        std::vector<std::string> sources;
+        for (const auto& [key, _] : m_modelRegistry)
+            sources.push_back(key);
+        for (const auto& asset : m_availableAssets)
+            sources.push_back("file:" + asset.relativePath);
+        std::sort(sources.begin(), sources.end());
+        // Remove duplicates (registry may overlap with scanned assets)
+        sources.erase(std::unique(sources.begin(), sources.end()), sources.end());
+        return sources;
     });
+
+    m_editorController.SetResolveModelCallback([this](const std::string& src) -> Model* { return ResolveModel(src); });
+
+    ScanAssets();
 
     UpdateWindowTitle();
 
@@ -264,10 +261,83 @@ Model* EditorApp::ResolveModel(const std::string& modelSource) {
 
 void EditorApp::ResolveSceneModels() {
     for (auto& obj : m_scene.GetObjects()) {
-        obj.model = ResolveModel(obj.modelSource);
+        if (obj.mesh.has_value()) {
+            obj.mesh->model = ResolveModel(obj.mesh->modelSource);
+        }
         obj.RecomputeWorldTransform();
         obj.UpdateAABB();
     }
+}
+
+void EditorApp::ScanAssets() {
+    namespace fs = std::filesystem;
+
+    m_availableAssets.clear();
+    std::string assetsPath = GetExecutableDir() + "assets/";
+
+    std::error_code ec;
+    if (!fs::exists(assetsPath, ec))
+        return;
+
+    for (const auto& entry : fs::recursive_directory_iterator(assetsPath, ec)) {
+        if (!entry.is_regular_file())
+            continue;
+
+        std::string ext = entry.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        if (ext != ".glb" && ext != ".gltf")
+            continue;
+
+        fs::path relPath = fs::relative(entry.path(), GetExecutableDir(), ec);
+        if (ec)
+            continue;
+
+        AssetEntry asset;
+        asset.relativePath = relPath.generic_string();
+        asset.filename = entry.path().filename().string();
+        asset.extension = ext;
+        m_availableAssets.push_back(std::move(asset));
+    }
+
+    std::sort(m_availableAssets.begin(), m_availableAssets.end(),
+              [](const AssetEntry& a, const AssetEntry& b) { return a.filename < b.filename; });
+}
+
+void EditorApp::ImportAsset() {
+    const char* filter = "glTF Files (*.glb;*.gltf)\0*.glb;*.gltf\0All Files (*.*)\0*.*\0";
+    std::string srcPath = OpenFileDialog(m_window.GetHandle(), filter, "glb");
+    if (srcPath.empty())
+        return;
+
+    namespace fs = std::filesystem;
+
+    fs::path source(srcPath);
+    std::string filename = source.filename().string();
+
+    std::string assetsPath = GetExecutableDir() + "assets/";
+    fs::path destDir = fs::path(assetsPath) / "models";
+    std::error_code ec;
+    fs::create_directories(destDir, ec);
+
+    fs::path destPath = destDir / filename;
+
+    if (fs::exists(destPath)) {
+        DialogResult result = ShowConfirmDialog(m_window.GetHandle(), "Overwrite File",
+                                                ("File \"" + filename + "\" already exists. Overwrite?").c_str());
+        if (result != DialogResult::Yes)
+            return;
+    }
+
+    fs::copy_file(source, destPath, fs::copy_options::overwrite_existing, ec);
+    if (ec) {
+        SE_LOG_ERROR("Failed to import asset: {}", ec.message());
+        return;
+    }
+
+    SE_LOG_INFO("Imported asset: {}", filename);
+    ScanAssets();
 }
 
 void EditorApp::NewScene() {
@@ -427,6 +497,10 @@ void EditorApp::RenderMainMenuBar() {
             }
             if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
                 SaveSceneAs();
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Import Asset...")) {
+                ImportAsset();
             }
             ImGui::EndMenu();
         }
@@ -606,7 +680,6 @@ int EditorApp::Run() {
                     ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.5f, &dockRightBottom, &dockRightTop);
 
                     ImGui::DockBuilderDockWindow("Console", dockBottom);
-                    ImGui::DockBuilderDockWindow("Asset Browser", dockBottom);
                     ImGui::DockBuilderDockWindow("Viewport", dockCenter);
                     ImGui::DockBuilderDockWindow("Scene Hierarchy", dockRightTop);
                     ImGui::DockBuilderDockWindow("Inspector", dockRightBottom);
@@ -619,7 +692,6 @@ int EditorApp::Run() {
 
             m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
             m_editorController.RenderUI(m_scene, m_viewport);
-            m_assetBrowser.Render();
             m_console.Render();
             m_imguiLayer.EndFrame(m_renderContext.GetCommandList());
 

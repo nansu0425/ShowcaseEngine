@@ -11,6 +11,7 @@
 namespace showcase {
 
 class Input;
+struct Model;
 class ViewportPanel;
 
 class EditorController {
@@ -28,6 +29,12 @@ public:
 
     using AddObjectCallback = std::function<SceneObject*(const std::string& modelSource)>;
     void SetAddObjectCallback(AddObjectCallback cb) { m_addObjectCallback = std::move(cb); }
+
+    using AssetListCallback = std::function<std::vector<std::string>()>;
+    void SetAssetListCallback(AssetListCallback cb) { m_assetListCallback = std::move(cb); }
+
+    using ResolveModelCallback = std::function<Model*(const std::string&)>;
+    void SetResolveModelCallback(ResolveModelCallback cb) { m_resolveModelCallback = std::move(cb); }
 
     // State persistence
     ImGuizmo::OPERATION GetGizmoOperation() const { return m_gizmoOperation; }
@@ -62,6 +69,8 @@ private:
 
     DirtyCallback m_dirtyCallback;
     AddObjectCallback m_addObjectCallback;
+    AssetListCallback m_assetListCallback;
+    ResolveModelCallback m_resolveModelCallback;
 };
 
 } // namespace showcase

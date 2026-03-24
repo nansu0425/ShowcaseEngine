@@ -3,7 +3,6 @@
 #include <showcase/core/Input.h>
 #include <showcase/core/Timer.h>
 #include <showcase/core/Window.h>
-#include <showcase/editor/AssetBrowserPanel.h>
 #include <showcase/editor/Console.h>
 #include <showcase/editor/EditorController.h>
 #include <showcase/editor/ImGuiLayer.h>
@@ -17,6 +16,12 @@
 #include <unordered_map>
 
 namespace showcase {
+
+struct AssetEntry {
+    std::string relativePath; // e.g. "assets/models/BoxTextured.glb"
+    std::string filename;     // e.g. "BoxTextured.glb"
+    std::string extension;    // e.g. ".glb"
+};
 
 enum class EditorMode {
     Edit,
@@ -52,6 +57,8 @@ private:
     void BuildModelRegistry();
     Model* ResolveModel(const std::string& modelSource);
     void ResolveSceneModels();
+    void ScanAssets();
+    void ImportAsset();
 
     Window m_window;
     Timer m_timer;
@@ -59,7 +66,6 @@ private:
     RenderContext m_renderContext;
     ImGuiLayer m_imguiLayer;
     Console m_console;
-    AssetBrowserPanel m_assetBrowser;
     ViewportPanel m_viewport;
 
     // Scene rendering
@@ -84,6 +90,7 @@ private:
     bool m_sceneDirty = false;
     std::unordered_map<std::string, Model*> m_modelRegistry;
     std::vector<std::unique_ptr<Model>> m_dynamicModels;
+    std::vector<AssetEntry> m_availableAssets;
 
     // Deferred scene actions (menu items run mid-frame; GPU resource changes must happen between frames)
     enum class PendingAction {

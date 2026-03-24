@@ -5,7 +5,6 @@ add_executable(ShowcaseEditor WIN32
     src/Console.cpp
     src/ViewportPanel.cpp
     src/EditorController.cpp
-    src/AssetBrowserPanel.cpp
 )
 
 target_include_directories(ShowcaseEditor PRIVATE

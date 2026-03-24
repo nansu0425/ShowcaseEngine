@@ -24,8 +24,8 @@ void SceneObject::RecomputeWorldTransform() {
 }
 
 void SceneObject::UpdateAABB() {
-    if (model) {
-        model->localAABB.Transform(worldAABB, worldTransform);
+    if (HasMesh()) {
+        mesh->model->localAABB.Transform(worldAABB, worldTransform);
     }
 }
 
@@ -33,9 +33,9 @@ void SceneObject::UpdateAABB() {
 SceneObject& Scene::AddObject(Model* model, const Matrix& transform) {
     SceneObject obj;
     obj.id = m_nextId++;
-    obj.model = model;
     obj.worldTransform = transform;
     if (model) {
+        obj.mesh = MeshComponent{"", model};
         model->localAABB.Transform(obj.worldAABB, transform);
     }
     m_objects.push_back(std::move(obj));
@@ -47,7 +47,9 @@ SceneObject& Scene::AddObject(Model* model, const std::string& name, const Vecto
     SceneObject obj;
     obj.id = m_nextId++;
     obj.name = name;
-    obj.model = model;
+    if (model) {
+        obj.mesh = MeshComponent{"", model};
+    }
     obj.position = pos;
     obj.rotation = rot;
     obj.scale = scl;
@@ -81,7 +83,7 @@ void Scene::Clear() {
 
 // ── Serialization ───────────────────────────────────────────────────
 void Scene::Serialize(JsonDocument& doc) const {
-    doc["version"].Set(1);
+    doc["version"].Set(2);
 
     auto objects = doc["objects"];
     objects.SetArray();
@@ -89,16 +91,26 @@ void Scene::Serialize(JsonDocument& doc) const {
     for (const auto& obj : m_objects) {
         auto node = objects.PushBack();
         node["name"].Set(obj.name);
-        node["modelSource"].Set(obj.modelSource);
         node["position"].SetFloatArray({obj.position.x, obj.position.y, obj.position.z});
         node["rotation"].SetFloatArray({obj.rotation.x, obj.rotation.y, obj.rotation.z});
         node["scale"].SetFloatArray({obj.scale.x, obj.scale.y, obj.scale.z});
+
+        if (obj.mesh.has_value()) {
+            auto components = node["components"];
+            auto mesh = components["mesh"];
+            mesh["modelSource"].Set(obj.mesh->modelSource);
+        }
     }
 }
 
 bool Scene::Deserialize(JsonDocument& doc) {
     m_objects.clear();
     m_nextId = 1;
+
+    // GetInt returns 0 if key missing; version was always 1 or 2
+    int version = doc["version"].GetInt();
+    if (version < 1)
+        version = 1;
 
     auto objects = doc["objects"];
     if (!objects.IsArray()) {
@@ -110,7 +122,23 @@ bool Scene::Deserialize(JsonDocument& doc) {
         SceneObject obj;
         obj.id = m_nextId++;
         obj.name = node["name"].GetString();
-        obj.modelSource = node["modelSource"].GetString();
+
+        // v2: components.mesh.modelSource, v1: top-level modelSource
+        if (version >= 2) {
+            auto components = node["components"];
+            auto mesh = components["mesh"];
+            if (mesh.Contains("modelSource")) {
+                std::string modelSource = mesh["modelSource"].GetString();
+                if (!modelSource.empty()) {
+                    obj.mesh = MeshComponent{modelSource, nullptr};
+                }
+            }
+        } else {
+            std::string modelSource = node["modelSource"].GetString();
+            if (!modelSource.empty()) {
+                obj.mesh = MeshComponent{modelSource, nullptr};
+            }
+        }
 
         auto pos = node["position"];
         if (pos.IsArray() && pos.Size() >= 3) {
