@@ -15,9 +15,17 @@ Review all uncommitted changes against project conventions and for bugs, auto-fi
    - `docs/CODING_CONVENTION.md` (naming, formatting, style rules)
    - `docs/ARCHITECTURE.md` (only if the diff includes new/renamed/deleted files, changes to CMakeLists, class hierarchies, or include structures)
 
+## Phase 1.5: Classify Changes
+
+3. From the `git diff --name-only` output, classify changed files:
+   - **Code files:** `*.cpp`, `*.h`, `*.hlsl`
+   - **Non-code files:** everything else (`*.md`, `*.cmake`, `*.json`, `*.yaml`, `*.txt`, `*.bat`, `*.sh`, `CMakeLists.txt`, `.gitignore`, etc.)
+
+   **If ALL changed files are non-code → skip Phase 2 entirely and proceed directly to Phase 3.**
+
 ## Phase 2: Code Review & Auto-Fix
 
-3. Launch **3 parallel review agents** (use the Agent tool). Provide each agent with the full `git diff` output, the list of changed files, and the contents of `CLAUDE.md` and `docs/CODING_CONVENTION.md`.
+4. Launch **3 parallel review agents** (use the Agent tool). Provide each agent with the full `git diff` output, the list of changed files, and the contents of `CLAUDE.md` and `docs/CODING_CONVENTION.md`.
 
    **Agent 1 — Convention Compliance:**
    Check all changed code against `docs/CODING_CONVENTION.md`:
@@ -77,9 +85,9 @@ Review all uncommitted changes against project conventions and for bugs, auto-fi
    - Intentional deviations marked with explanatory comments
    - Changes in functionality that are clearly intentional
 
-4. Collect all issues from the 3 agents. **Filter out any issue with confidence below 80.** If no issues remain, skip to Phase 3.
+5. Collect all issues from the 3 agents. **Filter out any issue with confidence below 80.** If no issues remain, skip to Phase 3.
 
-5. **Apply auto-fixes** using the Edit tool:
+6. **Apply auto-fixes** using the Edit tool:
    - For each issue with confidence ≥ 80, apply the suggested fix
    - Group fixes by file to minimize edit operations
    - Report all fixes applied in this format:
@@ -89,7 +97,7 @@ Review all uncommitted changes against project conventions and for bugs, auto-fi
      1. [File:Line] Description (Convention: "rule quote") [Confidence: XX] → Fixed
      ```
 
-6. **Re-review (max 1 cycle):**
+7. **Re-review (max 1 cycle):**
    - Run `git diff` on only the files modified during fixing
    - Launch a single agent to verify fixes are correct and no new issues were introduced
    - If new issues found with confidence ≥ 80, apply those fixes
@@ -98,10 +106,10 @@ Review all uncommitted changes against project conventions and for bugs, auto-fi
 
 ## Phase 3: Commit & Push
 
-7. Run `git status` and `git diff` to see the final state (original changes + review fixes)
-8. Run `git log --oneline -5` to match the repository's commit message style
-9. Stage relevant files with `git add <specific files>` (never `git add -A` or `git add .`)
-10. Analyze all changes and draft a concise commit message (1-2 sentences) focusing on the "why" not the "what". Create the commit using a HEREDOC:
+8. Run `git status` and `git diff` to see the final state (original changes + review fixes)
+9. Run `git log --oneline -5` to match the repository's commit message style
+10. Stage relevant files with `git add <specific files>` (never `git add -A` or `git add .`)
+11. Analyze all changes and draft a concise commit message (1-2 sentences) focusing on the "why" not the "what". Create the commit using a HEREDOC:
     ```
     git commit -m "$(cat <<'EOF'
     Commit message here.
@@ -110,8 +118,8 @@ Review all uncommitted changes against project conventions and for bugs, auto-fi
     EOF
     )"
     ```
-11. Push to remote: `git push` (or `git push origin $ARGUMENTS` if a branch name was provided)
-12. Report the final result:
+12. Push to remote: `git push` (or `git push origin $ARGUMENTS` if a branch name was provided)
+13. Report the final result:
     ```
     ## Committed and Pushed
     Commit: <hash> | Branch: <branch> → origin/<branch>
