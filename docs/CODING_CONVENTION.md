@@ -125,16 +125,41 @@ void Foo::DoSomething() {
 
 ## 7. Function Parameters
 
+### 7.1 Parameter Order
+
 Order parameters as follows:
 
 1. Context / system objects first (`RenderContext&`, `CommandList&`)
 2. Input parameters next
 3. Output parameters last, prefixed with `out` (`Model& outModel`)
 
+### 7.2 Single-Line Declaration Rule
+
+Every function declaration must fit on **one line** (within the 120-character limit). If parameters push the declaration past one line, pack the input parameters into a descriptor struct and pass it by `const&`.
+
+**Rules:**
+
+- **Naming**: `{Purpose}Desc` — e.g., `GLTFLoadDesc`, `PipelineStateDesc`.
+- **Output parameters stay separate**: `out`-prefixed parameters remain as individual function parameters, not packed into the descriptor struct.
+- **Struct placement**: Define the descriptor struct near the function that uses it (same header).
+
+**Before (violates — multi-line declaration):**
+
 ```cpp
-static bool LoadGLTF(const std::string& filepath,
-                     RenderContext& ctx,
+static bool LoadGLTF(RenderContext& ctx,
+                     const std::string& filepath,
                      Model& outModel);
+```
+
+**After:**
+
+```cpp
+struct GLTFLoadDesc {
+    RenderContext* ctx;
+    std::string filepath;
+};
+
+static bool LoadGLTF(const GLTFLoadDesc& desc, Model& outModel);
 ```
 
 ## 8. Type Usage
