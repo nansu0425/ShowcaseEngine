@@ -24,8 +24,8 @@ void SceneObject::RecomputeWorldTransform() {
 }
 
 void SceneObject::UpdateAABB() {
-    if (HasMesh()) {
-        mesh->model->localAABB.Transform(worldAABB, worldTransform);
+    if (HasModel()) {
+        modelComp->model->localAABB.Transform(worldAABB, worldTransform);
     }
 }
 
@@ -35,7 +35,7 @@ SceneObject& Scene::AddObject(Model* model, const Matrix& transform) {
     obj.id = m_nextId++;
     obj.worldTransform = transform;
     if (model) {
-        obj.mesh = MeshComponent{"", model};
+        obj.modelComp = ModelComponent{"", model};
         model->localAABB.Transform(obj.worldAABB, transform);
     }
     m_objects.push_back(std::move(obj));
@@ -48,7 +48,7 @@ SceneObject& Scene::AddObject(Model* model, const std::string& name, const Vecto
     obj.id = m_nextId++;
     obj.name = name;
     if (model) {
-        obj.mesh = MeshComponent{"", model};
+        obj.modelComp = ModelComponent{"", model};
     }
     obj.position = pos;
     obj.rotation = rot;
@@ -95,10 +95,10 @@ void Scene::Serialize(JsonDocument& doc) const {
         node["rotation"].SetFloatArray({obj.rotation.x, obj.rotation.y, obj.rotation.z});
         node["scale"].SetFloatArray({obj.scale.x, obj.scale.y, obj.scale.z});
 
-        if (obj.mesh.has_value()) {
+        if (obj.modelComp.has_value()) {
             auto components = node["components"];
             auto mesh = components["mesh"];
-            mesh["modelSource"].Set(obj.mesh->modelSource);
+            mesh["modelSource"].Set(obj.modelComp->modelSource);
         }
     }
 }
@@ -130,13 +130,13 @@ bool Scene::Deserialize(JsonDocument& doc) {
             if (mesh.Contains("modelSource")) {
                 std::string modelSource = mesh["modelSource"].GetString();
                 if (!modelSource.empty()) {
-                    obj.mesh = MeshComponent{modelSource, nullptr};
+                    obj.modelComp = ModelComponent{modelSource, nullptr};
                 }
             }
         } else {
             std::string modelSource = node["modelSource"].GetString();
             if (!modelSource.empty()) {
-                obj.mesh = MeshComponent{modelSource, nullptr};
+                obj.modelComp = ModelComponent{modelSource, nullptr};
             }
         }
 

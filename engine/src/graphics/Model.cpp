@@ -9,26 +9,31 @@
 #include <nlohmann/json.hpp>
 #include <tiny_gltf.h>
 
+#include <unordered_set>
+
 namespace showcase {
 
 // ── Lifecycle ────────────────────────────────────────────────────────
 void Model::Shutdown(RenderContext& ctx) {
+    std::unordered_set<Texture*> freedTextures;
     for (auto& mesh : meshes) {
         for (auto& prim : mesh.primitives) {
             prim.vertexBuffer.Shutdown();
             prim.indexBuffer.Shutdown();
+            if (prim.material && prim.material->baseColorTexture) {
+                Texture* tex = prim.material->baseColorTexture.get();
+                if (freedTextures.insert(tex).second) {
+                    tex->Shutdown(ctx.GetSrvHeap());
+                }
+            }
         }
     }
-    for (auto& tex : textures) {
-        tex.Shutdown(ctx.GetSrvHeap());
-    }
     meshes.clear();
-    materials.clear();
-    textures.clear();
 }
 
 // ── Texture loading ──────────────────────────────────────────────────
-static bool LoadTextures(const tinygltf::Model& gltfModel, RenderContext& ctx, std::vector<Texture>& outTextures) {
+static bool LoadTextures(const tinygltf::Model& gltfModel, RenderContext& ctx,
+                         std::vector<std::shared_ptr<Texture>>& outTextures) {
     if (gltfModel.images.empty())
         return true;
 
@@ -52,9 +57,10 @@ static bool LoadTextures(const tinygltf::Model& gltfModel, RenderContext& ctx, s
             continue;
         }
 
-        if (!outTextures[i].InitFromMemory(device, allocator, cmdList.Get(), ctx.GetSrvHeap(), image.image.data(),
-                                           static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height),
-                                           static_cast<uint32_t>(image.component))) {
+        outTextures[i] = std::make_shared<Texture>();
+        if (!outTextures[i]->InitFromMemory(device, allocator, cmdList.Get(), ctx.GetSrvHeap(), image.image.data(),
+                                            static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height),
+                                            static_cast<uint32_t>(image.component))) {
             SE_LOG_ERROR("Failed to load texture at index {}", i);
             return false;
         }
@@ -65,7 +71,8 @@ static bool LoadTextures(const tinygltf::Model& gltfModel, RenderContext& ctx, s
     ctx.GetDirectQueue().Flush();
 
     for (auto& tex : outTextures) {
-        tex.ReleaseUploadResources();
+        if (tex)
+            tex->ReleaseUploadResources();
     }
 
     cmdList.Shutdown();
@@ -73,22 +80,27 @@ static bool LoadTextures(const tinygltf::Model& gltfModel, RenderContext& ctx, s
 }
 
 // ── Material loading ─────────────────────────────────────────────────
-static void LoadMaterials(const tinygltf::Model& gltfModel, std::vector<Material>& outMaterials) {
+static void LoadMaterials(const tinygltf::Model& gltfModel, const std::vector<std::shared_ptr<Texture>>& textures,
+                          std::vector<std::shared_ptr<Material>>& outMaterials) {
     outMaterials.resize(gltfModel.materials.size());
 
     for (size_t i = 0; i < gltfModel.materials.size(); ++i) {
         const auto& gltfMat = gltfModel.materials[i];
-        auto& mat = outMaterials[i];
+        std::shared_ptr<Material> mat = std::make_shared<Material>();
 
         const auto& pbr = gltfMat.pbrMetallicRoughness;
-        mat.baseColorFactor =
+        mat->baseColorFactor =
             Vector4(static_cast<float>(pbr.baseColorFactor[0]), static_cast<float>(pbr.baseColorFactor[1]),
                     static_cast<float>(pbr.baseColorFactor[2]), static_cast<float>(pbr.baseColorFactor[3]));
 
         if (pbr.baseColorTexture.index >= 0) {
             const auto& texInfo = gltfModel.textures[pbr.baseColorTexture.index];
-            mat.baseColorTextureIndex = texInfo.source;
+            if (texInfo.source >= 0 && texInfo.source < static_cast<int>(textures.size())) {
+                mat->baseColorTexture = textures[texInfo.source];
+            }
         }
+
+        outMaterials[i] = std::move(mat);
     }
 }
 
@@ -220,13 +232,14 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
         return false;
     }
 
-    // Load textures
-    if (!LoadTextures(gltfModel, ctx, outModel.textures)) {
+    // Load textures and materials
+    std::vector<std::shared_ptr<Texture>> textures;
+    if (!LoadTextures(gltfModel, ctx, textures)) {
         return false;
     }
 
-    // Load materials
-    LoadMaterials(gltfModel, outModel.materials);
+    std::vector<std::shared_ptr<Material>> materials;
+    LoadMaterials(gltfModel, textures, materials);
 
     // Load meshes
     outModel.meshes.resize(gltfModel.meshes.size());
@@ -270,7 +283,9 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
                 }
             }
 
-            prim.materialIndex = gltfPrim.material;
+            if (gltfPrim.material >= 0 && gltfPrim.material < static_cast<int>(materials.size())) {
+                prim.material = materials[gltfPrim.material];
+            }
             prim.localAABB = ComputeLocalAABB(vertices);
 
             // Expand model AABB
@@ -284,7 +299,7 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
     outModel.localAABB = CreateAABB(modelMin, modelMax);
 
     SE_LOG_INFO("Loaded glTF: {} ({} meshes, {} materials, {} textures)", filepath, outModel.meshes.size(),
-                outModel.materials.size(), outModel.textures.size());
+                materials.size(), textures.size());
     return true;
 }
 

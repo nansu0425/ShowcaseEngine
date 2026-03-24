@@ -220,17 +220,17 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
             }
 
             // ── Mesh Component ──
-            if (selected->mesh.has_value()) {
+            if (selected->modelComp.has_value()) {
                 bool headerOpen = true;
-                if (ImGui::CollapsingHeader("Mesh Component", &headerOpen, ImGuiTreeNodeFlags_DefaultOpen)) {
-                    std::string currentSource = selected->mesh->modelSource;
+                if (ImGui::CollapsingHeader("Model Component", &headerOpen, ImGuiTreeNodeFlags_DefaultOpen)) {
+                    std::string currentSource = selected->modelComp->modelSource;
                     const char* preview = currentSource.empty() ? "(none)" : currentSource.c_str();
 
                     if (ImGui::BeginCombo("Model", preview)) {
                         // "(none)" option to clear model
                         if (ImGui::Selectable("(none)", currentSource.empty())) {
-                            selected->mesh->modelSource.clear();
-                            selected->mesh->model = nullptr;
+                            selected->modelComp->modelSource.clear();
+                            selected->modelComp->model = nullptr;
                             if (m_dirtyCallback)
                                 m_dirtyCallback();
                         }
@@ -241,9 +241,9 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                             for (const auto& src : sources) {
                                 bool isSelected = (src == currentSource);
                                 if (ImGui::Selectable(src.c_str(), isSelected)) {
-                                    selected->mesh->modelSource = src;
+                                    selected->modelComp->modelSource = src;
                                     if (m_resolveModelCallback) {
-                                        selected->mesh->model = m_resolveModelCallback(src);
+                                        selected->modelComp->model = m_resolveModelCallback(src);
                                     }
                                     selected->UpdateAABB();
                                     if (m_dirtyCallback)
@@ -259,7 +259,7 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
 
                 // Remove component if header close button was clicked
                 if (!headerOpen) {
-                    selected->mesh = std::nullopt;
+                    selected->modelComp = std::nullopt;
                     if (m_dirtyCallback)
                         m_dirtyCallback();
                 }
@@ -274,9 +274,9 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 ImGui::OpenPopup("AddComponentPopup");
             }
             if (ImGui::BeginPopup("AddComponentPopup")) {
-                if (!selected->mesh.has_value()) {
-                    if (ImGui::MenuItem("Mesh")) {
-                        selected->mesh = MeshComponent{};
+                if (!selected->modelComp.has_value()) {
+                    if (ImGui::MenuItem("Model")) {
+                        selected->modelComp = ModelComponent{};
                         if (m_dirtyCallback)
                             m_dirtyCallback();
                     }

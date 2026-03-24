@@ -9,7 +9,7 @@
 
 namespace showcase {
 
-struct MeshComponent {
+struct ModelComponent {
     std::string modelSource; // e.g. "builtin:cube", "file:assets/models/duck.glb"
     Model* model = nullptr;  // non-owning, resolved at runtime
 };
@@ -26,9 +26,9 @@ struct SceneObject {
     bool occlusionCulled = false;
     int lodLevel = 0;
 
-    std::optional<MeshComponent> mesh;
+    std::optional<ModelComponent> modelComp;
 
-    bool HasMesh() const { return mesh.has_value() && mesh->model != nullptr; }
+    bool HasModel() const { return modelComp.has_value() && modelComp->model != nullptr; }
     bool IsVisible() const;
     void RecomputeWorldTransform();
     void UpdateAABB();

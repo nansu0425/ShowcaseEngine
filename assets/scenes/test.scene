@@ -1,16 +1,20 @@
 {
   "camera": {
-    "pitch": -0.6667511463165283,
+    "pitch": -0.5617510080337524,
     "position": [
-      16.103036880493164,
-      7.620426654815674,
-      -4.994833946228027
+      13.530284881591797,
+      5.706578731536865,
+      -5.249222755432129
     ],
-    "yaw": -1.4010035991668701
+    "yaw": -0.8100016117095947
   },
   "objects": [
     {
-      "modelSource": "builtin:cube",
+      "components": {
+        "mesh": {
+          "modelSource": "builtin:cube"
+        }
+      },
       "name": "Cube 4",
       "position": [
         8.0,
@@ -29,17 +33,21 @@
       ]
     },
     {
-      "modelSource": "file:assets/models/BoxTextured.glb",
+      "components": {
+        "mesh": {
+          "modelSource": "builtin:cube"
+        }
+      },
       "name": "glTF Model",
       "position": [
-        0.0,
-        0.0,
+        9.029518127441406,
+        -0.01747317612171173,
         0.0
       ],
       "rotation": [
+        -0.0,
         0.0,
-        0.0,
-        0.0
+        -0.0
       ],
       "scale": [
         1.0,
@@ -48,10 +56,14 @@
       ]
     },
     {
-      "modelSource": "builtin:cube",
+      "components": {
+        "mesh": {
+          "modelSource": "builtin:cube"
+        }
+      },
       "name": "Cube",
       "position": [
-        4.0,
+        3.984034538269043,
         1.0,
         0.0
       ],
@@ -67,7 +79,11 @@
       ]
     },
     {
-      "modelSource": "builtin:cube",
+      "components": {
+        "mesh": {
+          "modelSource": "builtin:cube"
+        }
+      },
       "name": "Cube",
       "position": [
         8.0,
@@ -84,7 +100,30 @@
         1.0,
         1.0
       ]
+    },
+    {
+      "components": {
+        "mesh": {
+          "modelSource": "file:assets/models/BoxTextured.glb"
+        }
+      },
+      "name": "Empty",
+      "position": [
+        0.0,
+        1.0,
+        5.820766091346741e-11
+      ],
+      "rotation": [
+        -0.0,
+        0.0,
+        -0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
     }
   ],
-  "version": 1
+  "version": 2
 }

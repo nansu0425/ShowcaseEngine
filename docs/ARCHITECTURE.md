@@ -99,8 +99,10 @@ The project is split into two CMake targets with a strict dependency direction:
 | Class | File | Purpose |
 |-------|------|---------|
 | `Camera` | `Camera.h` | View/projection matrices, frustum extraction |
-| `Model` | `Model.h` | Meshes, materials, textures, local AABB; glTF loading via `ModelLoader` |
-| `MeshComponent` | `Scene.h` | Optional component: `modelSource` string + resolved `Model*` pointer |
+| `Model` | `Model.h` | Meshes with shared materials/textures, local AABB; glTF loading via `ModelLoader` |
+| `Material` | `Model.h` | Base color factor + optional `shared_ptr<Texture>` for base color texture |
+| `AssetManager` | `AssetManager.h` | Central ownership of all `Model` instances (builtin + file-loaded); deduplicates by source key |
+| `ModelComponent` | `Scene.h` | Optional component: `modelSource` string + resolved `Model*` pointer |
 | `Scene` | `Scene.h` | Flat collection of `SceneObject` with auto-incrementing IDs |
 | `SceneRenderer` | `SceneRenderer.h` | Root signature, PSO, constant buffers, draw loop, object picking |
 
@@ -265,9 +267,9 @@ Max objects: `kMaxObjects = 64`.
 The engine uses a **flat scene graph** — `Scene` holds a `vector<SceneObject>` with no parent-child hierarchy.
 
 ```cpp
-struct MeshComponent {
+struct ModelComponent {
     string modelSource;        // model reference ("builtin:cube", "file:path.gltf")
-    Model* model;              // shared reference (not owned), resolved at runtime
+    Model* model;              // non-owning pointer, resolved via AssetManager
 };
 
 struct SceneObject {
@@ -281,8 +283,8 @@ struct SceneObject {
     bool frustumCulled;
     bool occlusionCulled;
     int lodLevel;
-    optional<MeshComponent> mesh;  // present if object has renderable geometry
-    bool HasMesh() const;      // mesh.has_value() && mesh->model != nullptr
+    optional<ModelComponent> modelComp;  // present if object has renderable geometry
+    bool HasModel() const;     // modelComp.has_value() && modelComp->model != nullptr
 };
 ```
 
@@ -293,7 +295,7 @@ Components use `std::optional` rather than polymorphic base classes — simple, 
 Scenes are saved/loaded as `.scene` JSON files. `Scene::Serialize()` / `Scene::Deserialize()` handle object data, while `EditorApp` manages file I/O and injects editor-specific sections:
 
 - **Format version 2**: serializes `name`, `position`, `rotation`, `scale`, and `components.mesh.modelSource` (if mesh component present). Version 1 (legacy) stored `modelSource` at top level and is migrated on load
-- **Load** deserializes into `SceneObject` structs with `mesh->model = nullptr`; the editor resolves `modelSource` strings back to `Model*` pointers via a model registry. Editor camera is restored from the `camera` section if present
+- **Load** deserializes into `SceneObject` structs with `modelComp->model = nullptr`; the editor resolves `modelSource` strings back to `Model*` pointers via `AssetManager`. Editor camera is restored from the `camera` section if present
 - **Model sources**: `"builtin:cube"` for procedural geometry, `"file:relative/path.gltf"` for glTF assets
 - **Editor UI**: File menu bar (New Scene, Open, Save, Save As) with Ctrl+N/O/S/Shift+S shortcuts
 - **Dirty tracking**: `EditorController` notifies `EditorApp` on gizmo/inspector changes; window title shows `*` for unsaved state
@@ -311,19 +313,22 @@ Testing in local space correctly handles rotated objects (world-space AABB is ax
 ### Data model
 
 ```
-Model (shared asset)
+AssetManager (owns all models)
+└── unordered_map<string, unique_ptr<Model>>
+
+Model (shared asset, owned by AssetManager)
 ├── vector<Mesh>
 │   └── vector<MeshPrimitive>
 │       ├── Buffer vertexBuffer   (ModelVertex: position, normal, texCoord)
 │       ├── Buffer indexBuffer
 │       ├── uint32_t indexCount
-│       ├── int materialIndex
+│       ├── shared_ptr<Material>  (shared across primitives)
 │       └── BoundingBox localAABB
-├── vector<Material>
-│   ├── Vector4 baseColorFactor
-│   └── int baseColorTextureIndex
-├── vector<Texture>
 └── BoundingBox localAABB         (union of all mesh AABBs)
+
+Material (shared via shared_ptr)
+├── Vector4 baseColorFactor
+└── shared_ptr<Texture> baseColorTexture  (shared across materials)
 ```
 
 ---

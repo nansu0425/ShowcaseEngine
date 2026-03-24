@@ -127,7 +127,7 @@ int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, cons
     float closestDist = FLT_MAX;
 
     for (const auto& obj : scene.GetObjects()) {
-        if (!obj.HasMesh())
+        if (!obj.HasModel())
             continue;
 
         // Transform ray into object local space for accurate rotated picking
@@ -137,7 +137,7 @@ int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, cons
         localDir.Normalize();
 
         float dist = 0.0f;
-        if (obj.mesh->model->localAABB.Intersects(localOrigin, localDir, dist)) {
+        if (obj.modelComp->model->localAABB.Intersects(localOrigin, localDir, dist)) {
             // Convert local-space hit point back to world-space distance
             Vector3 localHit = localOrigin + localDir * dist;
             Vector3 worldHit = Vector3::Transform(localHit, obj.worldTransform);
@@ -263,12 +263,12 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     D3D12_GPU_VIRTUAL_ADDRESS matCbBase = m_perMaterialCB.GetResource()->GetGPUVirtualAddress();
 
     for (const auto& sceneObj : scene.GetObjects()) {
-        if (!sceneObj.HasMesh())
+        if (!sceneObj.HasModel())
             continue;
 
         bool isSelected = (static_cast<int>(sceneObj.id) == selectedObjectId);
 
-        for (const auto& mesh : sceneObj.mesh->model->meshes) {
+        for (const auto& mesh : sceneObj.modelComp->model->meshes) {
             for (const auto& prim : mesh.primitives) {
                 if (prim.indexCount == 0 || objectIndex >= kMaxObjects)
                     continue;
@@ -285,16 +285,12 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                 matData.hasTexture = 0;
                 matData.selectionTint = isSelected ? 1.0f : 0.0f;
 
-                if (prim.materialIndex >= 0 &&
-                    prim.materialIndex < static_cast<int>(sceneObj.mesh->model->materials.size())) {
-                    const auto& mat = sceneObj.mesh->model->materials[prim.materialIndex];
-                    matData.baseColorFactor = mat.baseColorFactor;
+                if (prim.material) {
+                    matData.baseColorFactor = prim.material->baseColorFactor;
 
-                    if (mat.baseColorTextureIndex >= 0 &&
-                        mat.baseColorTextureIndex < static_cast<int>(sceneObj.mesh->model->textures.size())) {
+                    if (prim.material->baseColorTexture) {
                         matData.hasTexture = 1;
-                        cmdList->SetGraphicsRootDescriptorTable(
-                            3, sceneObj.mesh->model->textures[mat.baseColorTextureIndex].GetSRVHandle().gpu);
+                        cmdList->SetGraphicsRootDescriptorTable(3, prim.material->baseColorTexture->GetSRVHandle().gpu);
                     } else {
                         cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
                     }

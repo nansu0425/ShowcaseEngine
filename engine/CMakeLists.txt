@@ -26,6 +26,7 @@ add_library(showcase_engine STATIC
     src/graphics/Scene.cpp
     src/graphics/RenderTarget.cpp
     src/graphics/SceneRenderer.cpp
+    src/graphics/AssetManager.cpp
     src/graphics/OffscreenTarget.cpp
 )
 

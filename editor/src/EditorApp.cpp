@@ -91,27 +91,25 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
             SceneObject& obj = m_scene.AddObject(nullptr, "Empty", Vector3(0, 1, 0));
             return &obj;
         }
-        Model* model = ResolveModel(modelSource);
+        Model* model = m_assetManager.LoadModel(modelSource);
         if (!model)
             return nullptr;
         SceneObject& obj = m_scene.AddObject(model, "Cube", Vector3(0, 1, 0));
-        obj.mesh->modelSource = modelSource;
+        obj.modelComp->modelSource = modelSource;
         return &obj;
     });
 
     m_editorController.SetAssetListCallback([this]() -> std::vector<std::string> {
-        std::vector<std::string> sources;
-        for (const auto& [key, _] : m_modelRegistry)
-            sources.push_back(key);
+        std::vector<std::string> sources = m_assetManager.GetAvailableSources();
         for (const auto& asset : m_availableAssets)
             sources.push_back("file:" + asset.relativePath);
         std::sort(sources.begin(), sources.end());
-        // Remove duplicates (registry may overlap with scanned assets)
         sources.erase(std::unique(sources.begin(), sources.end()), sources.end());
         return sources;
     });
 
-    m_editorController.SetResolveModelCallback([this](const std::string& src) -> Model* { return ResolveModel(src); });
+    m_editorController.SetResolveModelCallback(
+        [this](const std::string& src) -> Model* { return m_assetManager.LoadModel(src); });
 
     ScanAssets();
 
@@ -126,11 +124,8 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
 // ── Scene setup ──────────────────────────────────────────────────
 
 void EditorApp::BuildDefaultScene() {
-    m_sceneRenderer.CreateCubeModel(m_renderContext, m_cubeModel);
-
+    m_assetManager.Init(m_renderContext, m_sceneRenderer);
     m_scene.Clear();
-
-    BuildModelRegistry();
 }
 
 // ── Config persistence ───────────────────────────────────────────
@@ -225,44 +220,10 @@ void EditorApp::LoadEditorConfig() {
 
 // ── Scene document management ────────────────────────────────────
 
-void EditorApp::BuildModelRegistry() {
-    m_modelRegistry.clear();
-    m_modelRegistry["builtin:cube"] = &m_cubeModel;
-    if (m_modelLoaded && !m_testModelSource.empty()) {
-        m_modelRegistry[m_testModelSource] = &m_testModel;
-    }
-}
-
-Model* EditorApp::ResolveModel(const std::string& modelSource) {
-    auto it = m_modelRegistry.find(modelSource);
-    if (it != m_modelRegistry.end()) {
-        return it->second;
-    }
-
-    // Try loading file-based models (file:relative/path.gltf)
-    if (modelSource.rfind("file:", 0) == 0) {
-        std::string relPath = modelSource.substr(5);
-        std::string absPath = GetExecutableDir() + relPath;
-
-        auto model = std::make_unique<Model>();
-        if (ModelLoader::LoadGLTF(m_renderContext, absPath, *model)) {
-            SE_LOG_INFO("Dynamically loaded model: {}", relPath);
-            Model* ptr = model.get();
-            m_dynamicModels.push_back(std::move(model));
-            m_modelRegistry[modelSource] = ptr;
-            return ptr;
-        }
-
-        SE_LOG_WARN("Failed to load model: {}", absPath);
-    }
-
-    return nullptr;
-}
-
 void EditorApp::ResolveSceneModels() {
     for (auto& obj : m_scene.GetObjects()) {
-        if (obj.mesh.has_value()) {
-            obj.mesh->model = ResolveModel(obj.mesh->modelSource);
+        if (obj.modelComp.has_value()) {
+            obj.modelComp->model = m_assetManager.LoadModel(obj.modelComp->modelSource);
         }
         obj.RecomputeWorldTransform();
         obj.UpdateAABB();
@@ -352,24 +313,7 @@ void EditorApp::NewScene() {
 
     // Flush GPU and clean up all models before rebuilding
     m_renderContext.GetDirectQueue().Flush();
-    for (auto& model : m_dynamicModels) {
-        model->Shutdown(m_renderContext);
-    }
-    m_dynamicModels.clear();
-    m_modelRegistry.clear();
-
-    if (m_modelLoaded) {
-        m_testModel.Shutdown(m_renderContext);
-        m_modelLoaded = false;
-        m_testModelSource.clear();
-    }
-    for (auto& mesh : m_cubeModel.meshes) {
-        for (auto& prim : mesh.primitives) {
-            prim.vertexBuffer.Shutdown();
-            prim.indexBuffer.Shutdown();
-        }
-    }
-    m_cubeModel.meshes.clear();
+    m_assetManager.Shutdown();
 
     m_editorController.ClearSelection();
     BuildDefaultScene();
@@ -396,13 +340,10 @@ void EditorApp::OpenScene() {
     if (path.empty())
         return;
 
-    // Flush GPU and clean up dynamic models
+    // Flush GPU and clean up models
     m_renderContext.GetDirectQueue().Flush();
-    for (auto& model : m_dynamicModels) {
-        model->Shutdown(m_renderContext);
-    }
-    m_dynamicModels.clear();
-    m_modelRegistry.clear();
+    m_assetManager.Shutdown();
+    m_assetManager.Init(m_renderContext, m_sceneRenderer);
 
     m_editorController.ClearSelection();
 
@@ -424,8 +365,6 @@ void EditorApp::OpenScene() {
                               cam["yaw"].GetFloat(), cam["pitch"].GetFloat(), kPiOver4, 0.1f, 1000.0f);
     }
 
-    // Rebuild registry with builtin models
-    BuildModelRegistry();
     ResolveSceneModels();
 
     m_currentScenePath = path;
@@ -515,25 +454,7 @@ void EditorApp::Shutdown() {
 
     m_renderContext.GetDirectQueue().Flush();
 
-    // Shutdown dynamic models loaded via OpenScene
-    for (auto& model : m_dynamicModels) {
-        model->Shutdown(m_renderContext);
-    }
-    m_dynamicModels.clear();
-
-    if (m_modelLoaded) {
-        m_testModel.Shutdown(m_renderContext);
-        m_modelLoaded = false;
-    }
-
-    // Shutdown procedural model buffers
-    for (auto& mesh : m_cubeModel.meshes) {
-        for (auto& prim : mesh.primitives) {
-            prim.vertexBuffer.Shutdown();
-            prim.indexBuffer.Shutdown();
-        }
-    }
-    m_cubeModel.meshes.clear();
+    m_assetManager.Shutdown();
 
     m_scene.Clear();
     m_sceneRenderer.Shutdown();

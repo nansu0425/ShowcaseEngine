@@ -7,13 +7,13 @@
 #include <showcase/editor/EditorController.h>
 #include <showcase/editor/ImGuiLayer.h>
 #include <showcase/editor/ViewportPanel.h>
+#include <showcase/graphics/AssetManager.h>
 #include <showcase/graphics/Model.h>
 #include <showcase/graphics/RenderContext.h>
 #include <showcase/graphics/Scene.h>
 #include <showcase/graphics/SceneRenderer.h>
 
 #include <memory>
-#include <unordered_map>
 
 namespace showcase {
 
@@ -54,8 +54,6 @@ private:
     bool SaveSceneAs();
     void RenderMainMenuBar();
     void UpdateWindowTitle();
-    void BuildModelRegistry();
-    Model* ResolveModel(const std::string& modelSource);
     void ResolveSceneModels();
     void ScanAssets();
     void ImportAsset();
@@ -73,13 +71,7 @@ private:
     Scene m_scene;
     EditorController m_editorController;
 
-    // Procedural models
-    Model m_cubeModel;
-
-    // glTF model
-    Model m_testModel;
-    bool m_modelLoaded = false;
-    std::string m_testModelSource;
+    AssetManager m_assetManager;
 
     bool m_resizePending = false;
     uint32_t m_pendingWidth = 0;
@@ -88,8 +80,6 @@ private:
     // Scene document state
     std::string m_currentScenePath;
     bool m_sceneDirty = false;
-    std::unordered_map<std::string, Model*> m_modelRegistry;
-    std::vector<std::unique_ptr<Model>> m_dynamicModels;
     std::vector<AssetEntry> m_availableAssets;
 
     // Deferred scene actions (menu items run mid-frame; GPU resource changes must happen between frames)
