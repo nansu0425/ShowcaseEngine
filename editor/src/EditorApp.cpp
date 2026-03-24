@@ -108,41 +108,6 @@ void EditorApp::BuildDefaultScene() {
     m_sceneRenderer.CreateCubeModel(m_renderContext, m_cubeModel);
 
     m_scene.Clear();
-    m_scene.AddObject(&m_cubeModel, "Cube 1", Vector3(0, 1, 0), Vector3(0, 0, 0), Vector3(2, 2, 2)).modelSource =
-        "builtin:cube";
-    m_scene.AddObject(&m_cubeModel, "Cube 2", Vector3(5, 0.75f, 3), Vector3(0, 0, 0), Vector3(1.5f, 1.5f, 1.5f))
-        .modelSource = "builtin:cube";
-    m_scene.AddObject(&m_cubeModel, "Cube 3", Vector3(-6, 2, -4), Vector3(0, 0, 0), Vector3(3, 4, 3)).modelSource =
-        "builtin:cube";
-    m_scene.AddObject(&m_cubeModel, "Cube 4", Vector3(8, 0.5f, -7), Vector3(0, 0, 0), Vector3(1, 1, 1)).modelSource =
-        "builtin:cube";
-    m_scene.AddObject(&m_cubeModel, "Cube 5", Vector3(-3, 0.5f, 8), Vector3(0, 0, 0), Vector3(2, 1, 2)).modelSource =
-        "builtin:cube";
-
-    // Try loading a glTF model from assets/models/
-    {
-        std::filesystem::path modelDir = std::filesystem::path(GetExecutableDir()) / "assets" / "models";
-
-        if (std::filesystem::exists(modelDir)) {
-            for (const auto& entry : std::filesystem::directory_iterator(modelDir)) {
-                std::string ext = entry.path().extension().string();
-                if (ext == ".gltf" || ext == ".glb") {
-                    m_modelLoaded = ModelLoader::LoadGLTF(m_renderContext, entry.path().string(), m_testModel);
-                    if (m_modelLoaded) {
-                        SE_LOG_INFO("Loaded test model: {}", entry.path().filename().string());
-                        std::string relPath = "assets/models/" + entry.path().filename().string();
-                        m_testModelSource = "file:" + relPath;
-                        m_scene.AddObject(&m_testModel, "glTF Model", Vector3(0, 0, 0)).modelSource = m_testModelSource;
-                    }
-                    break;
-                }
-            }
-        }
-
-        if (!m_modelLoaded) {
-            SE_LOG_INFO("No glTF model found in assets/models/ — rendering procedural geometry only");
-        }
-    }
 
     BuildModelRegistry();
 }
