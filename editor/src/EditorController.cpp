@@ -116,7 +116,14 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
     // -- Scene Hierarchy panel --
     if (ImGui::Begin("Scene Hierarchy")) {
         if (ImGui::Button("+")) {
-            ImGui::OpenPopup("AddObjectPopup");
+            if (m_addObjectCallback) {
+                SceneObject* newObj = m_addObjectCallback("");
+                if (newObj) {
+                    m_selectedObjectId = static_cast<int>(newObj->id);
+                    if (m_dirtyCallback)
+                        m_dirtyCallback();
+                }
+            }
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Add object to scene");
@@ -136,29 +143,6 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
         }
         if (!hasSelection)
             ImGui::EndDisabled();
-        if (ImGui::BeginPopup("AddObjectPopup")) {
-            if (ImGui::MenuItem("Empty Object")) {
-                if (m_addObjectCallback) {
-                    SceneObject* newObj = m_addObjectCallback("");
-                    if (newObj) {
-                        m_selectedObjectId = static_cast<int>(newObj->id);
-                        if (m_dirtyCallback)
-                            m_dirtyCallback();
-                    }
-                }
-            }
-            if (ImGui::MenuItem("Cube")) {
-                if (m_addObjectCallback) {
-                    SceneObject* newObj = m_addObjectCallback("builtin:cube");
-                    if (newObj) {
-                        m_selectedObjectId = static_cast<int>(newObj->id);
-                        if (m_dirtyCallback)
-                            m_dirtyCallback();
-                    }
-                }
-            }
-            ImGui::EndPopup();
-        }
 
         ImGui::Separator();
 
