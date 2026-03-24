@@ -1,4 +1,4 @@
-add_library(showcase_engine STATIC
+add_library(ShowcaseEngine STATIC
     # Core
     src/core/Log.cpp
     src/core/Platform.cpp
@@ -30,13 +30,13 @@ add_library(showcase_engine STATIC
     src/graphics/OffscreenTarget.cpp
 )
 
-add_library(ShowcaseEngine::Core ALIAS showcase_engine)
+add_library(ShowcaseEngine::Core ALIAS ShowcaseEngine)
 
-target_include_directories(showcase_engine PUBLIC
+target_include_directories(ShowcaseEngine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(showcase_engine
+target_link_libraries(ShowcaseEngine
     PUBLIC
         d3d12
         dxgi
@@ -51,10 +51,10 @@ target_link_libraries(showcase_engine
         nlohmann_json::nlohmann_json
 )
 
-target_compile_features(showcase_engine PUBLIC cxx_std_20)
+target_compile_features(ShowcaseEngine PUBLIC cxx_std_20)
 
 # Precompiled headers
-target_precompile_headers(showcase_engine PRIVATE
+target_precompile_headers(ShowcaseEngine PRIVATE
     # Windows / COM
     <wrl/client.h>
 
@@ -77,10 +77,10 @@ target_precompile_headers(showcase_engine PRIVATE
 )
 
 # Enable Unicode for Win32
-target_compile_definitions(showcase_engine PUBLIC UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_compile_definitions(ShowcaseEngine PUBLIC UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 
 # Compile shaders
-target_compile_shaders(showcase_engine
+target_compile_shaders(ShowcaseEngine
     VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh_vs.hlsl
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh_ps.hlsl
 )

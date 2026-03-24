@@ -16,6 +16,7 @@ This document defines the coding convention for the ShowcaseEngine project. All 
 | Compile-time constants | `k` + PascalCase | `kMaxObjects`, `kBufferCount` |
 | Enum values | PascalCase | `FillMode::Wireframe` |
 | Namespace | lowercase | `showcase` |
+| CMake targets | PascalCase | `ShowcaseEngine`, `ShowcaseEditor` |
 | Files | PascalCase, matching primary type | `Camera.h` / `Camera.cpp` |
 
 ## 2. Formatting
