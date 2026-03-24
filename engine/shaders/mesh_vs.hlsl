@@ -20,9 +20,7 @@ struct VSInput
 struct VSOutput
 {
     float4 position : SV_POSITION;
-    float3 worldNorm : NORMAL;
-    float3 worldPos : TEXCOORD0;
-    float2 texCoord : TEXCOORD1;
+    float2 texCoord : TEXCOORD0;
 };
 
 VSOutput main(VSInput input)
@@ -31,8 +29,6 @@ VSOutput main(VSInput input)
 
     float4 worldPos = mul(float4(input.position, 1.0), world);
     output.position = mul(worldPos, viewProjection);
-    output.worldPos = worldPos.xyz;
-    output.worldNorm = normalize(mul(input.normal, (float3x3)world));
     output.texCoord = input.texCoord;
 
     return output;
