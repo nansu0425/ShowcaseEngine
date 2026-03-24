@@ -1,7 +1,7 @@
 #include <showcase/core/Window.h>
 
-#include <showcase/core/Log.h>
 #include <showcase/core/JsonDocument.h>
+#include <showcase/core/Log.h>
 
 // Forward declaration for ImGui Win32 handler
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -44,18 +44,9 @@ bool Window::Init(const WindowDesc& desc) {
     RECT windowRect = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
     AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
-    m_hwnd = CreateWindowExW(
-        0,
-        wc.lpszClassName,
-        desc.title.c_str(),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        windowRect.right - windowRect.left,
-        windowRect.bottom - windowRect.top,
-        nullptr, nullptr,
-        wc.hInstance,
-        this
-    );
+    m_hwnd = CreateWindowExW(0, wc.lpszClassName, desc.title.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                             windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, nullptr, nullptr,
+                             wc.hInstance, this);
 
     if (!m_hwnd) {
         SE_LOG_ERROR("Failed to create window");
@@ -82,13 +73,65 @@ void Window::SetTitle(const char* title) {
     }
 }
 
+// ── Fullscreen toggle ─────────────────────────────────────────────
+void Window::ToggleFullscreen() {
+    if (!m_hwnd)
+        return;
+
+    if (!m_fullscreen) {
+        m_savedStyle = GetWindowLongPtr(m_hwnd, GWL_STYLE);
+        m_savedPlacement.length = sizeof(WINDOWPLACEMENT);
+        GetWindowPlacement(m_hwnd, &m_savedPlacement);
+
+        SetWindowLongPtr(m_hwnd, GWL_STYLE, m_savedStyle & ~(WS_CAPTION | WS_THICKFRAME));
+
+        MONITORINFO mi = {sizeof(mi)};
+        if (!GetMonitorInfo(MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+            SetWindowLongPtr(m_hwnd, GWL_STYLE, m_savedStyle);
+            SE_LOG_ERROR("Failed to get monitor info for fullscreen");
+            return;
+        }
+        SetWindowPos(m_hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left,
+                     mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_FRAMECHANGED);
+
+        m_fullscreen = true;
+        SE_LOG_INFO("Entered fullscreen");
+    } else {
+        SetWindowLongPtr(m_hwnd, GWL_STYLE, m_savedStyle);
+        SetWindowPlacement(m_hwnd, &m_savedPlacement);
+        SetWindowPos(m_hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+        m_fullscreen = false;
+        SE_LOG_INFO("Exited fullscreen");
+    }
+}
+
 // ── State persistence ─────────────────────────────────────────────
 void Window::SavePlacement() const {
-    if (!m_hwnd) return;
+    if (!m_hwnd)
+        return;
+
+    // If fullscreen, save the windowed placement we stored before entering fullscreen
+    if (m_fullscreen) {
+        JsonDocument doc;
+        doc["showCmd"].Set(static_cast<int>(m_savedPlacement.showCmd));
+        JsonNode np = doc["normalPosition"];
+        np["left"].Set(static_cast<long>(m_savedPlacement.rcNormalPosition.left));
+        np["top"].Set(static_cast<long>(m_savedPlacement.rcNormalPosition.top));
+        np["right"].Set(static_cast<long>(m_savedPlacement.rcNormalPosition.right));
+        np["bottom"].Set(static_cast<long>(m_savedPlacement.rcNormalPosition.bottom));
+        doc["fullscreen"].Set(true);
+
+        if (doc.SaveToFile(GetConfigPath())) {
+            SE_LOG_INFO("Window placement saved (from pre-fullscreen state)");
+        }
+        return;
+    }
 
     WINDOWPLACEMENT wp = {};
     wp.length = sizeof(WINDOWPLACEMENT);
-    if (!GetWindowPlacement(m_hwnd, &wp)) return;
+    if (!GetWindowPlacement(m_hwnd, &wp))
+        return;
 
     JsonDocument doc;
     doc["showCmd"].Set(static_cast<int>(wp.showCmd));
@@ -97,6 +140,7 @@ void Window::SavePlacement() const {
     np["top"].Set(static_cast<long>(wp.rcNormalPosition.top));
     np["right"].Set(static_cast<long>(wp.rcNormalPosition.right));
     np["bottom"].Set(static_cast<long>(wp.rcNormalPosition.bottom));
+    doc["fullscreen"].Set(false);
 
     if (doc.SaveToFile(GetConfigPath())) {
         SE_LOG_INFO("Window placement saved");
@@ -104,7 +148,8 @@ void Window::SavePlacement() const {
 }
 
 void Window::RestorePlacement() {
-    if (!m_hwnd) return;
+    if (!m_hwnd)
+        return;
 
     JsonDocument doc;
     if (!doc.LoadFromFile(GetConfigPath())) {
@@ -115,14 +160,18 @@ void Window::RestorePlacement() {
     wp.length = sizeof(WINDOWPLACEMENT);
 
     auto np = doc["normalPosition"];
-    wp.rcNormalPosition.left   = np["left"].GetLong();
-    wp.rcNormalPosition.top    = np["top"].GetLong();
-    wp.rcNormalPosition.right  = np["right"].GetLong();
+    wp.rcNormalPosition.left = np["left"].GetLong();
+    wp.rcNormalPosition.top = np["top"].GetLong();
+    wp.rcNormalPosition.right = np["right"].GetLong();
     wp.rcNormalPosition.bottom = np["bottom"].GetLong();
     wp.showCmd = static_cast<UINT>(doc["showCmd"].GetInt());
 
     SetWindowPlacement(m_hwnd, &wp);
     SE_LOG_INFO("Window placement restored");
+
+    if (doc["fullscreen"].GetBool()) {
+        ToggleFullscreen();
+    }
 }
 
 // ── Message processing ────────────────────────────────────────────

@@ -53,6 +53,7 @@ constexpr int kControl = 0x11; // VK_CONTROL
 constexpr int kAlt = 0x12;     // VK_MENU
 constexpr int kDelete = 0x2E;  // VK_DELETE
 constexpr int kF5 = 0x74;      // VK_F5
+constexpr int kF11 = 0x7A;     // VK_F11
 } // namespace Key
 
 } // namespace showcase

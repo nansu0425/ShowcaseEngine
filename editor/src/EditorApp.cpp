@@ -531,6 +531,11 @@ int EditorApp::Run() {
 
         float dt = m_timer.DeltaTime();
 
+        // F11 to toggle fullscreen (works in both Edit and Play modes)
+        if (m_input.IsKeyPressed(Key::kF11)) {
+            m_window.ToggleFullscreen();
+        }
+
         if (m_mode == EditorMode::Edit) {
             // F5 to enter play mode
             if (m_input.IsKeyPressed(Key::kF5)) {

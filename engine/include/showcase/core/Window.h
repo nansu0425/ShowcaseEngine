@@ -2,9 +2,9 @@
 
 #include <Windows.h>
 
-#include <string>
-#include <functional>
 #include <cstdint>
+#include <functional>
+#include <string>
 
 namespace showcase {
 
@@ -26,6 +26,8 @@ public:
 
     void SavePlacement() const;
     void RestorePlacement();
+    void ToggleFullscreen();
+    bool IsFullscreen() const { return m_fullscreen; }
 
     [[nodiscard]] bool ProcessMessages();
 
@@ -46,6 +48,9 @@ private:
     uint32_t m_width = 0;
     uint32_t m_height = 0;
     bool m_minimized = false;
+    bool m_fullscreen = false;
+    LONG_PTR m_savedStyle = 0;
+    WINDOWPLACEMENT m_savedPlacement = {};
     ResizeCallback m_resizeCallback;
 };
 
