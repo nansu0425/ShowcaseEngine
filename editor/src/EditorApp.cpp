@@ -1,11 +1,14 @@
 #include <showcase/editor/EditorApp.h>
 
+#include <showcase/core/FileSystem.h>
 #include <showcase/core/JsonDocument.h>
 #include <showcase/core/Log.h>
-#include <showcase/core/Platform.h>
 #include <showcase/core/Profiler.h>
+#include <showcase/editor/NativeDialog.h>
 
 #include <imgui_internal.h>
+
+#include <shellapi.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -18,6 +21,11 @@ std::string GetEditorConfigPath() {
 
 const char* kSceneFileFilter = "Scene Files (*.scene)\0*.scene\0All Files (*.*)\0*.*\0";
 const char* kSceneFileExt = "scene";
+
+bool LaunchProcess(const std::string& exePath) {
+    HINSTANCE result = ShellExecuteA(nullptr, "open", exePath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    return reinterpret_cast<intptr_t>(result) > 32;
+}
 
 } // anonymous namespace
 
@@ -361,11 +369,13 @@ void EditorApp::OpenScene() {
 
     JsonDocument doc;
     if (!doc.LoadFromFile(path)) {
-        ShowErrorMessage(m_window.GetHandle(), "ShowcaseEditor", "Failed to load scene file.");
+        MessageBoxA(static_cast<HWND>(m_window.GetHandle()), "Failed to load scene file.", "ShowcaseEditor",
+                    MB_OK | MB_ICONERROR);
         return;
     }
     if (!m_scene.Deserialize(doc)) {
-        ShowErrorMessage(m_window.GetHandle(), "ShowcaseEditor", "Scene file missing 'objects' array.");
+        MessageBoxA(static_cast<HWND>(m_window.GetHandle()), "Scene file missing 'objects' array.", "ShowcaseEditor",
+                    MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -607,7 +617,7 @@ int EditorApp::Run() {
         m_input.Update(m_window.GetHandle());
 
         if (m_window.IsMinimized()) {
-            SleepMs(10);
+            Sleep(10);
             continue;
         }
 

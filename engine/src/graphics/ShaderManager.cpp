@@ -1,7 +1,7 @@
 #include <showcase/graphics/ShaderManager.h>
 
+#include <showcase/core/FileSystem.h>
 #include <showcase/core/Log.h>
-#include <showcase/core/Platform.h>
 #include <showcase/core/Profiler.h>
 
 #include <fstream>

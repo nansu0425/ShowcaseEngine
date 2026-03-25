@@ -1,7 +1,7 @@
 #include <showcase/editor/ImGuiLayer.h>
 
+#include <showcase/core/FileSystem.h>
 #include <showcase/core/Log.h>
-#include <showcase/core/Platform.h>
 #include <showcase/core/Profiler.h>
 #include <showcase/graphics/CommandList.h>
 #include <showcase/graphics/RenderContext.h>

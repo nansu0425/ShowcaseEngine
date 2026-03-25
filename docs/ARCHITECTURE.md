@@ -43,7 +43,7 @@ The project is split into two CMake targets with a strict dependency direction:
 
 **Key principles:**
 - The engine has **zero ImGui dependency**. All UI lives in the editor.
-- **Dependency policy:** The editor depends only on **ImGui/ImGuizmo** (external) and **engine public API**. All other external libraries (spdlog, tinygltf, D3D12MA, etc.) and D3D12 APIs are owned by the engine, which exposes abstractions for editor use (e.g., `LogListener` for log capture, `Platform.h` for OS utilities, `Key::` constants for input). Win32 APIs may be used directly in the editor where needed — the editor is a Windows-native application and the engine–editor boundary exists to keep the engine ImGui-free, not to abstract the OS from the editor.
+- **Dependency policy:** The editor depends only on **ImGui/ImGuizmo** (external) and **engine public API**. All other external libraries (spdlog, tinygltf, D3D12MA, etc.) and D3D12 APIs are owned by the engine, which exposes abstractions for editor use (e.g., `LogListener` for log capture, `FileSystem.h` for OS path utilities, `Key::` constants for input). Win32 APIs may be used directly in the editor where needed — the editor is a Windows-native application and the engine–editor boundary exists to keep the engine ImGui-free, not to abstract the OS from the editor.
 - **Accepted boundary exceptions:** `ImGuiLayer` is the designated platform integration point where ImGui backends (`imgui_impl_dx12`) necessarily touch D3D12 types.
 - **Entry point:** `editor/src/Main.cpp` contains the `WinMain` entry point directly.
 
@@ -61,7 +61,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Timer` | `Timer.h` | Frame delta time and FPS calculation |
 | `Log` | `Log.h` | spdlog wrapper with `SE_LOG_*` macros |
 | `LogListener` | `LogListener.h` | Abstract log listener interface (`LogLevel`, `LogMessage`) for non-spdlog consumers |
-| `Platform` | `Platform.h` | OS utilities (`GetExecutableDir()`, `SleepMs()`, `ShowErrorDialog()`, `OpenFileDialog()`, `SaveFileDialog()`, `LaunchProcess()`) |
+| `FileSystem` | `FileSystem.h` | Path utility (`GetExecutableDir()`) |
 | `Profiler` | `Profiler.h` | Tracy wrapper macros (`SE_ZONE_SCOPED`, `SE_FRAME_MARK`, etc.); no-op when Tracy is disabled |
 
 ### 2.2 Graphics Module — `engine/include/showcase/graphics/`
@@ -116,6 +116,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `ImGuiLayer` | `ImGuiLayer.h` | ImGui context init, DX12 backend, frame begin/end |
 | `Console` | `Console.h` | Log viewer (via `LogListener`), command system, circular buffer (2048 entries) |
 | `EditorController` | `EditorController.h` | Object picking, ImGuizmo gizmos (W/E/R), Scene Hierarchy + Inspector panels (component-based UI) |
+| `NativeDialog` | `NativeDialog.h` | Win32 native dialogs: confirm (yes/no/cancel), file open/save |
 
 ---
 

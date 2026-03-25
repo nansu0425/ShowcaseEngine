@@ -1,7 +1,7 @@
 add_library(ShowcaseEngine STATIC
     # Core
     src/core/Log.cpp
-    src/core/Platform.cpp
+    src/core/FileSystem.cpp
     src/core/Window.cpp
     src/core/Timer.cpp
     src/core/Input.cpp

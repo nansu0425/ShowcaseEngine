@@ -1,25 +1,11 @@
-#include <showcase/core/Platform.h>
+#include <showcase/editor/NativeDialog.h>
 
-#include <commdlg.h>
-#include <shellapi.h>
+// clang-format off
 #include <Windows.h>
+#include <commdlg.h>
+// clang-format on
 
 namespace showcase {
-
-std::string GetExecutableDir() {
-    char path[MAX_PATH];
-    GetModuleFileNameA(nullptr, path, MAX_PATH);
-    std::string exePath(path);
-    return exePath.substr(0, exePath.find_last_of("\\/") + 1);
-}
-
-void SleepMs(uint32_t ms) {
-    Sleep(static_cast<DWORD>(ms));
-}
-
-void ShowErrorDialog(const wchar_t* title, const wchar_t* message) {
-    MessageBoxW(nullptr, message, title, MB_OK | MB_ICONERROR);
-}
 
 DialogResult ShowConfirmDialog(void* ownerHwnd, const char* title, const char* message) {
     int result = MessageBoxA(static_cast<HWND>(ownerHwnd), message, title, MB_YESNOCANCEL | MB_ICONQUESTION);
@@ -28,10 +14,6 @@ DialogResult ShowConfirmDialog(void* ownerHwnd, const char* title, const char* m
     if (result == IDNO)
         return DialogResult::No;
     return DialogResult::Cancel;
-}
-
-void ShowErrorMessage(void* ownerHwnd, const char* title, const char* message) {
-    MessageBoxA(static_cast<HWND>(ownerHwnd), message, title, MB_OK | MB_ICONERROR);
 }
 
 std::string OpenFileDialog(void* ownerHwnd, const char* filter, const char* defaultExt) {
@@ -66,11 +48,6 @@ std::string SaveFileDialog(void* ownerHwnd, const char* filter, const char* defa
         return std::string(filePath);
     }
     return {};
-}
-
-bool LaunchProcess(const std::string& exePath) {
-    HINSTANCE result = ShellExecuteA(nullptr, "open", exePath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-    return reinterpret_cast<intptr_t>(result) > 32;
 }
 
 } // namespace showcase
