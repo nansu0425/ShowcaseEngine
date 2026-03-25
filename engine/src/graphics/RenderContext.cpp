@@ -7,6 +7,7 @@ namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
 bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
+    SE_ZONE_SCOPED;
 #ifdef _DEBUG
     bool enableDebug = true;
 #else
@@ -44,6 +45,7 @@ bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
 }
 
 void RenderContext::Shutdown() {
+    SE_ZONE_SCOPED;
     m_directQueue.Flush();
     m_depthBuffer.Shutdown(m_srvHeap);
     m_shaderManager.Clear();
@@ -57,12 +59,12 @@ void RenderContext::Shutdown() {
 
 // ── Frame management ─────────────────────────────────────────────────
 void RenderContext::BeginFrame() {
-    SE_ZONE_SCOPED;
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
 
     m_currentFrameIndex = m_swapChain.GetCurrentBackBufferIndex();
 
     {
-        SE_ZONE_SCOPED_N("WaitForFenceValue");
+        SE_ZONE_SCOPED_NC("WaitForFenceValue", profile::kColorGPUSync);
         // Wait for this frame's resources to be available
         uint64_t fenceValue = m_frameResource.GetFenceValue(m_currentFrameIndex);
         m_directQueue.WaitForFenceValue(fenceValue);
@@ -79,7 +81,7 @@ void RenderContext::BeginFrame() {
 }
 
 void RenderContext::EndFrame() {
-    SE_ZONE_SCOPED;
+    SE_ZONE_SCOPED_C(profile::kColorGPUSync);
     m_commandList.Close();
 
     // Execute and present

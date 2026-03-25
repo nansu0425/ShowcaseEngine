@@ -9,6 +9,7 @@
 namespace showcase {
 
 void AssetManager::Init(RenderContext& ctx, SceneRenderer& sceneRenderer) {
+    SE_ZONE_SCOPED;
     m_ctx = &ctx;
 
     // Create builtin cube model
@@ -27,7 +28,8 @@ void AssetManager::Shutdown() {
 }
 
 Model* AssetManager::LoadModel(const std::string& source) {
-    SE_ZONE_SCOPED;
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
+    SE_ZONE_TEXT(source.c_str(), source.size());
     // Check if already loaded
     auto it = m_models.find(source);
     if (it != m_models.end()) {

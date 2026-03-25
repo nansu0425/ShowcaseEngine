@@ -1,6 +1,7 @@
 #include <showcase/graphics/Model.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 #include <showcase/graphics/RenderContext.h>
 
 #define TINYGLTF_IMPLEMENTATION
@@ -210,6 +211,8 @@ static BoundingBox ComputeLocalAABB(const std::vector<ModelVertex>& vertices) {
 
 // ── glTF loading ─────────────────────────────────────────────────────
 bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Model& outModel) {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
+    SE_ZONE_TEXT(filepath.c_str(), filepath.size());
     auto* device = ctx.GetDevice().GetDevice();
     auto* allocator = ctx.GetDevice().GetAllocator();
     tinygltf::Model gltfModel;

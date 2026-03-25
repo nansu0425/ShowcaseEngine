@@ -2,6 +2,7 @@
 
 #include <showcase/core/Log.h>
 #include <showcase/core/Platform.h>
+#include <showcase/core/Profiler.h>
 
 #include <fstream>
 
@@ -9,6 +10,8 @@ namespace showcase {
 
 // ── Shader loading ───────────────────────────────────────────────────
 D3D12_SHADER_BYTECODE ShaderManager::LoadShader(const std::string& path) {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
+    SE_ZONE_TEXT(path.c_str(), path.size());
     // Check cache
     auto it = m_shaderCache.find(path);
     if (it != m_shaderCache.end()) {

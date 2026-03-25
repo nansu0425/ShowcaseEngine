@@ -1,13 +1,15 @@
 #include <showcase/graphics/SwapChain.h>
 
-#include <showcase/graphics/CommandQueue.h>
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
+#include <showcase/graphics/CommandQueue.h>
 
 namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
-bool SwapChain::Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue& commandQueue,
-                      HWND hwnd, uint32_t width, uint32_t height) {
+bool SwapChain::Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue& commandQueue, HWND hwnd,
+                     uint32_t width, uint32_t height) {
+    SE_ZONE_SCOPED;
     // Create RTV descriptor heap
     if (!m_rtvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kBufferCount, false)) {
         return false;
@@ -28,8 +30,8 @@ bool SwapChain::Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue&
     swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
     ComPtr<IDXGISwapChain1> swapChain1;
-    if (FAILED(factory->CreateSwapChainForHwnd(
-            commandQueue.GetQueue(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain1))) {
+    if (FAILED(factory->CreateSwapChainForHwnd(commandQueue.GetQueue(), hwnd, &swapChainDesc, nullptr, nullptr,
+                                               &swapChain1))) {
         SE_LOG_ERROR("Failed to create swap chain");
         return false;
     }
@@ -54,13 +56,15 @@ void SwapChain::Shutdown() {
 
 // ── Present / Resize ─────────────────────────────────────────────────
 void SwapChain::Present(bool vsync) {
+    SE_ZONE_SCOPED_C(profile::kColorGPUSync);
     UINT syncInterval = vsync ? 1 : 0;
     UINT flags = vsync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
     m_swapChain->Present(syncInterval, flags);
 }
 
 void SwapChain::Resize(ID3D12Device* device, uint32_t width, uint32_t height) {
-    if (width == 0 || height == 0) return;
+    if (width == 0 || height == 0)
+        return;
 
     for (auto& buffer : m_backBuffers) {
         buffer.Reset();
@@ -92,8 +96,7 @@ void SwapChain::CreateRenderTargetViews(ID3D12Device* device) {
         rtvDesc.Format = m_format;
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
-        device->CreateRenderTargetView(m_backBuffers[i].Get(), &rtvDesc,
-                                       m_rtvHeap.GetHandle(i).cpu);
+        device->CreateRenderTargetView(m_backBuffers[i].Get(), &rtvDesc, m_rtvHeap.GetHandle(i).cpu);
     }
 }
 

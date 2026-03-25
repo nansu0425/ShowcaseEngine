@@ -7,6 +7,7 @@ namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
 bool CommandQueue::Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type) {
+    SE_ZONE_SCOPED;
     D3D12_COMMAND_QUEUE_DESC desc = {};
     desc.Type = type;
     desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
@@ -45,7 +46,7 @@ void CommandQueue::Shutdown() {
 
 // ── Execution ────────────────────────────────────────────────────────
 uint64_t CommandQueue::ExecuteCommandList(ID3D12CommandList* commandList) {
-    SE_ZONE_SCOPED;
+    SE_ZONE_SCOPED_C(profile::kColorGPUSync);
     m_queue->ExecuteCommandLists(1, &commandList);
     return Signal();
 }
@@ -58,7 +59,7 @@ uint64_t CommandQueue::Signal() {
 
 // ── Synchronization ─────────────────────────────────────────────────
 void CommandQueue::WaitForFenceValue(uint64_t fenceValue) {
-    SE_ZONE_SCOPED;
+    SE_ZONE_SCOPED_C(profile::kColorGPUSync);
     if (!IsFenceComplete(fenceValue)) {
         m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent);
         WaitForSingleObject(m_fenceEvent, INFINITE);
@@ -66,6 +67,7 @@ void CommandQueue::WaitForFenceValue(uint64_t fenceValue) {
 }
 
 void CommandQueue::Flush() {
+    SE_ZONE_SCOPED_C(profile::kColorGPUSync);
     WaitForFenceValue(Signal());
 }
 

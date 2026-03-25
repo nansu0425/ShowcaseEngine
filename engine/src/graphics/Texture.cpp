@@ -1,14 +1,15 @@
 #include <showcase/graphics/Texture.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 
 namespace showcase {
 
 // ── Init ─────────────────────────────────────────────────────────────
-bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                              ID3D12GraphicsCommandList* cmdList, DescriptorHeap& srvHeap,
-                              const uint8_t* data, uint32_t width, uint32_t height,
-                              uint32_t channels, DXGI_FORMAT format) {
+bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator, ID3D12GraphicsCommandList* cmdList,
+                             DescriptorHeap& srvHeap, const uint8_t* data, uint32_t width, uint32_t height,
+                             uint32_t channels, DXGI_FORMAT format) {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     m_width = width;
     m_height = height;
 
@@ -29,8 +30,8 @@ bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator
 
     const uint32_t bytesPerPixel = channels;
     const uint32_t rowPitch = width * bytesPerPixel;
-    const uint32_t alignedRowPitch = (rowPitch + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
-                                     & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
+    const uint32_t alignedRowPitch =
+        (rowPitch + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
 
     // Create default heap texture resource
     D3D12_RESOURCE_DESC texDesc = {};
@@ -47,12 +48,8 @@ bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator
     D3D12MA::ALLOCATION_DESC allocDesc = {};
     allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 
-    HRESULT hr = allocator->CreateResource(
-        &allocDesc, &texDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr,
-        &m_allocation,
-        IID_PPV_ARGS(&m_resource));
+    HRESULT hr = allocator->CreateResource(&allocDesc, &texDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &m_allocation,
+                                           IID_PPV_ARGS(&m_resource));
 
     if (FAILED(hr)) {
         SE_LOG_ERROR("Failed to create texture resource ({}x{})", width, height);
@@ -75,12 +72,8 @@ bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator
     D3D12MA::ALLOCATION_DESC uploadAllocDesc = {};
     uploadAllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
 
-    hr = allocator->CreateResource(
-        &uploadAllocDesc, &uploadDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        &m_uploadAllocation,
-        IID_PPV_ARGS(&m_uploadResource));
+    hr = allocator->CreateResource(&uploadAllocDesc, &uploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+                                   &m_uploadAllocation, IID_PPV_ARGS(&m_uploadResource));
 
     if (FAILED(hr)) {
         SE_LOG_ERROR("Failed to create texture upload buffer");
@@ -122,8 +115,8 @@ bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = m_resource.Get();
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-                                  | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     cmdList->ResourceBarrier(1, &barrier);
 

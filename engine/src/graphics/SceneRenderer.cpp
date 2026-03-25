@@ -157,6 +157,7 @@ int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, cons
 // ── Init / Shutdown ──────────────────────────────────────────────────
 
 void SceneRenderer::Init(RenderContext& ctx) {
+    SE_ZONE_SCOPED;
     auto* device = ctx.GetDevice().GetDevice();
     auto* allocator = ctx.GetDevice().GetAllocator();
 
@@ -246,7 +247,8 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
 // ── Render ───────────────────────────────────────────────────────────
 
 void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId) {
-    SE_ZONE_SCOPED;
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+    SE_PLOT("Scene Objects", static_cast<int64_t>(scene.GetObjects().size()));
     auto* cmdList = ctx.GetCommandList().Get();
 
     cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
@@ -312,6 +314,8 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
             }
         }
     }
+
+    SE_PLOT("Draw Calls", static_cast<int64_t>(objectIndex));
 }
 
 } // namespace showcase

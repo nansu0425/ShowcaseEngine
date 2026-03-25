@@ -1,6 +1,7 @@
 #include <showcase/graphics/Device.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 
 #include <stdexcept>
 
@@ -8,6 +9,7 @@ namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
 bool Device::Init(bool enableDebugLayer) {
+    SE_ZONE_SCOPED;
     UINT dxgiFactoryFlags = 0;
 
     // Enable debug layer
@@ -28,17 +30,16 @@ bool Device::Init(bool enableDebugLayer) {
 
     // Find best adapter (prefer discrete GPU)
     ComPtr<IDXGIAdapter1> adapter;
-    for (UINT i = 0;
-         m_factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-                                                IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND;
+    for (UINT i = 0; m_factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+                                                           IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND;
          ++i) {
         DXGI_ADAPTER_DESC1 desc;
         adapter->GetDesc1(&desc);
 
-        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) continue;
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            continue;
 
-        if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0,
-                                         IID_PPV_ARGS(&m_device)))) {
+        if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&m_device)))) {
             adapter.As(&m_adapter);
 
             char adapterName[256];
@@ -60,9 +61,7 @@ bool Device::Init(bool enableDebugLayer) {
             m_infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
             m_infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
 
-            D3D12_MESSAGE_SEVERITY suppressSeverities[] = {
-                D3D12_MESSAGE_SEVERITY_INFO
-            };
+            D3D12_MESSAGE_SEVERITY suppressSeverities[] = {D3D12_MESSAGE_SEVERITY_INFO};
             D3D12_INFO_QUEUE_FILTER filter = {};
             filter.DenyList.NumSeverities = _countof(suppressSeverities);
             filter.DenyList.pSeverityList = suppressSeverities;
