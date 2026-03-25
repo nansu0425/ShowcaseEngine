@@ -444,3 +444,114 @@ float PristineGrid(float2 coord, float2 uvDeriv, float2 lineWidth)
     ...
 }
 ```
+
+## 15. Profiling (Tracy)
+
+All profiling goes through the macros in `<showcase/core/Profiler.h>`. Never call Tracy functions directly.
+
+### 15.1 Zone Placement Criteria
+
+Place zones at **architecture boundaries**, not individual functions. The question is "should this stage be visible in the frame timeline?" — not "might this function be slow?"
+
+**Where to place zones (4 categories):**
+
+| Category | Criterion | Examples |
+|----------|----------|---------|
+| Frame pipeline stages | Functions that appear in the ARCHITECTURE.md frame workflow | `BeginFrame`, `Render`, `EndFrame` |
+| CPU-GPU synchronization | Points where CPU waits for GPU or submits GPU work | `WaitForFenceValue`, `Present`, `ExecuteCommandList`, `Flush` |
+| I/O and resource creation | File reads, GPU buffer/texture creation, scene serialization | `LoadModel`, `LoadGLTF`, `InitFromFile`, `Deserialize` |
+| Init / Shutdown | `Init()` / `Shutdown()` pattern functions (runs once, but startup time matters) | `RenderContext::Init`, `SceneRenderer::Init` |
+
+**Where NOT to place zones:**
+
+- Trivial getter/setter — zone overhead (~50ns) may exceed the function itself
+- Per-primitive functions inside draw loops — 64 objects × 6 primitives = 384 calls/frame, adds noise only
+- Individual ImGui panel rendering — one zone for the entire ImGui stage is sufficient
+- Utility / math functions — `GetExecutableDir`, `ToRadians`, etc.
+- One-line wrapper functions that only call an already-instrumented parent
+
+### 15.2 Macro Placement
+
+Place the zone macro on the **first line** of the function body, before any early return:
+
+```cpp
+void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+    if (scene.GetObjects().empty())
+        return;
+    // ...
+}
+```
+
+For sub-blocks within a function, use a `{}` scope with `SE_ZONE_SCOPED_NC`:
+
+```cpp
+{
+    SE_ZONE_SCOPED_NC("WaitForFenceValue", profile::kColorGPUSync);
+    m_directQueue.WaitForFenceValue(fenceValue);
+}
+```
+
+Rationale: Tracy zones are RAII. First-line placement measures the full function time including early returns. If a fast path is invisible in Tracy, it causes confusion ("why wasn't this function called?").
+
+### 15.3 Zone Names and Colors
+
+**Names:**
+
+- Whole function → `SE_ZONE_SCOPED` or `SE_ZONE_SCOPED_C(color)` — uses `__FUNCTION__` automatically
+- Sub-block within a function → `SE_ZONE_SCOPED_N("Name")` or `SE_ZONE_SCOPED_NC("Name", color)` — PascalCase, `"VerbNoun"` form, max 40 characters
+
+**Colors:** Use the subsystem color constants from `showcase::profile`. When unsure, use colorless (`SE_ZONE_SCOPED`) — Tracy applies its default color.
+
+| Subsystem | Color constant | Usage |
+|-----------|---------------|-------|
+| Update | `kColorUpdate` (purple) | Input, camera, game logic, picking |
+| Rendering | `kColorRendering` (red) | Scene rendering, render target transitions |
+| GPU Sync | `kColorGPUSync` (orange) | Fence waits, command submission, Present |
+| ImGui | `kColorImGui` (blue) | ImGui frame, editor UI as a whole |
+| Asset I/O | `kColorAssetIO` (green) | Model/texture loading, scene serialization |
+
+### 15.4 SE_FRAME_MARK
+
+- Exactly **once per frame**, at the end of the `EditorApp::Run()` main loop
+- Same location for both Play mode and Edit mode
+- Never add additional calls — multiple calls per frame distort Tracy's frame time graph
+
+### 15.5 SE_PLOT
+
+Display per-frame numeric data as graphs above the Tracy timeline.
+
+| Plot name | Value | Location |
+|-----------|-------|----------|
+| `"Frame Time (ms)"` | `deltaTime * 1000.0f` | Main loop, right after `Timer::Tick()` |
+| `"Draw Calls"` | Number of `DrawIndexedInstanced` calls in the frame | End of `SceneRenderer::Render()` |
+| `"Scene Objects"` | `scene.GetObjects().size()` | Start of `SceneRenderer::Render()` |
+
+Naming convention: `"Title Case Name (unit)"` — include units in parentheses when applicable.
+
+### 15.6 SE_MESSAGE
+
+Mark **discrete, non-recurring events** on the Tracy timeline. Used to visually correlate frame time spikes with specific events.
+
+Target events:
+
+- Mode transitions: `SE_MESSAGE_L("Entered Play mode")` / `"Exited Play mode"`
+- Scene operations: `SE_MESSAGE_L("Scene loaded")`, `"Scene saved"`, `"New scene created"`
+- Resize: `SE_MESSAGE_L("Window resized")`, `"Viewport resized"`
+- Asset loading completion: `SE_MESSAGE_L("Model loaded")`
+
+For per-frame recurring data, use `SE_PLOT` instead of `SE_MESSAGE`.
+
+### 15.7 SE_ZONE_TEXT
+
+Attach dynamic context (e.g., file paths) to I/O-related zones:
+
+```cpp
+Model* AssetManager::LoadModel(const std::string& source) {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
+    SE_ZONE_TEXT(source.c_str(), source.size());
+    // ...
+}
+```
+
+Clicking the zone in Tracy reveals which file was being loaded.
