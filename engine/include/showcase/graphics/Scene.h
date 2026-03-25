@@ -10,8 +10,9 @@
 namespace showcase {
 
 struct ModelComponent {
-    std::string modelSource; // e.g. "builtin:cube", "file:assets/models/duck.glb"
-    Model* model = nullptr;  // non-owning, resolved at runtime
+    std::string modelSource;          // e.g. "builtin:cube", "file:assets/models/duck.glb"
+    Model* model = nullptr;           // non-owning, resolved at runtime
+    std::optional<Vector4> baseColor; // instance-level material override
 };
 
 struct SceneObject {

@@ -245,6 +245,29 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         }
                         ImGui::EndCombo();
                     }
+                    // ── Material ──
+                    ImGui::Spacing();
+                    ImGui::SeparatorText("Material");
+
+                    bool hasOverride = selected->modelComp->baseColor.has_value();
+                    if (ImGui::Checkbox("Base Color Override", &hasOverride)) {
+                        if (hasOverride) {
+                            selected->modelComp->baseColor = Vector4(0.7f, 0.7f, 0.7f, 1.0f);
+                        } else {
+                            selected->modelComp->baseColor = std::nullopt;
+                        }
+                        if (m_dirtyCallback)
+                            m_dirtyCallback();
+                    }
+                    if (selected->modelComp->baseColor.has_value()) {
+                        float color[3] = {selected->modelComp->baseColor->x, selected->modelComp->baseColor->y,
+                                          selected->modelComp->baseColor->z};
+                        if (ImGui::ColorEdit3("Color", color)) {
+                            selected->modelComp->baseColor = Vector4(color[0], color[1], color[2], 1.0f);
+                            if (m_dirtyCallback)
+                                m_dirtyCallback();
+                        }
+                    }
                 }
 
                 // Remove component if header close button was clicked

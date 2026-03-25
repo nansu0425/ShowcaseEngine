@@ -20,6 +20,8 @@ public:
     Model* LoadModel(const std::string& source);
     Model* GetModel(const std::string& source) const;
     Model* GetBuiltinCube() const;
+    Model* GetBuiltinPlane() const;
+    Model* GetBuiltinSphere() const;
 
     std::vector<std::string> GetAvailableSources() const;
 
@@ -27,6 +29,8 @@ private:
     RenderContext* m_ctx = nullptr;
     std::unordered_map<std::string, std::unique_ptr<Model>> m_models;
     Model* m_builtinCube = nullptr;
+    Model* m_builtinPlane = nullptr;
+    Model* m_builtinSphere = nullptr;
 };
 
 } // namespace showcase

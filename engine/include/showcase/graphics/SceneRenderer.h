@@ -27,6 +27,8 @@ public:
 
     // Procedural geometry helpers
     void CreateCubeModel(RenderContext& ctx, Model& outModel);
+    void CreatePlaneModel(RenderContext& ctx, Model& outModel);
+    void CreateSphereModel(RenderContext& ctx, Model& outModel);
 
     Texture& GetDefaultWhiteTexture() { return m_defaultWhiteTex; }
 

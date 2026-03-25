@@ -103,7 +103,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Model` | `Model.h` | Meshes with shared materials/textures, local AABB; glTF loading via `ModelLoader` |
 | `Material` | `Model.h` | Base color factor + optional `shared_ptr<Texture>` for base color texture |
 | `AssetManager` | `AssetManager.h` | Central ownership of all `Model` instances (builtin + file-loaded); deduplicates by source key |
-| `ModelComponent` | `Scene.h` | Optional component: `modelSource` string + resolved `Model*` pointer |
+| `ModelComponent` | `Scene.h` | Optional component: `modelSource` string, resolved `Model*` pointer, and optional `baseColor` material override |
 | `Scene` | `Scene.h` | Flat collection of `SceneObject` with auto-incrementing IDs |
 | `SceneRenderer` | `SceneRenderer.h` | Root signature, PSO, constant buffers, draw loop, object picking |
 
@@ -269,8 +269,9 @@ The engine uses a **flat scene graph** — `Scene` holds a `vector<SceneObject>`
 
 ```cpp
 struct ModelComponent {
-    string modelSource;        // model reference ("builtin:cube", "file:path.gltf")
-    Model* model;              // non-owning pointer, resolved via AssetManager
+    string modelSource;          // model reference ("builtin:cube", "file:path.gltf")
+    Model* model;                // non-owning pointer, resolved via AssetManager
+    optional<Vector4> baseColor; // instance-level material override (replaces Material::baseColorFactor)
 };
 
 struct SceneObject {
@@ -295,9 +296,9 @@ Components use `std::optional` rather than polymorphic base classes — simple, 
 
 Scenes are saved/loaded as `.scene` JSON files. `Scene::Serialize()` / `Scene::Deserialize()` handle object data, while `EditorApp` manages file I/O and injects editor-specific sections:
 
-- **Format version 2**: serializes `name`, `position`, `rotation`, `scale`, and `components.mesh.modelSource` (if mesh component present). Version 1 (legacy) stored `modelSource` at top level and is migrated on load
+- **Format version 3**: serializes `name`, `position`, `rotation`, `scale`, and `components.model` (containing `mesh` and optional `material.baseColor`). Version 2 (legacy `components.mesh.modelSource` + top-level `baseColorOverride`) and version 1 (top-level `modelSource`) are migrated on load
 - **Load** deserializes into `SceneObject` structs with `modelComp->model = nullptr`; the editor resolves `modelSource` strings back to `Model*` pointers via `AssetManager`. Editor camera is restored from the `camera` section if present
-- **Model sources**: `"builtin:cube"` for procedural geometry, `"file:relative/path.gltf"` for glTF assets
+- **Model sources**: `"builtin:cube"`, `"builtin:plane"`, `"builtin:sphere"` for procedural geometry, `"file:relative/path.gltf"` for glTF assets
 - **Editor UI**: File menu bar (New Scene, Open, Save, Save As) with Ctrl+N/O/S/Shift+S shortcuts
 - **Dirty tracking**: `EditorController` notifies `EditorApp` on gizmo/inspector changes; window title shows `*` for unsaved state
 

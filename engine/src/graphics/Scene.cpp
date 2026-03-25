@@ -83,7 +83,7 @@ void Scene::Clear() {
 
 // ── Serialization ───────────────────────────────────────────────────
 void Scene::Serialize(JsonDocument& doc) const {
-    doc["version"].Set(2);
+    doc["version"].Set(3);
 
     auto objects = doc["objects"];
     objects.SetArray();
@@ -96,9 +96,13 @@ void Scene::Serialize(JsonDocument& doc) const {
         node["scale"].SetFloatArray({obj.scale.x, obj.scale.y, obj.scale.z});
 
         if (obj.modelComp.has_value()) {
-            auto components = node["components"];
-            auto mesh = components["mesh"];
-            mesh["modelSource"].Set(obj.modelComp->modelSource);
+            auto model = node["components"]["model"];
+            model["mesh"].Set(obj.modelComp->modelSource);
+
+            if (obj.modelComp->baseColor.has_value()) {
+                const auto& c = *obj.modelComp->baseColor;
+                model["material"]["baseColor"].SetFloatArray({c.x, c.y, c.z, c.w});
+            }
         }
     }
 }
@@ -123,9 +127,29 @@ bool Scene::Deserialize(JsonDocument& doc) {
         obj.id = m_nextId++;
         obj.name = node["name"].GetString();
 
-        // v2: components.mesh.modelSource, v1: top-level modelSource
-        if (version >= 2) {
-            auto components = node["components"];
+        // v3: components.model.mesh + components.model.material
+        // v2: components.mesh.modelSource
+        // v1: top-level modelSource
+        auto components = node["components"];
+        auto modelNode = components["model"];
+
+        if (modelNode.Contains("mesh")) {
+            // v3 format
+            std::string modelSource = modelNode["mesh"].GetString();
+            if (!modelSource.empty()) {
+                obj.modelComp = ModelComponent{modelSource, nullptr};
+            }
+
+            auto matNode = modelNode["material"];
+            if (obj.modelComp.has_value() && matNode.Contains("baseColor")) {
+                auto bc = matNode["baseColor"];
+                if (bc.IsArray() && bc.Size() >= 4) {
+                    obj.modelComp->baseColor =
+                        Vector4(bc[0].GetFloat(), bc[1].GetFloat(), bc[2].GetFloat(), bc[3].GetFloat());
+                }
+            }
+        } else if (version >= 2) {
+            // v2 legacy: components.mesh.modelSource
             auto mesh = components["mesh"];
             if (mesh.Contains("modelSource")) {
                 std::string modelSource = mesh["modelSource"].GetString();
@@ -134,9 +158,19 @@ bool Scene::Deserialize(JsonDocument& doc) {
                 }
             }
         } else {
+            // v1 legacy: top-level modelSource
             std::string modelSource = node["modelSource"].GetString();
             if (!modelSource.empty()) {
                 obj.modelComp = ModelComponent{modelSource, nullptr};
+            }
+        }
+
+        // Legacy fallback: top-level baseColorOverride → ModelComponent::baseColor
+        if (obj.modelComp.has_value() && !obj.modelComp->baseColor.has_value()) {
+            auto colorOverride = node["baseColorOverride"];
+            if (colorOverride.IsArray() && colorOverride.Size() >= 4) {
+                obj.modelComp->baseColor = Vector4(colorOverride[0].GetFloat(), colorOverride[1].GetFloat(),
+                                                   colorOverride[2].GetFloat(), colorOverride[3].GetFloat());
             }
         }
 

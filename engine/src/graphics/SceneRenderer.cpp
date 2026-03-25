@@ -99,6 +99,113 @@ void SceneRenderer::CreateCubeModel(RenderContext& ctx, Model& outModel) {
     outModel.localAABB = BoundingBox(Vector3(0.f, 0.f, 0.f), Vector3(0.5f, 0.5f, 0.5f));
 }
 
+void SceneRenderer::CreatePlaneModel(RenderContext& ctx, Model& outModel) {
+    auto* device = ctx.GetDevice().GetDevice();
+    auto* allocator = ctx.GetDevice().GetAllocator();
+
+    // 1x1 quad in XZ plane, normal +Y, centered at origin
+    ModelVertex vertices[] = {
+        {{-0.5f, 0.0f, 0.5f}, {0, 1, 0}, {0, 0}},
+        {{0.5f, 0.0f, 0.5f}, {0, 1, 0}, {1, 0}},
+        {{0.5f, 0.0f, -0.5f}, {0, 1, 0}, {1, 1}},
+        {{-0.5f, 0.0f, -0.5f}, {0, 1, 0}, {0, 1}},
+    };
+
+    uint32_t indices[] = {0, 1, 2, 0, 2, 3};
+
+    MeshPrimitive prim;
+    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices, sizeof(vertices), sizeof(ModelVertex))) {
+        SE_LOG_ERROR("Failed to create plane vertex buffer");
+        return;
+    }
+    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices, sizeof(indices))) {
+        SE_LOG_ERROR("Failed to create plane index buffer");
+        return;
+    }
+    prim.indexCount = _countof(indices);
+    prim.localAABB = BoundingBox(Vector3(0.f, 0.f, 0.f), Vector3(0.5f, 0.001f, 0.5f));
+
+    Mesh mesh;
+    mesh.name = "Plane";
+    mesh.primitives.push_back(std::move(prim));
+
+    outModel.meshes.push_back(std::move(mesh));
+    outModel.localAABB = BoundingBox(Vector3(0.f, 0.f, 0.f), Vector3(0.5f, 0.001f, 0.5f));
+}
+
+void SceneRenderer::CreateSphereModel(RenderContext& ctx, Model& outModel) {
+    auto* device = ctx.GetDevice().GetDevice();
+    auto* allocator = ctx.GetDevice().GetAllocator();
+
+    const uint32_t sectors = 32;
+    const uint32_t stacks = 16;
+    const float radius = 0.5f;
+
+    std::vector<ModelVertex> vertices;
+    std::vector<uint32_t> indices;
+
+    // Generate vertices
+    for (uint32_t i = 0; i <= stacks; ++i) {
+        float stackAngle = DirectX::XM_PI / 2.0f - DirectX::XM_PI * i / stacks; // from +pi/2 to -pi/2
+        float xy = radius * cosf(stackAngle);
+        float y = radius * sinf(stackAngle);
+
+        for (uint32_t j = 0; j <= sectors; ++j) {
+            float sectorAngle = 2.0f * DirectX::XM_PI * j / sectors;
+            float x = xy * cosf(sectorAngle);
+            float z = xy * sinf(sectorAngle);
+
+            Vector3 pos(x, y, z);
+            Vector3 normal(x, y, z);
+            normal.Normalize();
+            Vector2 texCoord(static_cast<float>(j) / sectors, static_cast<float>(i) / stacks);
+
+            vertices.push_back({pos, normal, texCoord});
+        }
+    }
+
+    // Generate indices
+    for (uint32_t i = 0; i < stacks; ++i) {
+        uint32_t k1 = i * (sectors + 1);
+        uint32_t k2 = k1 + sectors + 1;
+
+        for (uint32_t j = 0; j < sectors; ++j, ++k1, ++k2) {
+            if (i != 0) {
+                indices.push_back(k1);
+                indices.push_back(k2);
+                indices.push_back(k1 + 1);
+            }
+            if (i != (stacks - 1)) {
+                indices.push_back(k1 + 1);
+                indices.push_back(k2);
+                indices.push_back(k2 + 1);
+            }
+        }
+    }
+
+    MeshPrimitive prim;
+    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices.data(),
+                                              static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex)),
+                                              sizeof(ModelVertex))) {
+        SE_LOG_ERROR("Failed to create sphere vertex buffer");
+        return;
+    }
+    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices.data(),
+                                            static_cast<uint32_t>(indices.size() * sizeof(uint32_t)))) {
+        SE_LOG_ERROR("Failed to create sphere index buffer");
+        return;
+    }
+    prim.indexCount = static_cast<uint32_t>(indices.size());
+    prim.localAABB = BoundingBox(Vector3(0.f, 0.f, 0.f), Vector3(0.5f, 0.5f, 0.5f));
+
+    Mesh mesh;
+    mesh.name = "Sphere";
+    mesh.primitives.push_back(std::move(prim));
+
+    outModel.meshes.push_back(std::move(mesh));
+    outModel.localAABB = BoundingBox(Vector3(0.f, 0.f, 0.f), Vector3(0.5f, 0.5f, 0.5f));
+}
+
 // ── Ray picking ──────────────────────────────────────────────────────
 
 int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene, float vpMinX,
@@ -300,6 +407,11 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                     }
                 } else {
                     cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
+                }
+
+                // Per-object color override takes priority over material color
+                if (sceneObj.modelComp->baseColor.has_value()) {
+                    matData.baseColorFactor = *sceneObj.modelComp->baseColor;
                 }
 
                 m_perMaterialCB.UpdateDataAtOffset(&matData, sizeof(matData), objectIndex * sizeof(PerMaterialData));

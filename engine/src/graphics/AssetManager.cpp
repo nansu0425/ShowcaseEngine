@@ -17,6 +17,18 @@ void AssetManager::Init(RenderContext& ctx, SceneRenderer& sceneRenderer) {
     sceneRenderer.CreateCubeModel(ctx, *cube);
     m_builtinCube = cube.get();
     m_models["builtin:cube"] = std::move(cube);
+
+    // Create builtin plane model
+    std::unique_ptr<Model> plane = std::make_unique<Model>();
+    sceneRenderer.CreatePlaneModel(ctx, *plane);
+    m_builtinPlane = plane.get();
+    m_models["builtin:plane"] = std::move(plane);
+
+    // Create builtin sphere model
+    std::unique_ptr<Model> sphere = std::make_unique<Model>();
+    sceneRenderer.CreateSphereModel(ctx, *sphere);
+    m_builtinSphere = sphere.get();
+    m_models["builtin:sphere"] = std::move(sphere);
 }
 
 void AssetManager::Shutdown() {
@@ -25,6 +37,8 @@ void AssetManager::Shutdown() {
     }
     m_models.clear();
     m_builtinCube = nullptr;
+    m_builtinPlane = nullptr;
+    m_builtinSphere = nullptr;
 }
 
 Model* AssetManager::LoadModel(const std::string& source) {
@@ -62,6 +76,14 @@ Model* AssetManager::GetModel(const std::string& source) const {
 
 Model* AssetManager::GetBuiltinCube() const {
     return m_builtinCube;
+}
+
+Model* AssetManager::GetBuiltinPlane() const {
+    return m_builtinPlane;
+}
+
+Model* AssetManager::GetBuiltinSphere() const {
+    return m_builtinSphere;
 }
 
 std::vector<std::string> AssetManager::GetAvailableSources() const {

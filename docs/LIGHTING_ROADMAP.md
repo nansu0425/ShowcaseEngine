@@ -22,7 +22,7 @@ Build the Cornell Box scene from engine primitives before any lighting code exis
 
 ### Technical scope
 - Add `builtin:plane` and `builtin:sphere` primitives to engine
-- Add per-object `baseColorOverride` to assign different colors to shared primitives
+- Add per-object `ModelComponent::baseColor` override to assign different colors to shared primitives
 - Create `cornell_box.scene` file with walls, box, and sphere
 
 ### Prerequisites
