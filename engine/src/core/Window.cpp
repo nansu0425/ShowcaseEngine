@@ -2,6 +2,7 @@
 
 #include <showcase/core/JsonDocument.h>
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 
 // Forward declaration for ImGui Win32 handler
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -176,6 +177,7 @@ void Window::RestorePlacement() {
 
 // ── Message processing ────────────────────────────────────────────
 bool Window::ProcessMessages() {
+    SE_ZONE_SCOPED;
     MSG msg = {};
     while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
         if (msg.message == WM_QUIT) {

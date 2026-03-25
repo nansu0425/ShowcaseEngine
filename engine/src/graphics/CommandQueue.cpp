@@ -1,6 +1,7 @@
 #include <showcase/graphics/CommandQueue.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 
 namespace showcase {
 
@@ -44,6 +45,7 @@ void CommandQueue::Shutdown() {
 
 // ── Execution ────────────────────────────────────────────────────────
 uint64_t CommandQueue::ExecuteCommandList(ID3D12CommandList* commandList) {
+    SE_ZONE_SCOPED;
     m_queue->ExecuteCommandLists(1, &commandList);
     return Signal();
 }
@@ -56,6 +58,7 @@ uint64_t CommandQueue::Signal() {
 
 // ── Synchronization ─────────────────────────────────────────────────
 void CommandQueue::WaitForFenceValue(uint64_t fenceValue) {
+    SE_ZONE_SCOPED;
     if (!IsFenceComplete(fenceValue)) {
         m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent);
         WaitForSingleObject(m_fenceEvent, INFINITE);

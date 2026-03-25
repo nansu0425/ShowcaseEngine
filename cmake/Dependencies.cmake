@@ -52,6 +52,17 @@ FetchContent_Declare(
     EXCLUDE_FROM_ALL
 )
 
+# Tracy Profiler (disable with -DSHOWCASE_ENABLE_TRACY=OFF)
+option(SHOWCASE_ENABLE_TRACY "Enable Tracy profiler instrumentation" ON)
+
+FetchContent_Declare(
+    tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG        v0.13.1
+    GIT_SHALLOW    TRUE
+    EXCLUDE_FROM_ALL
+)
+
 # Suppress deprecation warnings from third-party CMakeLists.txt
 set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
 
@@ -103,5 +114,11 @@ FetchContent_MakeAvailable(imguizmo)
 add_library(imguizmo_lib STATIC ${imguizmo_SOURCE_DIR}/ImGuizmo.cpp)
 target_include_directories(imguizmo_lib PUBLIC ${imguizmo_SOURCE_DIR})
 target_link_libraries(imguizmo_lib PUBLIC imgui::imgui)
+
+if(SHOWCASE_ENABLE_TRACY)
+    set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
+    set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(tracy)
+endif()
 
 set(CMAKE_WARN_DEPRECATED ON CACHE BOOL "" FORCE)

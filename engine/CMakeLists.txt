@@ -79,6 +79,12 @@ target_precompile_headers(ShowcaseEngine PRIVATE
 # Enable Unicode for Win32
 target_compile_definitions(ShowcaseEngine PUBLIC UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 
+# Tracy Profiler (conditional)
+if(SHOWCASE_ENABLE_TRACY)
+    target_link_libraries(ShowcaseEngine PUBLIC TracyClient)
+    target_compile_definitions(ShowcaseEngine PUBLIC SHOWCASE_TRACY_ENABLED)
+endif()
+
 # Compile shaders
 target_compile_shaders(ShowcaseEngine
     VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh_vs.hlsl

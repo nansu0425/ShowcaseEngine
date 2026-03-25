@@ -1,13 +1,14 @@
 #include <showcase/editor/ImGuiLayer.h>
 
-#include <showcase/graphics/RenderContext.h>
-#include <showcase/graphics/CommandList.h>
 #include <showcase/core/Log.h>
 #include <showcase/core/Platform.h>
+#include <showcase/core/Profiler.h>
+#include <showcase/graphics/CommandList.h>
+#include <showcase/graphics/RenderContext.h>
 
 #include <imgui.h>
-#include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
+#include <imgui_impl_win32.h>
 
 namespace showcase {
 
@@ -60,12 +61,14 @@ void ImGuiLayer::Shutdown() {
 // ── Frame management ──────────────────────────────────────────────
 
 void ImGuiLayer::BeginFrame() {
+    SE_ZONE_SCOPED;
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 }
 
 void ImGuiLayer::EndFrame(CommandList& cmdList) {
+    SE_ZONE_SCOPED;
     ImGui::Render();
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList.Get());
 }

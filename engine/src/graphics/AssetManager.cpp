@@ -2,6 +2,7 @@
 
 #include <showcase/core/Log.h>
 #include <showcase/core/Platform.h>
+#include <showcase/core/Profiler.h>
 #include <showcase/graphics/RenderContext.h>
 #include <showcase/graphics/SceneRenderer.h>
 
@@ -26,6 +27,7 @@ void AssetManager::Shutdown() {
 }
 
 Model* AssetManager::LoadModel(const std::string& source) {
+    SE_ZONE_SCOPED;
     // Check if already loaded
     auto it = m_models.find(source);
     if (it != m_models.end()) {

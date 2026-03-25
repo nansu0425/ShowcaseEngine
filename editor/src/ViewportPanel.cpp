@@ -53,12 +53,8 @@ void ViewportPanel::OnImGui(float fps, float deltaTime) {
         }
 
         ImVec2 size = ImGui::GetContentRegionAvail();
-        uint32_t w = static_cast<uint32_t>(size.x);
-        uint32_t h = static_cast<uint32_t>(size.y);
-
-        // Clamp to minimum 1x1
-        w = (w < 1) ? 1 : w;
-        h = (h < 1) ? 1 : h;
+        uint32_t w = static_cast<uint32_t>(std::max(size.x, 1.0f));
+        uint32_t h = static_cast<uint32_t>(std::max(size.y, 1.0f));
 
         // Detect resize
         m_offscreenTarget.RequestResize(w, h);

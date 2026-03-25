@@ -62,6 +62,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Log` | `Log.h` | spdlog wrapper with `SE_LOG_*` macros |
 | `LogListener` | `LogListener.h` | Abstract log listener interface (`LogLevel`, `LogMessage`) for non-spdlog consumers |
 | `Platform` | `Platform.h` | OS utilities (`GetExecutableDir()`, `SleepMs()`, `ShowErrorDialog()`, `OpenFileDialog()`, `SaveFileDialog()`) |
+| `Profiler` | `Profiler.h` | Tracy wrapper macros (`SE_ZONE_SCOPED`, `SE_FRAME_MARK`, etc.); no-op when Tracy is disabled |
 
 ### 2.2 Graphics Module — `engine/include/showcase/graphics/`
 
@@ -365,6 +366,7 @@ All third-party libraries are fetched via CMake `FetchContent` (see `cmake/Depen
 | spdlog | v1.15.0 | Logging framework | `FetchContent_MakeAvailable` |
 | nlohmann/json | v3.11.3 | JSON parsing | `FetchContent_MakeAvailable` |
 | tinygltf | v2.9.5 | glTF 2.0 loader (header-only) | `FetchContent_Populate` → interface lib |
+| Tracy | v0.13.1 | CPU profiler (optional, `-DSHOWCASE_ENABLE_TRACY=ON`) | Conditional `FetchContent_MakeAvailable` |
 
 **System libraries** (Windows SDK): `d3d12.lib`, `dxgi.lib`, `dxguid.lib`, `d3dcompiler.lib`
 

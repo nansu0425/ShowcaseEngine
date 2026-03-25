@@ -1,6 +1,7 @@
 #include <showcase/graphics/RenderContext.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 
 namespace showcase {
 
@@ -56,11 +57,16 @@ void RenderContext::Shutdown() {
 
 // ── Frame management ─────────────────────────────────────────────────
 void RenderContext::BeginFrame() {
+    SE_ZONE_SCOPED;
+
     m_currentFrameIndex = m_swapChain.GetCurrentBackBufferIndex();
 
-    // Wait for this frame's resources to be available
-    uint64_t fenceValue = m_frameResource.GetFenceValue(m_currentFrameIndex);
-    m_directQueue.WaitForFenceValue(fenceValue);
+    {
+        SE_ZONE_SCOPED_N("WaitForFenceValue");
+        // Wait for this frame's resources to be available
+        uint64_t fenceValue = m_frameResource.GetFenceValue(m_currentFrameIndex);
+        m_directQueue.WaitForFenceValue(fenceValue);
+    }
 
     // Reset the command allocator and command list
     m_frameResource.BeginFrame(m_currentFrameIndex);
@@ -73,6 +79,7 @@ void RenderContext::BeginFrame() {
 }
 
 void RenderContext::EndFrame() {
+    SE_ZONE_SCOPED;
     m_commandList.Close();
 
     // Execute and present

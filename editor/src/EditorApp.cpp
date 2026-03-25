@@ -3,6 +3,7 @@
 #include <showcase/core/JsonDocument.h>
 #include <showcase/core/Log.h>
 #include <showcase/core/Platform.h>
+#include <showcase/core/Profiler.h>
 
 #include <imgui_internal.h>
 
@@ -704,6 +705,8 @@ int EditorApp::Run() {
 
             m_renderContext.EndFrame();
         }
+
+        SE_FRAME_MARK;
     }
 
     return 0;

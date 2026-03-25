@@ -1,6 +1,7 @@
 #include <showcase/graphics/SceneRenderer.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 #include <showcase/graphics/CommandList.h>
 #include <showcase/graphics/PipelineState.h>
 #include <showcase/graphics/RenderContext.h>
@@ -245,6 +246,7 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
 // ── Render ───────────────────────────────────────────────────────────
 
 void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId) {
+    SE_ZONE_SCOPED;
     auto* cmdList = ctx.GetCommandList().Get();
 
     cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
