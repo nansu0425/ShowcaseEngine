@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include <cstdint>
+#include <string>
 
 namespace showcase {
 
@@ -15,12 +15,19 @@ void SleepMs(uint32_t ms);
 void ShowErrorDialog(const wchar_t* title, const wchar_t* message);
 
 // Modal dialog boxes.
-enum class DialogResult { Yes, No, Cancel };
+enum class DialogResult {
+    Yes,
+    No,
+    Cancel
+};
 DialogResult ShowConfirmDialog(void* ownerHwnd, const char* title, const char* message);
 void ShowErrorMessage(void* ownerHwnd, const char* title, const char* message);
 
 // Native file dialogs. Returns selected file path, or empty string if cancelled.
 std::string OpenFileDialog(void* ownerHwnd, const char* filter, const char* defaultExt);
 std::string SaveFileDialog(void* ownerHwnd, const char* filter, const char* defaultExt);
+
+// Launches an external executable. Returns true if the process was started successfully.
+bool LaunchProcess(const std::string& exePath);
 
 } // namespace showcase

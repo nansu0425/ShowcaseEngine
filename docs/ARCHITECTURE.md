@@ -61,7 +61,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Timer` | `Timer.h` | Frame delta time and FPS calculation |
 | `Log` | `Log.h` | spdlog wrapper with `SE_LOG_*` macros |
 | `LogListener` | `LogListener.h` | Abstract log listener interface (`LogLevel`, `LogMessage`) for non-spdlog consumers |
-| `Platform` | `Platform.h` | OS utilities (`GetExecutableDir()`, `SleepMs()`, `ShowErrorDialog()`, `OpenFileDialog()`, `SaveFileDialog()`) |
+| `Platform` | `Platform.h` | OS utilities (`GetExecutableDir()`, `SleepMs()`, `ShowErrorDialog()`, `OpenFileDialog()`, `SaveFileDialog()`, `LaunchProcess()`) |
 | `Profiler` | `Profiler.h` | Tracy wrapper macros (`SE_ZONE_SCOPED`, `SE_FRAME_MARK`, etc.); no-op when Tracy is disabled |
 
 ### 2.2 Graphics Module — `engine/include/showcase/graphics/`

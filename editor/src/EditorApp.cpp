@@ -468,6 +468,25 @@ void EditorApp::RenderMainMenuBar() {
             }
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("Tools")) {
+#ifdef SHOWCASE_TRACY_ENABLED
+            if (ImGui::MenuItem("Tracy Profiler")) {
+                namespace fs = std::filesystem;
+                fs::path tracyPath = fs::path(GetExecutableDir()) / ".." / ".." / ".." / "tools" / "tracy-profiler.exe";
+                std::error_code ec;
+                tracyPath = fs::canonical(tracyPath, ec);
+                if (!ec && LaunchProcess(tracyPath.string())) {
+                    SE_LOG_INFO("Launched Tracy Profiler");
+                } else {
+                    SE_LOG_ERROR("Failed to launch Tracy Profiler");
+                }
+            }
+#else
+            ImGui::MenuItem("Tracy Profiler (disabled)", nullptr, false, false);
+#endif
+            ImGui::EndMenu();
+        }
+
         // ── Window control buttons (right-aligned, fullscreen only) ──
         if (m_window.IsFullscreen()) {
             const HWND hwnd = m_window.GetHandle();

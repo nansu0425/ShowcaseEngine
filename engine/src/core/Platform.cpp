@@ -1,7 +1,8 @@
 #include <showcase/core/Platform.h>
 
-#include <Windows.h>
 #include <commdlg.h>
+#include <shellapi.h>
+#include <Windows.h>
 
 namespace showcase {
 
@@ -21,10 +22,11 @@ void ShowErrorDialog(const wchar_t* title, const wchar_t* message) {
 }
 
 DialogResult ShowConfirmDialog(void* ownerHwnd, const char* title, const char* message) {
-    int result = MessageBoxA(static_cast<HWND>(ownerHwnd), message, title,
-                             MB_YESNOCANCEL | MB_ICONQUESTION);
-    if (result == IDYES) return DialogResult::Yes;
-    if (result == IDNO) return DialogResult::No;
+    int result = MessageBoxA(static_cast<HWND>(ownerHwnd), message, title, MB_YESNOCANCEL | MB_ICONQUESTION);
+    if (result == IDYES)
+        return DialogResult::Yes;
+    if (result == IDNO)
+        return DialogResult::No;
     return DialogResult::Cancel;
 }
 
@@ -64,6 +66,11 @@ std::string SaveFileDialog(void* ownerHwnd, const char* filter, const char* defa
         return std::string(filePath);
     }
     return {};
+}
+
+bool LaunchProcess(const std::string& exePath) {
+    HINSTANCE result = ShellExecuteA(nullptr, "open", exePath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    return reinterpret_cast<intptr_t>(result) > 32;
 }
 
 } // namespace showcase
