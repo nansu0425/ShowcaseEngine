@@ -59,6 +59,7 @@ cmake/           Dependencies.cmake, ShaderCompilation.cmake
 - HLSL `cbuffer` matrices default to column-major, but SimpleMath stores row-major — always declare `row_major float4x4` in HLSL, or transpose on CPU before upload
 - A single upload-heap constant buffer rewritten per draw call causes GPU aliasing (flickering) — use offset-based writes (`UpdateDataAtOffset`) so each object occupies its own 256-byte-aligned slot
 - SimpleMath `Matrix::CreateLookAt` / `CreatePerspectiveFieldOfView` produce RH matrices — use `XMMatrixLookAtLH` / `XMMatrixPerspectiveFovLH` directly for LH pipelines
+- OBS Studio recording: Always use VSync ON when recording with OBS. OBS's DXGI Present() hook causes severe frame stuttering (~10% spike rate) under VSync OFF + fullscreen + edit mode. Since OBS captures at 60fps anyway, VSync OFF frames are not captured. Confirmed via PresentMon analysis (2026-03-25)
 - Incremental Debug builds can fail with `LNK1103: debugging information corrupt` after large header changes (struct/include modifications) — stale PCH objects cause PDB mismatch. Fix: `scripts/build.bat nuke` then reconfigure and rebuild
 
 ## Verification

@@ -33,3 +33,6 @@ imgui.ini
 
 # Claude AI (local settings only)
 .claude/settings.local.json
+
+# Local tools/binaries (PresentMon, etc.)
+tools/
