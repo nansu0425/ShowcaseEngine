@@ -26,6 +26,7 @@ namespace showcase {
 // ── Init ──────────────────────────────────────────────────────────
 
 bool EditorApp::Init(const EditorAppDesc& desc) {
+    SE_ZONE_SCOPED;
     Log::Init();
 
     if (!m_window.Init(desc.window))
@@ -222,6 +223,7 @@ void EditorApp::LoadEditorConfig() {
 // ── Scene document management ────────────────────────────────────
 
 void EditorApp::ResolveSceneModels() {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     for (auto& obj : m_scene.GetObjects()) {
         if (obj.modelComp.has_value()) {
             obj.modelComp->model = m_assetManager.LoadModel(obj.modelComp->modelSource);
@@ -232,6 +234,7 @@ void EditorApp::ResolveSceneModels() {
 }
 
 void EditorApp::ScanAssets() {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     namespace fs = std::filesystem;
 
     m_availableAssets.clear();
@@ -268,10 +271,13 @@ void EditorApp::ScanAssets() {
 }
 
 void EditorApp::ImportAsset() {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     const char* filter = "glTF Files (*.glb;*.gltf)\0*.glb;*.gltf\0All Files (*.*)\0*.*\0";
     std::string srcPath = OpenFileDialog(m_window.GetHandle(), filter, "glb");
     if (srcPath.empty())
         return;
+
+    SE_ZONE_TEXT(srcPath.c_str(), srcPath.size());
 
     namespace fs = std::filesystem;
 
@@ -303,6 +309,7 @@ void EditorApp::ImportAsset() {
 }
 
 void EditorApp::NewScene() {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     if (m_sceneDirty) {
         DialogResult result =
             ShowConfirmDialog(m_window.GetHandle(), "ShowcaseEditor", "Save changes to current scene?");
@@ -325,9 +332,11 @@ void EditorApp::NewScene() {
     m_currentScenePath.clear();
     m_sceneDirty = false;
     UpdateWindowTitle();
+    SE_MESSAGE_L("New scene created");
 }
 
 void EditorApp::OpenScene() {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     if (m_sceneDirty) {
         DialogResult result =
             ShowConfirmDialog(m_window.GetHandle(), "ShowcaseEditor", "Save changes to current scene?");
@@ -340,6 +349,8 @@ void EditorApp::OpenScene() {
     std::string path = OpenFileDialog(m_window.GetHandle(), kSceneFileFilter, kSceneFileExt);
     if (path.empty())
         return;
+
+    SE_ZONE_TEXT(path.c_str(), path.size());
 
     // Flush GPU and clean up models
     m_renderContext.GetDirectQueue().Flush();
@@ -371,12 +382,16 @@ void EditorApp::OpenScene() {
     m_currentScenePath = path;
     m_sceneDirty = false;
     UpdateWindowTitle();
+    SE_MESSAGE_L("Scene loaded");
 }
 
 bool EditorApp::SaveScene() {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     if (m_currentScenePath.empty()) {
         return SaveSceneAs();
     }
+
+    SE_ZONE_TEXT(m_currentScenePath.c_str(), m_currentScenePath.size());
 
     JsonDocument doc;
     m_scene.Serialize(doc);
@@ -396,6 +411,7 @@ bool EditorApp::SaveScene() {
     SE_LOG_INFO("Scene saved: {}", m_currentScenePath);
     m_sceneDirty = false;
     UpdateWindowTitle();
+    SE_MESSAGE_L("Scene saved");
     return true;
 }
 
@@ -499,6 +515,7 @@ void EditorApp::RenderMainMenuBar() {
 // ── Shutdown ─────────────────────────────────────────────────────
 
 void EditorApp::Shutdown() {
+    SE_ZONE_SCOPED;
     SaveEditorConfig();
 
     m_renderContext.GetDirectQueue().Flush();
@@ -543,6 +560,7 @@ void EditorApp::EnterPlayMode() {
     m_input.SetMousePosition(clientCenter.x, clientCenter.y);
 
     SE_LOG_INFO("Entered Play mode (F5)");
+    SE_MESSAGE_L("Entered Play mode");
 }
 
 void EditorApp::ExitPlayMode() {
@@ -558,6 +576,7 @@ void EditorApp::ExitPlayMode() {
     ShowCursor(TRUE);
 
     SE_LOG_INFO("Exited Play mode (ESC)");
+    SE_MESSAGE_L("Exited Play mode");
 }
 
 // ── Main loop ────────────────────────────────────────────────────
@@ -565,6 +584,7 @@ void EditorApp::ExitPlayMode() {
 int EditorApp::Run() {
     while (m_window.ProcessMessages()) {
         m_timer.Tick();
+        SE_PLOT("Frame Time (ms)", m_timer.DeltaTime() * 1000.0f);
         m_input.Update(m_window.GetHandle());
 
         if (m_window.IsMinimized()) {
@@ -715,6 +735,7 @@ int EditorApp::Run() {
 // ── Resize ────────────────────────────────────────────────────────
 
 void EditorApp::OnResize(uint32_t width, uint32_t height) {
+    SE_MESSAGE_L("Window resized");
     m_renderContext.Resize(width, height);
 
     // In play mode, update camera aspect to match window

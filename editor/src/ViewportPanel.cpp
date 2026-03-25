@@ -2,6 +2,7 @@
 
 #include <showcase/core/Input.h>
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 #include <showcase/graphics/RenderContext.h>
 
 #include <imgui.h>
@@ -14,26 +15,31 @@ namespace showcase {
 // ── Init / Shutdown ──────────────────────────────────────────────
 
 bool ViewportPanel::Init(RenderContext& ctx, uint32_t initialWidth, uint32_t initialHeight) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
     // Set up camera aspect ratio update on resize
     m_offscreenTarget.SetResizeCallback([this](uint32_t w, uint32_t h) {
         float aspect = h > 0 ? static_cast<float>(w) / h : 1.0f;
         m_camera.SetPerspective(m_camera.GetFovY(), aspect, m_camera.GetNearZ(), m_camera.GetFarZ());
+        SE_MESSAGE_L("Viewport resized");
     });
 
     return m_offscreenTarget.Init(ctx, initialWidth, initialHeight);
 }
 
 void ViewportPanel::Shutdown(RenderContext& ctx) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
     m_offscreenTarget.Shutdown(ctx);
 }
 
 // ── Rendering ────────────────────────────────────────────────────
 
 void ViewportPanel::BeginRender(CommandList& cmdList) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
     m_offscreenTarget.BeginRender(cmdList);
 }
 
 void ViewportPanel::EndRender(CommandList& cmdList) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
     m_offscreenTarget.EndRender(cmdList);
 }
 
@@ -114,6 +120,7 @@ void ViewportPanel::InitCamera(const Vector3& position, float yaw, float pitch, 
 }
 
 void ViewportPanel::UpdateCamera(const Input& input, float deltaTime, bool playMode) {
+    SE_ZONE_SCOPED_C(profile::kColorUpdate);
     // Initialize yaw/pitch from current camera direction on first update
     if (m_firstCameraUpdate) {
         Vector3 fwd = m_camera.GetForward();
@@ -185,6 +192,7 @@ void ViewportPanel::SetResizeCallback(ResizeCallback callback) {
     m_offscreenTarget.SetResizeCallback([this, externalCb = std::move(callback)](uint32_t w, uint32_t h) {
         float aspect = h > 0 ? static_cast<float>(w) / h : 1.0f;
         m_camera.SetPerspective(m_camera.GetFovY(), aspect, m_camera.GetNearZ(), m_camera.GetFarZ());
+        SE_MESSAGE_L("Viewport resized");
         if (externalCb) {
             externalCb(w, h);
         }

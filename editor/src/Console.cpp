@@ -1,6 +1,7 @@
 #include <showcase/editor/Console.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 
 #include <chrono>
 
@@ -28,9 +29,7 @@ class ConsoleLogListener : public LogListener {
 public:
     explicit ConsoleLogListener(Console* console) : m_console(console) {}
 
-    void OnLogMessage(const LogMessage& msg) override {
-        m_console->AddEntry(msg.level, msg.timestamp, msg.message);
-    }
+    void OnLogMessage(const LogMessage& msg) override { m_console->AddEntry(msg.level, msg.timestamp, msg.message); }
 
 private:
     Console* m_console;
@@ -39,6 +38,7 @@ private:
 // ── Init / Shutdown ──────────────────────────────────────────────
 
 bool Console::Init() {
+    SE_ZONE_SCOPED;
     m_logListener = std::make_unique<ConsoleLogListener>(this);
     Log::AddListener(m_logListener.get());
     return true;
@@ -69,23 +69,35 @@ void Console::Clear() {
 
 ImVec4 Console::GetLevelColor(LogLevel level) {
     switch (level) {
-        case LogLevel::Trace:    return {0.5f, 0.5f, 0.5f, 1.0f}; // gray
-        case LogLevel::Info:     return {1.0f, 1.0f, 1.0f, 1.0f}; // white
-        case LogLevel::Warn:     return {1.0f, 0.9f, 0.3f, 1.0f}; // yellow
-        case LogLevel::Error:    return {1.0f, 0.3f, 0.3f, 1.0f}; // red
-        case LogLevel::Critical: return {1.0f, 0.1f, 0.1f, 1.0f}; // bright red
-        default:                 return {1.0f, 1.0f, 1.0f, 1.0f};
+    case LogLevel::Trace:
+        return {0.5f, 0.5f, 0.5f, 1.0f}; // gray
+    case LogLevel::Info:
+        return {1.0f, 1.0f, 1.0f, 1.0f}; // white
+    case LogLevel::Warn:
+        return {1.0f, 0.9f, 0.3f, 1.0f}; // yellow
+    case LogLevel::Error:
+        return {1.0f, 0.3f, 0.3f, 1.0f}; // red
+    case LogLevel::Critical:
+        return {1.0f, 0.1f, 0.1f, 1.0f}; // bright red
+    default:
+        return {1.0f, 1.0f, 1.0f, 1.0f};
     }
 }
 
 const char* Console::GetLevelLabel(LogLevel level) {
     switch (level) {
-        case LogLevel::Trace:    return "TRACE";
-        case LogLevel::Info:     return "INFO";
-        case LogLevel::Warn:     return "WARN";
-        case LogLevel::Error:    return "ERROR";
-        case LogLevel::Critical: return "CRITICAL";
-        default:                 return "???";
+    case LogLevel::Trace:
+        return "TRACE";
+    case LogLevel::Info:
+        return "INFO";
+    case LogLevel::Warn:
+        return "WARN";
+    case LogLevel::Error:
+        return "ERROR";
+    case LogLevel::Critical:
+        return "CRITICAL";
+    default:
+        return "???";
     }
 }
 
@@ -127,7 +139,8 @@ void Console::ExecuteCommand(const std::string& input) {
 // ── Rendering ────────────────────────────────────────────────────
 
 void Console::Render() {
-    if (!m_open) return;
+    if (!m_open)
+        return;
 
     if (!ImGui::Begin("Console", &m_open, ImGuiWindowFlags_NoScrollbar)) {
         ImGui::End();
@@ -136,10 +149,8 @@ void Console::Render() {
 
     // Toolbar
     static const char* levelNames[] = {"Trace", "Info", "Warn", "Error", "Critical"};
-    static const LogLevel levelValues[] = {
-        LogLevel::Trace, LogLevel::Info, LogLevel::Warn,
-        LogLevel::Error, LogLevel::Critical
-    };
+    static const LogLevel levelValues[] = {LogLevel::Trace, LogLevel::Info, LogLevel::Warn, LogLevel::Error,
+                                           LogLevel::Critical};
 
     ImGui::SetNextItemWidth(100.0f);
     ImGui::Combo("##Level", &m_levelFilter, levelNames, IM_ARRAYSIZE(levelNames));
@@ -154,22 +165,24 @@ void Console::Render() {
     ImGui::Separator();
 
     // Log entries
-    ImGui::BeginChild("LogScrollRegion", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()),
-                      ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::BeginChild("LogScrollRegion", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), ImGuiChildFlags_None,
+                      ImGuiWindowFlags_HorizontalScrollbar);
 
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         LogLevel filterLevel = levelValues[m_levelFilter];
 
         for (const auto& entry : m_entries) {
-            if (entry.level < filterLevel) continue;
+            if (entry.level < filterLevel)
+                continue;
 
             // Build display string for text filter
             char lineBuf[512];
-            std::snprintf(lineBuf, sizeof(lineBuf), "[%s] [%s] %s",
-                entry.timestamp.c_str(), GetLevelLabel(entry.level), entry.message.c_str());
+            std::snprintf(lineBuf, sizeof(lineBuf), "[%s] [%s] %s", entry.timestamp.c_str(), GetLevelLabel(entry.level),
+                          entry.message.c_str());
 
-            if (!m_textFilter.PassFilter(lineBuf)) continue;
+            if (!m_textFilter.PassFilter(lineBuf))
+                continue;
 
             ImGui::PushStyleColor(ImGuiCol_Text, GetLevelColor(entry.level));
             ImGui::TextUnformatted(lineBuf);
@@ -185,8 +198,7 @@ void Console::Render() {
 
     // Command input
     ImGui::Separator();
-    if (ImGui::InputText("##CmdInput", m_inputBuf, sizeof(m_inputBuf),
-                         ImGuiInputTextFlags_EnterReturnsTrue)) {
+    if (ImGui::InputText("##CmdInput", m_inputBuf, sizeof(m_inputBuf), ImGuiInputTextFlags_EnterReturnsTrue)) {
         std::string input(m_inputBuf);
         if (!input.empty()) {
             ExecuteCommand(input);

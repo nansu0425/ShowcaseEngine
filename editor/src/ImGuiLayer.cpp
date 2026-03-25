@@ -15,6 +15,7 @@ namespace showcase {
 // ── Init / Shutdown ──────────────────────────────────────────────
 
 bool ImGuiLayer::Init(HWND hwnd, RenderContext& ctx) {
+    SE_ZONE_SCOPED_C(profile::kColorImGui);
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
 
@@ -53,6 +54,7 @@ bool ImGuiLayer::Init(HWND hwnd, RenderContext& ctx) {
 }
 
 void ImGuiLayer::Shutdown() {
+    SE_ZONE_SCOPED_C(profile::kColorImGui);
     ImGui_ImplDX12_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
@@ -61,14 +63,14 @@ void ImGuiLayer::Shutdown() {
 // ── Frame management ──────────────────────────────────────────────
 
 void ImGuiLayer::BeginFrame() {
-    SE_ZONE_SCOPED;
+    SE_ZONE_SCOPED_C(profile::kColorImGui);
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 }
 
 void ImGuiLayer::EndFrame(CommandList& cmdList) {
-    SE_ZONE_SCOPED;
+    SE_ZONE_SCOPED_C(profile::kColorImGui);
     ImGui::Render();
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList.Get());
 }

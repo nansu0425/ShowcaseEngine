@@ -1,6 +1,7 @@
 #include <showcase/editor/EditorController.h>
 
 #include <showcase/core/Input.h>
+#include <showcase/core/Profiler.h>
 #include <showcase/editor/ViewportPanel.h>
 
 #include <imgui.h>
@@ -11,6 +12,7 @@ namespace showcase {
 // ── Update ────────────────────────────────────────────────────────
 
 void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport) {
+    SE_ZONE_SCOPED_C(profile::kColorUpdate);
     Camera& camera = viewport.GetCamera();
 
     // Left-click picking (not during right-click camera rotation, not when using gizmo)
@@ -46,6 +48,7 @@ void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& r
 // ── UI ────────────────────────────────────────────────────────────
 
 void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
+    SE_ZONE_SCOPED_C(profile::kColorImGui);
     Camera& camera = viewport.GetCamera();
 
     ImGuizmo::BeginFrame();
