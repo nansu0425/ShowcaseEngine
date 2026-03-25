@@ -1,6 +1,7 @@
 #include <showcase/core/JsonDocument.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Profiler.h>
 
 #include <nlohmann/json.hpp>
 
@@ -157,13 +158,14 @@ JsonDocument::JsonDocument(JsonDocument&& other) noexcept = default;
 JsonDocument& JsonDocument::operator=(JsonDocument&& other) noexcept = default;
 
 bool JsonDocument::LoadFromFile(const std::string& filePath) {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
+    SE_ZONE_TEXT(filePath.c_str(), filePath.size());
     std::ifstream file(filePath);
     if (!file.is_open()) {
         return false;
     }
 
-    std::string content((std::istreambuf_iterator<char>(file)),
-                         std::istreambuf_iterator<char>());
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
     if (!nlohmann::json::accept(content)) {
         SE_LOG_WARN("Failed to parse JSON: {}", filePath);
@@ -175,6 +177,8 @@ bool JsonDocument::LoadFromFile(const std::string& filePath) {
 }
 
 bool JsonDocument::SaveToFile(const std::string& filePath, int indent) const {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
+    SE_ZONE_TEXT(filePath.c_str(), filePath.size());
     std::ofstream file(filePath);
     if (!file.is_open()) {
         SE_LOG_WARN("Failed to open file for writing: {}", filePath);

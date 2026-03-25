@@ -1,8 +1,11 @@
 #include <showcase/core/Input.h>
 
+#include <showcase/core/Profiler.h>
+
 namespace showcase {
 
 void Input::Update(HWND hwnd) {
+    SE_ZONE_SCOPED_C(profile::kColorUpdate);
     m_keysPrevious = m_keysCurrent;
 
     for (int i = 0; i < 256; i++) {

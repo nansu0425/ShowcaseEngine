@@ -1,5 +1,7 @@
 #include <showcase/core/Timer.h>
 
+#include <showcase/core/Profiler.h>
+
 namespace showcase {
 
 // ── Lifecycle ─────────────────────────────────────────────────────
@@ -26,6 +28,7 @@ void Timer::Reset() {
 
 // ── Frame timing ──────────────────────────────────────────────────
 void Timer::Tick() {
+    SE_ZONE_SCOPED_C(profile::kColorUpdate);
     if (m_paused) {
         m_deltaTime = 0.0;
         return;
@@ -76,11 +79,9 @@ void Timer::Resume() {
 // ── Query ─────────────────────────────────────────────────────────
 float Timer::TotalTime() const {
     if (m_paused) {
-        return static_cast<float>(
-            ((m_stopTime - m_pausedTime) - m_baseTime) * m_secondsPerCount);
+        return static_cast<float>(((m_stopTime - m_pausedTime) - m_baseTime) * m_secondsPerCount);
     }
-    return static_cast<float>(
-        ((m_currTime - m_pausedTime) - m_baseTime) * m_secondsPerCount);
+    return static_cast<float>(((m_currTime - m_pausedTime) - m_baseTime) * m_secondsPerCount);
 }
 
 } // namespace showcase

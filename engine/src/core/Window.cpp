@@ -26,6 +26,7 @@ Window::~Window() {
 
 // ── Init / Shutdown ───────────────────────────────────────────────
 bool Window::Init(const WindowDesc& desc) {
+    SE_ZONE_SCOPED;
     m_width = desc.width;
     m_height = desc.height;
 
@@ -62,6 +63,7 @@ bool Window::Init(const WindowDesc& desc) {
 }
 
 void Window::Shutdown() {
+    SE_ZONE_SCOPED;
     if (m_hwnd) {
         DestroyWindow(m_hwnd);
         m_hwnd = nullptr;
@@ -109,6 +111,7 @@ void Window::ToggleFullscreen() {
 
 // ── State persistence ─────────────────────────────────────────────
 void Window::SavePlacement() const {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     if (!m_hwnd)
         return;
 
@@ -149,6 +152,7 @@ void Window::SavePlacement() const {
 }
 
 void Window::RestorePlacement() {
+    SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     if (!m_hwnd)
         return;
 
@@ -177,7 +181,7 @@ void Window::RestorePlacement() {
 
 // ── Message processing ────────────────────────────────────────────
 bool Window::ProcessMessages() {
-    SE_ZONE_SCOPED;
+    SE_ZONE_SCOPED_C(profile::kColorUpdate);
     MSG msg = {};
     while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
         if (msg.message == WM_QUIT) {

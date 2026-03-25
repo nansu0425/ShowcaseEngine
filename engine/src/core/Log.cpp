@@ -1,7 +1,9 @@
 #include <showcase/core/Log.h>
 
-#include <spdlog/sinks/stdout_color_sinks.h>
+#include <showcase/core/Profiler.h>
+
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <algorithm>
 #include <chrono>
@@ -17,12 +19,18 @@ static std::mutex s_listenerMutex;
 
 static LogLevel ToLogLevel(spdlog::level::level_enum level) {
     switch (level) {
-        case spdlog::level::trace:    return LogLevel::Trace;
-        case spdlog::level::info:     return LogLevel::Info;
-        case spdlog::level::warn:     return LogLevel::Warn;
-        case spdlog::level::err:      return LogLevel::Error;
-        case spdlog::level::critical: return LogLevel::Critical;
-        default:                      return LogLevel::Trace;
+    case spdlog::level::trace:
+        return LogLevel::Trace;
+    case spdlog::level::info:
+        return LogLevel::Info;
+    case spdlog::level::warn:
+        return LogLevel::Warn;
+    case spdlog::level::err:
+        return LogLevel::Error;
+    case spdlog::level::critical:
+        return LogLevel::Critical;
+    default:
+        return LogLevel::Trace;
     }
 }
 
@@ -57,6 +65,7 @@ protected:
 std::shared_ptr<spdlog::logger> Log::s_logger;
 
 void Log::Init() {
+    SE_ZONE_SCOPED;
     auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     consoleSink->set_pattern("[%T] [%^%l%$] %v");
 
@@ -66,8 +75,7 @@ void Log::Init() {
     auto bridgeSink = std::make_shared<ListenerBridgeSink>();
     bridgeSink->set_level(spdlog::level::trace);
 
-    s_logger = std::make_shared<spdlog::logger>("SE",
-        spdlog::sinks_init_list{consoleSink, fileSink, bridgeSink});
+    s_logger = std::make_shared<spdlog::logger>("SE", spdlog::sinks_init_list{consoleSink, fileSink, bridgeSink});
     s_logger->set_level(spdlog::level::trace);
     s_logger->flush_on(spdlog::level::warn);
 
