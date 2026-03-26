@@ -98,13 +98,13 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
 
     m_editorController.SetAddObjectCallback([this](const std::string& modelSource) -> SceneObject* {
         if (modelSource.empty()) {
-            SceneObject& obj = m_scene.AddObject(nullptr, "Empty", Vector3(0, 1, 0));
+            SceneObject& obj = m_scene.AddObject({nullptr, "Empty", Vector3(0, 1, 0)});
             return &obj;
         }
         Model* model = m_assetManager.LoadModel(modelSource);
         if (!model)
             return nullptr;
-        SceneObject& obj = m_scene.AddObject(model, "Cube", Vector3(0, 1, 0));
+        SceneObject& obj = m_scene.AddObject({model, "Cube", Vector3(0, 1, 0)});
         obj.modelComp->modelSource = modelSource;
         return &obj;
     });
@@ -693,7 +693,7 @@ int EditorApp::Run() {
 
             // Update
             m_viewport.UpdateCamera(m_input, dt);
-            m_editorController.Update(m_input, m_scene, m_sceneRenderer, m_viewport, m_renderContext);
+            m_editorController.Update({&m_input, &m_scene, &m_sceneRenderer, &m_viewport, &m_renderContext});
 
             // Begin render frame
             m_renderContext.BeginFrame();

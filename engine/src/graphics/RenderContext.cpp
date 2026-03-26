@@ -21,14 +21,14 @@ bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
 
     if (!m_directQueue.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT))
         return false;
-    if (!m_swapChain.Init(device, m_device.GetFactory(), m_directQueue, hwnd, width, height))
+    if (!m_swapChain.Init({device, m_device.GetFactory(), &m_directQueue, hwnd, width, height}))
         return false;
 
     // Shader-visible SRV heap (for ImGui and general use)
-    if (!m_srvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 256, true))
+    if (!m_srvHeap.Init({device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 256, true}))
         return false;
 
-    if (!m_depthBuffer.Init(device, m_device.GetAllocator(), width, height))
+    if (!m_depthBuffer.Init({device, m_device.GetAllocator(), width, height}))
         return false;
 
     if (!m_frameResource.Init(device))

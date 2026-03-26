@@ -3,8 +3,8 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 
-#include <vector>
 #include <cstdint>
+#include <vector>
 
 using Microsoft::WRL::ComPtr;
 
@@ -54,10 +54,9 @@ inline D3D12_DEPTH_STENCIL_DESC DefaultDepthStencilDesc() {
     desc.StencilEnable = FALSE;
     desc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
     desc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-    desc.FrontFace = {D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP,
-                      D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS};
-    desc.BackFace = {D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP,
-                     D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS};
+    desc.FrontFace = {D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP,
+                      D3D12_COMPARISON_FUNC_ALWAYS};
+    desc.BackFace = {D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS};
     return desc;
 }
 
@@ -75,14 +74,16 @@ struct GraphicsPipelineDesc {
     uint32_t sampleCount = 1;
 };
 
+struct ComputePipelineDesc {
+    ID3D12RootSignature* rootSignature = nullptr;
+    D3D12_SHADER_BYTECODE computeShader = {};
+};
+
 class PipelineState {
 public:
-    static ComPtr<ID3D12PipelineState> CreateGraphicsPSO(ID3D12Device* device,
-                                                          const GraphicsPipelineDesc& desc);
+    static ComPtr<ID3D12PipelineState> CreateGraphicsPSO(ID3D12Device* device, const GraphicsPipelineDesc& desc);
 
-    static ComPtr<ID3D12PipelineState> CreateComputePSO(ID3D12Device* device,
-                                                         ID3D12RootSignature* rootSignature,
-                                                         D3D12_SHADER_BYTECODE computeShader);
+    static ComPtr<ID3D12PipelineState> CreateComputePSO(ID3D12Device* device, const ComputePipelineDesc& desc);
 };
 
 } // namespace showcase

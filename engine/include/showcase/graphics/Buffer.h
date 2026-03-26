@@ -11,12 +11,26 @@ using Microsoft::WRL::ComPtr;
 
 namespace showcase {
 
+struct VertexBufferDesc {
+    ID3D12Device* device = nullptr;
+    D3D12MA::Allocator* allocator = nullptr;
+    const void* data = nullptr;
+    uint32_t size = 0;
+    uint32_t stride = 0;
+};
+
+struct IndexBufferDesc {
+    ID3D12Device* device = nullptr;
+    D3D12MA::Allocator* allocator = nullptr;
+    const void* data = nullptr;
+    uint32_t size = 0;
+    DXGI_FORMAT format = DXGI_FORMAT_R32_UINT;
+};
+
 class Buffer {
 public:
-    [[nodiscard]] bool InitAsVertexBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                            const void* data, uint32_t size, uint32_t stride);
-    [[nodiscard]] bool InitAsIndexBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                           const void* data, uint32_t size, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT);
+    [[nodiscard]] bool InitAsVertexBuffer(const VertexBufferDesc& desc);
+    [[nodiscard]] bool InitAsIndexBuffer(const IndexBufferDesc& desc);
     [[nodiscard]] bool InitAsUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t size);
     void Shutdown();
 
@@ -30,8 +44,7 @@ public:
     ID3D12Resource* GetResource() const { return m_resource.Get(); }
 
 private:
-    bool CreateUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                            uint32_t size, const void* data);
+    bool CreateUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t size, const void* data);
 
     ComPtr<ID3D12Resource> m_resource;
     ComPtr<D3D12MA::Allocation> m_allocation;

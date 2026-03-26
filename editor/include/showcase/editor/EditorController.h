@@ -17,10 +17,17 @@ struct Model;
 class RenderContext;
 class ViewportPanel;
 
+struct EditorUpdateDesc {
+    const Input* input;
+    Scene* scene;
+    SceneRenderer* renderer;
+    ViewportPanel* viewport;
+    RenderContext* renderContext;
+};
+
 class EditorController {
 public:
-    void Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport,
-                RenderContext& renderContext);
+    void Update(const EditorUpdateDesc& desc);
     void RenderUI(Scene& scene, ViewportPanel& viewport);
     void RenderToolbar(ViewportPanel& viewport);
 

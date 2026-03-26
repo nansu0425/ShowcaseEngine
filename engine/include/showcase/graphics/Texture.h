@@ -13,12 +13,21 @@ using Microsoft::WRL::ComPtr;
 
 namespace showcase {
 
+struct TextureLoadDesc {
+    ID3D12Device* device = nullptr;
+    D3D12MA::Allocator* allocator = nullptr;
+    ID3D12GraphicsCommandList* cmdList = nullptr;
+    DescriptorHeap* srvHeap = nullptr;
+    const uint8_t* data = nullptr;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t channels = 0;
+    DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
+};
+
 class Texture {
 public:
-    [[nodiscard]] bool InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                        ID3D12GraphicsCommandList* cmdList, DescriptorHeap& srvHeap,
-                        const uint8_t* data, uint32_t width, uint32_t height,
-                        uint32_t channels, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);
+    [[nodiscard]] bool InitFromMemory(const TextureLoadDesc& desc);
     /// Releases the temporary upload heap after the GPU copy has completed.
     void ReleaseUploadResources();
     void Shutdown(DescriptorHeap& srvHeap);

@@ -7,18 +7,17 @@
 namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
-bool SwapChain::Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue& commandQueue, HWND hwnd,
-                     uint32_t width, uint32_t height) {
+bool SwapChain::Init(const SwapChainDesc& desc) {
     SE_ZONE_SCOPED;
     // Create RTV descriptor heap
-    if (!m_rtvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kBufferCount, false)) {
+    if (!m_rtvHeap.Init({desc.device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kBufferCount, false})) {
         return false;
     }
 
     // Create swap chain
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-    swapChainDesc.Width = width;
-    swapChainDesc.Height = height;
+    swapChainDesc.Width = desc.width;
+    swapChainDesc.Height = desc.height;
     swapChainDesc.Format = m_format;
     swapChainDesc.Stereo = FALSE;
     swapChainDesc.SampleDesc = {1, 0};
@@ -30,19 +29,19 @@ bool SwapChain::Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue&
     swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
     ComPtr<IDXGISwapChain1> swapChain1;
-    if (FAILED(factory->CreateSwapChainForHwnd(commandQueue.GetQueue(), hwnd, &swapChainDesc, nullptr, nullptr,
-                                               &swapChain1))) {
+    if (FAILED(desc.factory->CreateSwapChainForHwnd(desc.commandQueue->GetQueue(), desc.hwnd, &swapChainDesc, nullptr,
+                                                    nullptr, &swapChain1))) {
         SE_LOG_ERROR("Failed to create swap chain");
         return false;
     }
 
     // Disable Alt+Enter fullscreen toggle
-    factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+    desc.factory->MakeWindowAssociation(desc.hwnd, DXGI_MWA_NO_ALT_ENTER);
 
     swapChain1.As(&m_swapChain);
-    CreateRenderTargetViews(device);
+    CreateRenderTargetViews(desc.device);
 
-    SE_LOG_INFO("Swap chain created: {}x{}, {} buffers", width, height, kBufferCount);
+    SE_LOG_INFO("Swap chain created: {}x{}, {} buffers", desc.width, desc.height, kBufferCount);
     return true;
 }
 

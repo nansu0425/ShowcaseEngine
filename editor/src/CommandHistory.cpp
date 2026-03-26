@@ -62,10 +62,9 @@ std::string CommandHistory::GetRedoName() const {
 
 // ── TransformCommand ────────────────────────────────────────────────
 
-TransformCommand::TransformCommand(Scene& scene, uint32_t objectId, Vector3 oldPos, Vector3 oldRot, Vector3 oldScale,
-                                   Vector3 newPos, Vector3 newRot, Vector3 newScale)
-    : m_scene(scene), m_objectId(objectId), m_oldPos(oldPos), m_oldRot(oldRot), m_oldScale(oldScale), m_newPos(newPos),
-      m_newRot(newRot), m_newScale(newScale) {}
+TransformCommand::TransformCommand(const TransformCommandDesc& desc)
+    : m_scene(*desc.scene), m_objectId(desc.objectId), m_oldPos(desc.oldPos), m_oldRot(desc.oldRot),
+      m_oldScale(desc.oldScale), m_newPos(desc.newPos), m_newRot(desc.newRot), m_newScale(desc.newScale) {}
 
 void TransformCommand::Execute() {
     Apply(m_newPos, m_newRot, m_newScale);
@@ -105,10 +104,9 @@ void RenameCommand::Undo() {
 
 // ── ChangeModelCommand ──────────────────────────────────────────────
 
-ChangeModelCommand::ChangeModelCommand(Scene& scene, uint32_t objectId, std::string oldSource, std::string newSource,
-                                       ResolveModelFn resolver)
-    : m_scene(scene), m_objectId(objectId), m_oldSource(std::move(oldSource)), m_newSource(std::move(newSource)),
-      m_resolver(std::move(resolver)) {}
+ChangeModelCommand::ChangeModelCommand(const ChangeModelCommandDesc& desc)
+    : m_scene(*desc.scene), m_objectId(desc.objectId), m_oldSource(desc.oldSource), m_newSource(desc.newSource),
+      m_resolver(desc.resolver) {}
 
 void ChangeModelCommand::Execute() {
     Apply(m_newSource);
@@ -133,9 +131,8 @@ void ChangeModelCommand::Apply(const std::string& source) {
 
 // ── ChangeBaseColorCommand ──────────────────────────────────────────
 
-ChangeBaseColorCommand::ChangeBaseColorCommand(Scene& scene, uint32_t objectId, std::optional<Vector4> oldColor,
-                                               std::optional<Vector4> newColor)
-    : m_scene(scene), m_objectId(objectId), m_oldColor(std::move(oldColor)), m_newColor(std::move(newColor)) {}
+ChangeBaseColorCommand::ChangeBaseColorCommand(const ChangeBaseColorCommandDesc& desc)
+    : m_scene(*desc.scene), m_objectId(desc.objectId), m_oldColor(desc.oldColor), m_newColor(desc.newColor) {}
 
 void ChangeBaseColorCommand::Execute() {
     Apply(m_newColor);
@@ -154,9 +151,8 @@ void ChangeBaseColorCommand::Apply(const std::optional<Vector4>& color) {
 
 // ── AddComponentCommand ─────────────────────────────────────────────
 
-AddComponentCommand::AddComponentCommand(Scene& scene, uint32_t objectId, std::optional<ModelComponent> oldComp,
-                                         std::optional<ModelComponent> newComp)
-    : m_scene(scene), m_objectId(objectId), m_oldComp(std::move(oldComp)), m_newComp(std::move(newComp)) {}
+AddComponentCommand::AddComponentCommand(const AddComponentCommandDesc& desc)
+    : m_scene(*desc.scene), m_objectId(desc.objectId), m_oldComp(desc.oldComp), m_newComp(desc.newComp) {}
 
 void AddComponentCommand::Execute() {
     Apply(m_newComp);

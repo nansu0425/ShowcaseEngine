@@ -5,20 +5,19 @@
 namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
-bool DepthBuffer::Init(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t width, uint32_t height,
-                       DXGI_FORMAT format) {
-    m_format = format;
+bool DepthBuffer::Init(const DepthBufferDesc& desc) {
+    m_format = desc.format;
 
-    if (!m_dsvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false)) {
+    if (!m_dsvHeap.Init({desc.device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false})) {
         SE_LOG_ERROR("Failed to create DSV descriptor heap");
         return false;
     }
 
-    if (!CreateResources(device, allocator, width, height)) {
+    if (!CreateResources(desc.device, desc.allocator, desc.width, desc.height)) {
         return false;
     }
 
-    SE_LOG_INFO("Depth buffer initialized ({}x{})", width, height);
+    SE_LOG_INFO("Depth buffer initialized ({}x{})", desc.width, desc.height);
     return true;
 }
 

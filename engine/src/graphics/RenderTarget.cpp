@@ -5,26 +5,25 @@
 namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
-bool RenderTarget::Init(ID3D12Device* device, D3D12MA::Allocator* allocator, DescriptorHeap& srvHeap, uint32_t width,
-                        uint32_t height, DXGI_FORMAT format, const float* clearColor) {
-    m_format = format;
-    if (clearColor) {
-        m_clearColor[0] = clearColor[0];
-        m_clearColor[1] = clearColor[1];
-        m_clearColor[2] = clearColor[2];
-        m_clearColor[3] = clearColor[3];
+bool RenderTarget::Init(const RenderTargetInitDesc& desc) {
+    m_format = desc.format;
+    if (desc.clearColor) {
+        m_clearColor[0] = desc.clearColor[0];
+        m_clearColor[1] = desc.clearColor[1];
+        m_clearColor[2] = desc.clearColor[2];
+        m_clearColor[3] = desc.clearColor[3];
     }
 
-    if (!m_rtvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1, false)) {
+    if (!m_rtvHeap.Init({desc.device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1, false})) {
         SE_LOG_ERROR("Failed to create RTV descriptor heap for render target");
         return false;
     }
 
-    if (!CreateResources(device, allocator, srvHeap, width, height)) {
+    if (!CreateResources({desc.device, desc.allocator, desc.srvHeap, desc.width, desc.height})) {
         return false;
     }
 
-    SE_LOG_INFO("Render target initialized ({}x{})", width, height);
+    SE_LOG_INFO("Render target initialized ({}x{})", desc.width, desc.height);
     return true;
 }
 
@@ -39,24 +38,25 @@ void RenderTarget::Shutdown(DescriptorHeap& srvHeap) {
 }
 
 // ── Resize ───────────────────────────────────────────────────────────
-void RenderTarget::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator, DescriptorHeap& srvHeap, uint32_t width,
-                          uint32_t height) {
+void RenderTarget::Resize(const RenderTargetResizeDesc& desc) {
     if (m_srvHandle.IsValid()) {
-        srvHeap.Free(m_srvHandle);
+        desc.srvHeap->Free(m_srvHandle);
         m_srvHandle = {};
     }
     m_resource.Reset();
     m_allocation.Reset();
 
-    CreateResources(device, allocator, srvHeap, width, height);
-    SE_LOG_INFO("Render target resized ({}x{})", width, height);
+    CreateResources(desc);
+    SE_LOG_INFO("Render target resized ({}x{})", desc.width, desc.height);
 }
 
 // ── Internal ─────────────────────────────────────────────────────────
-bool RenderTarget::CreateResources(ID3D12Device* device, D3D12MA::Allocator* allocator, DescriptorHeap& srvHeap,
-                                   uint32_t width, uint32_t height) {
-    m_width = width;
-    m_height = height;
+bool RenderTarget::CreateResources(const RenderTargetResizeDesc& desc) {
+    m_width = desc.width;
+    m_height = desc.height;
+
+    auto* device = desc.device;
+    auto* allocator = desc.allocator;
 
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = m_format;
@@ -67,8 +67,8 @@ bool RenderTarget::CreateResources(ID3D12Device* device, D3D12MA::Allocator* all
 
     D3D12_RESOURCE_DESC resourceDesc = {};
     resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    resourceDesc.Width = width;
-    resourceDesc.Height = height;
+    resourceDesc.Width = desc.width;
+    resourceDesc.Height = desc.height;
     resourceDesc.DepthOrArraySize = 1;
     resourceDesc.MipLevels = 1;
     resourceDesc.Format = m_format;
@@ -95,7 +95,7 @@ bool RenderTarget::CreateResources(ID3D12Device* device, D3D12MA::Allocator* all
     device->CreateRenderTargetView(m_resource.Get(), &rtvDesc, rtvHandle.cpu);
 
     // Create SRV in shared shader-visible heap
-    m_srvHandle = srvHeap.Allocate();
+    m_srvHandle = desc.srvHeap->Allocate();
     if (!m_srvHandle.IsValid()) {
         SE_LOG_ERROR("Failed to allocate SRV descriptor for render target");
         return false;

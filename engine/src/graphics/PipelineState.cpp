@@ -5,8 +5,7 @@
 namespace showcase {
 
 // ── Graphics PSO ─────────────────────────────────────────────────────
-ComPtr<ID3D12PipelineState> PipelineState::CreateGraphicsPSO(ID3D12Device* device,
-                                                               const GraphicsPipelineDesc& desc) {
+ComPtr<ID3D12PipelineState> PipelineState::CreateGraphicsPSO(ID3D12Device* device, const GraphicsPipelineDesc& desc) {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.pRootSignature = desc.rootSignature;
     psoDesc.VS = desc.vertexShader;
@@ -15,10 +14,7 @@ ComPtr<ID3D12PipelineState> PipelineState::CreateGraphicsPSO(ID3D12Device* devic
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.RasterizerState = desc.rasterizerState;
     psoDesc.DepthStencilState = desc.depthStencilState;
-    psoDesc.InputLayout = {
-        desc.inputLayout.data(),
-        static_cast<UINT>(desc.inputLayout.size())
-    };
+    psoDesc.InputLayout = {desc.inputLayout.data(), static_cast<UINT>(desc.inputLayout.size())};
     psoDesc.PrimitiveTopologyType = desc.primitiveTopology;
     psoDesc.NumRenderTargets = 1;
     psoDesc.RTVFormats[0] = desc.rtvFormat;
@@ -36,12 +32,10 @@ ComPtr<ID3D12PipelineState> PipelineState::CreateGraphicsPSO(ID3D12Device* devic
 }
 
 // ── Compute PSO ──────────────────────────────────────────────────────
-ComPtr<ID3D12PipelineState> PipelineState::CreateComputePSO(ID3D12Device* device,
-                                                              ID3D12RootSignature* rootSignature,
-                                                              D3D12_SHADER_BYTECODE computeShader) {
+ComPtr<ID3D12PipelineState> PipelineState::CreateComputePSO(ID3D12Device* device, const ComputePipelineDesc& desc) {
     D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
-    psoDesc.pRootSignature = rootSignature;
-    psoDesc.CS = computeShader;
+    psoDesc.pRootSignature = desc.rootSignature;
+    psoDesc.CS = desc.computeShader;
 
     ComPtr<ID3D12PipelineState> pso;
     HRESULT hr = device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&pso));

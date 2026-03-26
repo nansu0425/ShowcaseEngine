@@ -42,17 +42,16 @@ SceneObject& Scene::AddObject(Model* model, const Matrix& transform) {
     return m_objects.back();
 }
 
-SceneObject& Scene::AddObject(Model* model, const std::string& name, const Vector3& pos, const Vector3& rot,
-                              const Vector3& scl) {
+SceneObject& Scene::AddObject(const AddObjectDesc& desc) {
     SceneObject obj;
     obj.id = m_nextId++;
-    obj.name = name;
-    if (model) {
-        obj.modelComp = ModelComponent{"", model};
+    obj.name = desc.name;
+    if (desc.model) {
+        obj.modelComp = ModelComponent{"", desc.model};
     }
-    obj.position = pos;
-    obj.rotation = rot;
-    obj.scale = scl;
+    obj.position = desc.position;
+    obj.rotation = desc.rotation;
+    obj.scale = desc.scale;
     obj.RecomputeWorldTransform();
     obj.UpdateAABB();
     m_objects.push_back(std::move(obj));

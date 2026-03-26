@@ -79,11 +79,11 @@ void SceneRenderer::CreateCubeModel(RenderContext& ctx, Model& outModel) {
     };
 
     MeshPrimitive prim;
-    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices, sizeof(vertices), sizeof(ModelVertex))) {
+    if (!prim.vertexBuffer.InitAsVertexBuffer({device, allocator, vertices, sizeof(vertices), sizeof(ModelVertex)})) {
         SE_LOG_ERROR("Failed to create cube vertex buffer");
         return;
     }
-    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices, sizeof(indices))) {
+    if (!prim.indexBuffer.InitAsIndexBuffer({device, allocator, indices, sizeof(indices)})) {
         SE_LOG_ERROR("Failed to create cube index buffer");
         return;
     }
@@ -113,11 +113,11 @@ void SceneRenderer::CreatePlaneModel(RenderContext& ctx, Model& outModel) {
     uint32_t indices[] = {0, 1, 2, 0, 2, 3};
 
     MeshPrimitive prim;
-    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices, sizeof(vertices), sizeof(ModelVertex))) {
+    if (!prim.vertexBuffer.InitAsVertexBuffer({device, allocator, vertices, sizeof(vertices), sizeof(ModelVertex)})) {
         SE_LOG_ERROR("Failed to create plane vertex buffer");
         return;
     }
-    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices, sizeof(indices))) {
+    if (!prim.indexBuffer.InitAsIndexBuffer({device, allocator, indices, sizeof(indices)})) {
         SE_LOG_ERROR("Failed to create plane index buffer");
         return;
     }
@@ -183,14 +183,14 @@ void SceneRenderer::CreateSphereModel(RenderContext& ctx, Model& outModel) {
     }
 
     MeshPrimitive prim;
-    if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices.data(),
-                                              static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex)),
-                                              sizeof(ModelVertex))) {
+    const uint32_t sphereVbSize = static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex));
+    const uint32_t sphereIbSize = static_cast<uint32_t>(indices.size() * sizeof(uint32_t));
+    if (!prim.vertexBuffer.InitAsVertexBuffer(
+            {device, allocator, vertices.data(), sphereVbSize, sizeof(ModelVertex)})) {
         SE_LOG_ERROR("Failed to create sphere vertex buffer");
         return;
     }
-    if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices.data(),
-                                            static_cast<uint32_t>(indices.size() * sizeof(uint32_t)))) {
+    if (!prim.indexBuffer.InitAsIndexBuffer({device, allocator, indices.data(), sphereIbSize})) {
         SE_LOG_ERROR("Failed to create sphere index buffer");
         return;
     }
@@ -215,12 +215,12 @@ void SceneRenderer::Init(RenderContext& ctx) {
     // Root signature: CBV b0 (PerFrame), CBV b1 (PerObject), CBV b2 (PerMaterial),
     //                 DescriptorTable(SRV t0), Constants b3 (objectId), StaticSampler s0
     m_rootSignature = RootSignatureBuilder()
-                          .AddCBV(0)                                                 // slot 0: PerFrame
-                          .AddCBV(1)                                                 // slot 1: PerObject
-                          .AddCBV(2)                                                 // slot 2: PerMaterial
-                          .AddDescriptorTable(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0) // slot 3: baseColorTex t0
-                          .AddConstants(1, 3)                                        // slot 4: objectId (b3, 1 DWORD)
-                          .AddStaticSampler(0)                                       // s0: linear wrap
+                          .AddCBV({0})                                                 // slot 0: PerFrame
+                          .AddCBV({1})                                                 // slot 1: PerObject
+                          .AddCBV({2})                                                 // slot 2: PerMaterial
+                          .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0}) // slot 3: baseColorTex t0
+                          .AddConstants({1, 3})                                        // slot 4: objectId (b3, 1 DWORD)
+                          .AddStaticSampler({0})                                       // s0: linear wrap
                           .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
                           .Build(device);
 
@@ -286,8 +286,8 @@ void SceneRenderer::Init(RenderContext& ctx) {
         texCmdList.Reset();
 
         uint8_t whitePixel[] = {255, 255, 255, 255};
-        if (!m_defaultWhiteTex.InitFromMemory(device, allocator, texCmdList.Get(), ctx.GetSrvHeap(), whitePixel, 1, 1,
-                                              4)) {
+        if (!m_defaultWhiteTex.InitFromMemory(
+                {device, allocator, texCmdList.Get(), &ctx.GetSrvHeap(), whitePixel, 1, 1, 4})) {
             SE_LOG_ERROR("Failed to create default white texture");
             texCmdList.Shutdown();
             return;
@@ -352,9 +352,9 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
 
     float idClearColor[] = {0.0f, 0.0f, 0.0f, 0.0f};
     if (m_objectIdRT.GetResource()) {
-        m_objectIdRT.Resize(m_device, m_allocator, *m_srvHeap, width, height);
+        m_objectIdRT.Resize({m_device, m_allocator, m_srvHeap, width, height});
     } else {
-        if (!m_objectIdRT.Init(m_device, m_allocator, *m_srvHeap, width, height, DXGI_FORMAT_R32_UINT, idClearColor)) {
+        if (!m_objectIdRT.Init({m_device, m_allocator, m_srvHeap, width, height, DXGI_FORMAT_R32_UINT, idClearColor})) {
             SE_LOG_ERROR("Failed to init object ID render target");
         }
     }
@@ -362,7 +362,7 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
     if (m_objectIdDepth.GetResource()) {
         m_objectIdDepth.Resize(m_device, m_allocator, width, height);
     } else {
-        if (!m_objectIdDepth.Init(m_device, m_allocator, width, height)) {
+        if (!m_objectIdDepth.Init({m_device, m_allocator, width, height})) {
             SE_LOG_ERROR("Failed to init object ID depth buffer");
         }
     }

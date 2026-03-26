@@ -8,27 +8,25 @@
 namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
-bool Buffer::InitAsVertexBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                                 const void* data, uint32_t size, uint32_t stride) {
-    if (!CreateUploadBuffer(device, allocator, size, data)) {
+bool Buffer::InitAsVertexBuffer(const VertexBufferDesc& desc) {
+    if (!CreateUploadBuffer(desc.device, desc.allocator, desc.size, desc.data)) {
         return false;
     }
 
     m_vbView.BufferLocation = m_resource->GetGPUVirtualAddress();
-    m_vbView.SizeInBytes = size;
-    m_vbView.StrideInBytes = stride;
+    m_vbView.SizeInBytes = desc.size;
+    m_vbView.StrideInBytes = desc.stride;
     return true;
 }
 
-bool Buffer::InitAsIndexBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                                const void* data, uint32_t size, DXGI_FORMAT format) {
-    if (!CreateUploadBuffer(device, allocator, size, data)) {
+bool Buffer::InitAsIndexBuffer(const IndexBufferDesc& desc) {
+    if (!CreateUploadBuffer(desc.device, desc.allocator, desc.size, desc.data)) {
         return false;
     }
 
     m_ibView.BufferLocation = m_resource->GetGPUVirtualAddress();
-    m_ibView.SizeInBytes = size;
-    m_ibView.Format = format;
+    m_ibView.SizeInBytes = desc.size;
+    m_ibView.Format = desc.format;
     return true;
 }
 
@@ -60,8 +58,7 @@ void Buffer::UpdateDataAtOffset(const void* data, uint32_t size, uint32_t offset
 }
 
 // ── Internal ─────────────────────────────────────────────────────────
-bool Buffer::CreateUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                                 uint32_t size, const void* data) {
+bool Buffer::CreateUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t size, const void* data) {
     m_size = size;
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
@@ -78,12 +75,8 @@ bool Buffer::CreateUploadBuffer(ID3D12Device* device, D3D12MA::Allocator* alloca
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    HRESULT hr = allocator->CreateResource(
-        &allocDesc, &resourceDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        &m_allocation,
-        IID_PPV_ARGS(&m_resource));
+    HRESULT hr = allocator->CreateResource(&allocDesc, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+                                           &m_allocation, IID_PPV_ARGS(&m_resource));
 
     if (FAILED(hr)) {
         SE_LOG_ERROR("Failed to create upload buffer");

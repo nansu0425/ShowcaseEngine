@@ -6,12 +6,19 @@
 namespace showcase {
 
 // ── Init ─────────────────────────────────────────────────────────────
-bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator, ID3D12GraphicsCommandList* cmdList,
-                             DescriptorHeap& srvHeap, const uint8_t* data, uint32_t width, uint32_t height,
-                             uint32_t channels, DXGI_FORMAT format) {
+bool Texture::InitFromMemory(const TextureLoadDesc& desc) {
     SE_ZONE_SCOPED_C(profile::kColorAssetIO);
-    m_width = width;
-    m_height = height;
+    m_width = desc.width;
+    m_height = desc.height;
+
+    auto* device = desc.device;
+    auto* allocator = desc.allocator;
+    auto* cmdList = desc.cmdList;
+    const uint8_t* data = desc.data;
+    uint32_t width = desc.width;
+    uint32_t height = desc.height;
+    uint32_t channels = desc.channels;
+    DXGI_FORMAT format = desc.format;
 
     // Expand RGB to RGBA if needed
     std::vector<uint8_t> rgbaData;
@@ -121,7 +128,7 @@ bool Texture::InitFromMemory(ID3D12Device* device, D3D12MA::Allocator* allocator
     cmdList->ResourceBarrier(1, &barrier);
 
     // Create SRV
-    m_srvHandle = srvHeap.Allocate();
+    m_srvHandle = desc.srvHeap->Allocate();
     if (!m_srvHandle.IsValid()) {
         SE_LOG_ERROR("Failed to allocate SRV descriptor for texture");
         return false;

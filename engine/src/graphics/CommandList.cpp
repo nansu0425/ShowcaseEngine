@@ -14,8 +14,7 @@ bool CommandList::Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE type) {
         return false;
     }
 
-    if (FAILED(device->CreateCommandList(0, type, m_allocator.Get(), nullptr,
-                                          IID_PPV_ARGS(&m_commandList)))) {
+    if (FAILED(device->CreateCommandList(0, type, m_allocator.Get(), nullptr, IID_PPV_ARGS(&m_commandList)))) {
         SE_LOG_ERROR("Failed to create command list");
         return false;
     }
@@ -41,9 +40,8 @@ void CommandList::Close() {
 }
 
 // ── Barriers ─────────────────────────────────────────────────────────
-void CommandList::TransitionBarrier(ID3D12Resource* resource,
-                                     D3D12_RESOURCE_STATES before,
-                                     D3D12_RESOURCE_STATES after) {
+void CommandList::TransitionBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before,
+                                    D3D12_RESOURCE_STATES after) {
     SE_ASSERT(resource != nullptr);
     D3D12_RESOURCE_BARRIER barrier = {};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;

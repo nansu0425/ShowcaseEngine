@@ -12,11 +12,11 @@ bool OffscreenTarget::Init(RenderContext& ctx, uint32_t initialWidth, uint32_t i
     auto* device = ctx.GetDevice().GetDevice();
     auto* allocator = ctx.GetDevice().GetAllocator();
 
-    if (!m_renderTarget.Init(device, allocator, ctx.GetSrvHeap(), initialWidth, initialHeight)) {
+    if (!m_renderTarget.Init({device, allocator, &ctx.GetSrvHeap(), initialWidth, initialHeight})) {
         return false;
     }
 
-    if (!m_depthBuffer.Init(device, allocator, initialWidth, initialHeight)) {
+    if (!m_depthBuffer.Init({device, allocator, initialWidth, initialHeight})) {
         return false;
     }
     m_depthBuffer.CreateSRV(device, ctx.GetSrvHeap());
@@ -83,7 +83,7 @@ void OffscreenTarget::Resize(uint32_t width, uint32_t height) {
     auto* device = m_ctx->GetDevice().GetDevice();
     auto* allocator = m_ctx->GetDevice().GetAllocator();
     m_ctx->GetDirectQueue().Flush();
-    m_renderTarget.Resize(device, allocator, m_ctx->GetSrvHeap(), width, height);
+    m_renderTarget.Resize({device, allocator, &m_ctx->GetSrvHeap(), width, height});
     m_depthBuffer.Resize(device, allocator, width, height);
     m_depthBuffer.CreateSRV(device, m_ctx->GetSrvHeap());
     m_width = width;

@@ -6,26 +6,25 @@
 namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
-bool DescriptorHeap::Init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors,
-                          bool shaderVisible) {
-    m_type = type;
-    m_numDescriptors = numDescriptors;
-    m_shaderVisible = shaderVisible;
+bool DescriptorHeap::Init(const DescriptorHeapDesc& desc) {
+    m_type = desc.type;
+    m_numDescriptors = desc.numDescriptors;
+    m_shaderVisible = desc.shaderVisible;
 
-    D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-    desc.Type = type;
-    desc.NumDescriptors = numDescriptors;
-    desc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    desc.NodeMask = 0;
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.Type = desc.type;
+    heapDesc.NumDescriptors = desc.numDescriptors;
+    heapDesc.Flags = desc.shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    heapDesc.NodeMask = 0;
 
-    if (FAILED(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_heap)))) {
+    if (FAILED(desc.device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_heap)))) {
         SE_LOG_ERROR("Failed to create descriptor heap");
         return false;
     }
 
-    m_descriptorSize = device->GetDescriptorHandleIncrementSize(type);
+    m_descriptorSize = desc.device->GetDescriptorHandleIncrementSize(desc.type);
     m_cpuStart = m_heap->GetCPUDescriptorHandleForHeapStart();
-    if (shaderVisible) {
+    if (desc.shaderVisible) {
         m_gpuStart = m_heap->GetGPUDescriptorHandleForHeapStart();
     }
 

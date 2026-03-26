@@ -32,9 +32,38 @@ void Model::Shutdown(RenderContext& ctx) {
     meshes.clear();
 }
 
+// ── Descriptor structs for internal helpers ─────────────────────────
+struct GLTFTextureLoadDesc {
+    const tinygltf::Model* gltfModel = nullptr;
+    RenderContext* ctx = nullptr;
+};
+
+struct GLTFMaterialLoadDesc {
+    const tinygltf::Model* gltfModel = nullptr;
+    const std::vector<std::shared_ptr<Texture>>* textures = nullptr;
+};
+
+struct GatherMeshDesc {
+    const tinygltf::Model* gltfModel = nullptr;
+    int nodeIndex = 0;
+    Matrix parentTransform;
+};
+
+struct MeshExtractionDesc {
+    const tinygltf::Model* gltfModel = nullptr;
+    const tinygltf::Primitive* gltfPrim = nullptr;
+    Matrix nodeTransform;
+};
+
+struct MeshExtractionOutput {
+    std::vector<ModelVertex> vertices;
+    std::vector<uint32_t> indices;
+};
+
 // ── Texture loading ──────────────────────────────────────────────────
-static bool LoadTextures(const tinygltf::Model& gltfModel, RenderContext& ctx,
-                         std::vector<std::shared_ptr<Texture>>& outTextures) {
+static bool LoadTextures(const GLTFTextureLoadDesc& desc, std::vector<std::shared_ptr<Texture>>& outTextures) {
+    const auto& gltfModel = *desc.gltfModel;
+    auto& ctx = *desc.ctx;
     if (gltfModel.images.empty())
         return true;
 
@@ -59,9 +88,15 @@ static bool LoadTextures(const tinygltf::Model& gltfModel, RenderContext& ctx,
         }
 
         outTextures[i] = std::make_shared<Texture>();
-        if (!outTextures[i]->InitFromMemory(device, allocator, cmdList.Get(), ctx.GetSrvHeap(), image.image.data(),
-                                            static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height),
-                                            static_cast<uint32_t>(image.component))) {
+        TextureLoadDesc texDesc = {device,
+                                   allocator,
+                                   cmdList.Get(),
+                                   &ctx.GetSrvHeap(),
+                                   image.image.data(),
+                                   static_cast<uint32_t>(image.width),
+                                   static_cast<uint32_t>(image.height),
+                                   static_cast<uint32_t>(image.component)};
+        if (!outTextures[i]->InitFromMemory(texDesc)) {
             SE_LOG_ERROR("Failed to load texture at index {}", i);
             return false;
         }
@@ -81,8 +116,9 @@ static bool LoadTextures(const tinygltf::Model& gltfModel, RenderContext& ctx,
 }
 
 // ── Material loading ─────────────────────────────────────────────────
-static void LoadMaterials(const tinygltf::Model& gltfModel, const std::vector<std::shared_ptr<Texture>>& textures,
-                          std::vector<std::shared_ptr<Material>>& outMaterials) {
+static void LoadMaterials(const GLTFMaterialLoadDesc& desc, std::vector<std::shared_ptr<Material>>& outMaterials) {
+    const auto& gltfModel = *desc.gltfModel;
+    const auto& textures = *desc.textures;
     outMaterials.resize(gltfModel.materials.size());
 
     for (size_t i = 0; i < gltfModel.materials.size(); ++i) {
@@ -149,25 +185,28 @@ static Matrix ComputeNodeLocalTransform(const tinygltf::Node& node) {
     return S * R * T;
 }
 
-static void GatherMeshInstances(const tinygltf::Model& gltfModel, int nodeIndex, const Matrix& parentTransform,
-                                std::vector<MeshInstance>& outInstances) {
-    const auto& node = gltfModel.nodes[nodeIndex];
+static void GatherMeshInstances(const GatherMeshDesc& desc, std::vector<MeshInstance>& outInstances) {
+    const auto& node = desc.gltfModel->nodes[desc.nodeIndex];
     Matrix localTransform = ComputeNodeLocalTransform(node);
-    Matrix worldTransform = localTransform * parentTransform;
+    Matrix worldTransform = localTransform * desc.parentTransform;
 
     if (node.mesh >= 0) {
         outInstances.push_back({node.mesh, worldTransform});
     }
 
     for (int childIdx : node.children) {
-        GatherMeshInstances(gltfModel, childIdx, worldTransform, outInstances);
+        GatherMeshInstances({desc.gltfModel, childIdx, worldTransform}, outInstances);
     }
 }
 
 // ── Mesh extraction ──────────────────────────────────────────────────
-static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel, const tinygltf::Primitive& gltfPrim,
-                                      std::vector<ModelVertex>& vertices, std::vector<uint32_t>& indices,
-                                      const Matrix& nodeTransform) {
+static void ExtractVerticesAndIndices(const MeshExtractionDesc& desc, MeshExtractionOutput& outMesh) {
+    const auto& gltfModel = *desc.gltfModel;
+    const auto& gltfPrim = *desc.gltfPrim;
+    auto& vertices = outMesh.vertices;
+    auto& indices = outMesh.indices;
+    const auto& nodeTransform = desc.nodeTransform;
+
     // Position
     const auto posIt = gltfPrim.attributes.find("POSITION");
     if (posIt == gltfPrim.attributes.end())
@@ -311,12 +350,12 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
 
     // Load textures and materials
     std::vector<std::shared_ptr<Texture>> textures;
-    if (!LoadTextures(gltfModel, ctx, textures)) {
+    if (!LoadTextures({&gltfModel, &ctx}, textures)) {
         return false;
     }
 
     std::vector<std::shared_ptr<Material>> materials;
-    LoadMaterials(gltfModel, textures, materials);
+    LoadMaterials({&gltfModel, &textures}, materials);
 
     // Gather mesh instances from node hierarchy (applies node transforms)
     std::vector<MeshInstance> instances;
@@ -324,7 +363,7 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
         int sceneIdx = gltfModel.defaultScene >= 0 ? gltfModel.defaultScene : 0;
         const auto& scene = gltfModel.scenes[sceneIdx];
         for (int rootIdx : scene.nodes) {
-            GatherMeshInstances(gltfModel, rootIdx, MatrixIdentity(), instances);
+            GatherMeshInstances({&gltfModel, rootIdx, MatrixIdentity()}, instances);
         }
     } else {
         for (int i = 0; i < static_cast<int>(gltfModel.meshes.size()); ++i) {
@@ -349,17 +388,18 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
             const auto& gltfPrim = gltfMesh.primitives[pi];
             auto& prim = mesh.primitives[pi];
 
-            std::vector<ModelVertex> vertices;
-            std::vector<uint32_t> indices;
-            ExtractVerticesAndIndices(gltfModel, gltfPrim, vertices, indices, inst.transform);
+            MeshExtractionOutput meshData;
+            ExtractVerticesAndIndices({&gltfModel, &gltfPrim, inst.transform}, meshData);
+            auto& vertices = meshData.vertices;
+            auto& indices = meshData.indices;
 
             if (vertices.empty())
                 continue;
 
             // Create vertex buffer
             const uint32_t vbSize = static_cast<uint32_t>(vertices.size() * sizeof(ModelVertex));
-            if (!prim.vertexBuffer.InitAsVertexBuffer(device, allocator, vertices.data(), vbSize,
-                                                      sizeof(ModelVertex))) {
+            if (!prim.vertexBuffer.InitAsVertexBuffer(
+                    {device, allocator, vertices.data(), vbSize, sizeof(ModelVertex)})) {
                 SE_LOG_ERROR("Failed to create vertex buffer for mesh '{}'", mesh.name);
                 return false;
             }
@@ -368,8 +408,7 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
             prim.indexCount = static_cast<uint32_t>(indices.size());
             if (!indices.empty()) {
                 const uint32_t ibSize = static_cast<uint32_t>(indices.size() * sizeof(uint32_t));
-                if (!prim.indexBuffer.InitAsIndexBuffer(device, allocator, indices.data(), ibSize,
-                                                        DXGI_FORMAT_R32_UINT)) {
+                if (!prim.indexBuffer.InitAsIndexBuffer({device, allocator, indices.data(), ibSize})) {
                     SE_LOG_ERROR("Failed to create index buffer for mesh '{}'", mesh.name);
                     return false;
                 }

@@ -18,10 +18,16 @@ struct DescriptorHandle {
     bool IsValid() const { return index != UINT32_MAX; }
 };
 
+struct DescriptorHeapDesc {
+    ID3D12Device* device = nullptr;
+    D3D12_DESCRIPTOR_HEAP_TYPE type = {};
+    uint32_t numDescriptors = 0;
+    bool shaderVisible = false;
+};
+
 class DescriptorHeap {
 public:
-    [[nodiscard]] bool Init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
-              uint32_t numDescriptors, bool shaderVisible = false);
+    [[nodiscard]] bool Init(const DescriptorHeapDesc& desc);
     void Shutdown();
 
     DescriptorHandle Allocate();

@@ -11,14 +11,29 @@ using Microsoft::WRL::ComPtr;
 
 namespace showcase {
 
+struct RenderTargetInitDesc {
+    ID3D12Device* device = nullptr;
+    D3D12MA::Allocator* allocator = nullptr;
+    DescriptorHeap* srvHeap = nullptr;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    const float* clearColor = nullptr;
+};
+
+struct RenderTargetResizeDesc {
+    ID3D12Device* device = nullptr;
+    D3D12MA::Allocator* allocator = nullptr;
+    DescriptorHeap* srvHeap = nullptr;
+    uint32_t width = 0;
+    uint32_t height = 0;
+};
+
 class RenderTarget {
 public:
-    [[nodiscard]] bool Init(ID3D12Device* device, D3D12MA::Allocator* allocator, DescriptorHeap& srvHeap,
-                            uint32_t width, uint32_t height, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM,
-                            const float* clearColor = nullptr);
+    [[nodiscard]] bool Init(const RenderTargetInitDesc& desc);
     void Shutdown(DescriptorHeap& srvHeap);
-    void Resize(ID3D12Device* device, D3D12MA::Allocator* allocator, DescriptorHeap& srvHeap, uint32_t width,
-                uint32_t height);
+    void Resize(const RenderTargetResizeDesc& desc);
 
     ID3D12Resource* GetResource() const { return m_resource.Get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetRTV() const { return m_rtvHeap.GetHandle(0).cpu; }
@@ -28,8 +43,7 @@ public:
     uint32_t GetHeight() const { return m_height; }
 
 private:
-    bool CreateResources(ID3D12Device* device, D3D12MA::Allocator* allocator, DescriptorHeap& srvHeap, uint32_t width,
-                         uint32_t height);
+    bool CreateResources(const RenderTargetResizeDesc& desc);
 
     ComPtr<ID3D12Resource> m_resource;
     ComPtr<D3D12MA::Allocation> m_allocation;

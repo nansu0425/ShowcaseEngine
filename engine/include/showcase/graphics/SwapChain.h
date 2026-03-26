@@ -2,12 +2,12 @@
 
 #include <showcase/graphics/DescriptorHeap.h>
 
-#include <dxgi1_6.h>
 #include <d3d12.h>
+#include <dxgi1_6.h>
 #include <wrl/client.h>
 
-#include <cstdint>
 #include <array>
+#include <cstdint>
 
 using Microsoft::WRL::ComPtr;
 
@@ -15,12 +15,20 @@ namespace showcase {
 
 class CommandQueue;
 
+struct SwapChainDesc {
+    ID3D12Device* device = nullptr;
+    IDXGIFactory6* factory = nullptr;
+    CommandQueue* commandQueue = nullptr;
+    HWND hwnd = nullptr;
+    uint32_t width = 0;
+    uint32_t height = 0;
+};
+
 class SwapChain {
 public:
     static constexpr uint32_t kBufferCount = 3;
 
-    [[nodiscard]] bool Init(ID3D12Device* device, IDXGIFactory6* factory, CommandQueue& commandQueue,
-              HWND hwnd, uint32_t width, uint32_t height);
+    [[nodiscard]] bool Init(const SwapChainDesc& desc);
     void Shutdown();
 
     void Present(bool vsync = true);

@@ -12,6 +12,8 @@ namespace showcase {
 class EditorController;
 struct Model;
 
+using ResolveModelFn = std::function<Model*(const std::string&)>;
+
 // ── Command base ────────────────────────────────────────────────────
 
 class Command {
@@ -50,10 +52,16 @@ private:
 
 // ── Concrete commands ───────────────────────────────────────────────
 
+struct TransformCommandDesc {
+    Scene* scene;
+    uint32_t objectId;
+    Vector3 oldPos, oldRot, oldScale;
+    Vector3 newPos, newRot, newScale;
+};
+
 class TransformCommand : public Command {
 public:
-    TransformCommand(Scene& scene, uint32_t objectId, Vector3 oldPos, Vector3 oldRot, Vector3 oldScale, Vector3 newPos,
-                     Vector3 newRot, Vector3 newScale);
+    explicit TransformCommand(const TransformCommandDesc& desc);
     void Execute() override;
     void Undo() override;
     std::string GetName() const override { return "Transform"; }
@@ -79,11 +87,17 @@ private:
     std::string m_oldName, m_newName;
 };
 
+struct ChangeModelCommandDesc {
+    Scene* scene;
+    uint32_t objectId;
+    std::string oldSource;
+    std::string newSource;
+    ResolveModelFn resolver;
+};
+
 class ChangeModelCommand : public Command {
 public:
-    using ResolveModelFn = std::function<Model*(const std::string&)>;
-    ChangeModelCommand(Scene& scene, uint32_t objectId, std::string oldSource, std::string newSource,
-                       ResolveModelFn resolver);
+    explicit ChangeModelCommand(const ChangeModelCommandDesc& desc);
     void Execute() override;
     void Undo() override;
     std::string GetName() const override { return "Change Model"; }
@@ -96,10 +110,16 @@ private:
     ResolveModelFn m_resolver;
 };
 
+struct ChangeBaseColorCommandDesc {
+    Scene* scene;
+    uint32_t objectId;
+    std::optional<Vector4> oldColor;
+    std::optional<Vector4> newColor;
+};
+
 class ChangeBaseColorCommand : public Command {
 public:
-    ChangeBaseColorCommand(Scene& scene, uint32_t objectId, std::optional<Vector4> oldColor,
-                           std::optional<Vector4> newColor);
+    explicit ChangeBaseColorCommand(const ChangeBaseColorCommandDesc& desc);
     void Execute() override;
     void Undo() override;
     std::string GetName() const override { return "Change Base Color"; }
@@ -111,10 +131,16 @@ private:
     std::optional<Vector4> m_oldColor, m_newColor;
 };
 
+struct AddComponentCommandDesc {
+    Scene* scene;
+    uint32_t objectId;
+    std::optional<ModelComponent> oldComp;
+    std::optional<ModelComponent> newComp;
+};
+
 class AddComponentCommand : public Command {
 public:
-    AddComponentCommand(Scene& scene, uint32_t objectId, std::optional<ModelComponent> oldComp,
-                        std::optional<ModelComponent> newComp);
+    explicit AddComponentCommand(const AddComponentCommandDesc& desc);
     void Execute() override;
     void Undo() override;
     std::string GetName() const override { return "Add Component"; }

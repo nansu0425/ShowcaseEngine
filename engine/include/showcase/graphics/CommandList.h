@@ -15,9 +15,7 @@ public:
     void Reset();
     void Close();
 
-    void TransitionBarrier(ID3D12Resource* resource,
-                           D3D12_RESOURCE_STATES before,
-                           D3D12_RESOURCE_STATES after);
+    void TransitionBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
 
     ID3D12GraphicsCommandList* Get() const { return m_commandList.Get(); }
     ID3D12GraphicsCommandList* operator->() const { return m_commandList.Get(); }

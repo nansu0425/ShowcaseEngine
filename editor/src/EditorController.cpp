@@ -14,9 +14,13 @@ namespace showcase {
 
 // ── Update ────────────────────────────────────────────────────────
 
-void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport,
-                              RenderContext& renderContext) {
+void EditorController::Update(const EditorUpdateDesc& desc) {
     SE_ZONE_SCOPED_C(profile::kColorUpdate);
+    const Input& input = *desc.input;
+    Scene& scene = *desc.scene;
+    SceneRenderer& renderer = *desc.renderer;
+    ViewportPanel& viewport = *desc.viewport;
+    RenderContext& renderContext = *desc.renderContext;
 
     // Check for completed GPU pick result from previous frame
     if (m_pickPending && renderer.IsPickComplete(renderContext)) {
@@ -152,8 +156,8 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 m_gizmoDragging = false;
                 if (m_commandHistory) {
                     m_commandHistory->RecordCommand(std::make_unique<TransformCommand>(
-                        scene, selected->id, m_gizmoStartPos, m_gizmoStartRot, m_gizmoStartScale, selected->position,
-                        selected->rotation, selected->scale));
+                        TransformCommandDesc{&scene, selected->id, m_gizmoStartPos, m_gizmoStartRot, m_gizmoStartScale,
+                                             selected->position, selected->rotation, selected->scale}));
                 }
             }
         }
@@ -254,8 +258,8 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
                     if (m_commandHistory) {
                         m_commandHistory->RecordCommand(std::make_unique<TransformCommand>(
-                            scene, selected->id, m_dragStartPos, m_dragStartRot, m_dragStartScale, selected->position,
-                            selected->rotation, selected->scale));
+                            TransformCommandDesc{&scene, selected->id, m_dragStartPos, m_dragStartRot, m_dragStartScale,
+                                                 selected->position, selected->rotation, selected->scale}));
                     }
                 }
 
@@ -270,8 +274,8 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
                     if (m_commandHistory) {
                         m_commandHistory->RecordCommand(std::make_unique<TransformCommand>(
-                            scene, selected->id, m_dragStartPos, m_dragStartRot, m_dragStartScale, selected->position,
-                            selected->rotation, selected->scale));
+                            TransformCommandDesc{&scene, selected->id, m_dragStartPos, m_dragStartRot, m_dragStartScale,
+                                                 selected->position, selected->rotation, selected->scale}));
                     }
                 }
 
@@ -287,8 +291,8 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
                     if (m_commandHistory) {
                         m_commandHistory->RecordCommand(std::make_unique<TransformCommand>(
-                            scene, selected->id, m_dragStartPos, m_dragStartRot, m_dragStartScale, selected->position,
-                            selected->rotation, selected->scale));
+                            TransformCommandDesc{&scene, selected->id, m_dragStartPos, m_dragStartRot, m_dragStartScale,
+                                                 selected->position, selected->rotation, selected->scale}));
                     }
                 }
 
@@ -311,8 +315,9 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         // "(none)" option to clear model
                         if (ImGui::Selectable("(none)", currentSource.empty())) {
                             if (m_commandHistory) {
-                                m_commandHistory->ExecuteCommand(std::make_unique<ChangeModelCommand>(
-                                    scene, selected->id, currentSource, "", m_resolveModelCallback));
+                                m_commandHistory->ExecuteCommand(
+                                    std::make_unique<ChangeModelCommand>(ChangeModelCommandDesc{
+                                        &scene, selected->id, currentSource, "", m_resolveModelCallback}));
                             }
                         }
 
@@ -323,8 +328,9 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                 bool isCurrent = (src == currentSource);
                                 if (ImGui::Selectable(src.c_str(), isCurrent)) {
                                     if (m_commandHistory) {
-                                        m_commandHistory->ExecuteCommand(std::make_unique<ChangeModelCommand>(
-                                            scene, selected->id, currentSource, src, m_resolveModelCallback));
+                                        m_commandHistory->ExecuteCommand(
+                                            std::make_unique<ChangeModelCommand>(ChangeModelCommandDesc{
+                                                &scene, selected->id, currentSource, src, m_resolveModelCallback}));
                                     }
                                 }
                                 if (isCurrent)
@@ -343,8 +349,8 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         std::optional<Vector4> newColor =
                             hasOverride ? std::optional(Vector4(0.7f, 0.7f, 0.7f, 1.0f)) : std::nullopt;
                         if (m_commandHistory) {
-                            m_commandHistory->ExecuteCommand(
-                                std::make_unique<ChangeBaseColorCommand>(scene, selected->id, oldColor, newColor));
+                            m_commandHistory->ExecuteCommand(std::make_unique<ChangeBaseColorCommand>(
+                                ChangeBaseColorCommandDesc{&scene, selected->id, oldColor, newColor}));
                         }
                     }
                     if (selected->modelComp->baseColor.has_value()) {
@@ -360,8 +366,9 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         }
                         if (ImGui::IsItemDeactivatedAfterEdit()) {
                             if (m_commandHistory) {
-                                m_commandHistory->RecordCommand(std::make_unique<ChangeBaseColorCommand>(
-                                    scene, selected->id, m_dragStartColor, selected->modelComp->baseColor));
+                                m_commandHistory->RecordCommand(
+                                    std::make_unique<ChangeBaseColorCommand>(ChangeBaseColorCommandDesc{
+                                        &scene, selected->id, m_dragStartColor, selected->modelComp->baseColor}));
                             }
                         }
                     }
@@ -371,7 +378,7 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 if (!headerOpen) {
                     if (m_commandHistory) {
                         m_commandHistory->ExecuteCommand(std::make_unique<AddComponentCommand>(
-                            scene, selected->id, selected->modelComp, std::nullopt));
+                            AddComponentCommandDesc{&scene, selected->id, selected->modelComp, std::nullopt}));
                     }
                 }
             }
@@ -389,7 +396,7 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                     if (ImGui::MenuItem("Model")) {
                         if (m_commandHistory) {
                             m_commandHistory->ExecuteCommand(std::make_unique<AddComponentCommand>(
-                                scene, selected->id, std::nullopt, ModelComponent{}));
+                                AddComponentCommandDesc{&scene, selected->id, std::nullopt, ModelComponent{}}));
                         }
                     }
                 } else {

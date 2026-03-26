@@ -5,66 +5,56 @@
 namespace showcase {
 
 // ── Root parameters ──────────────────────────────────────────────────
-RootSignatureBuilder& RootSignatureBuilder::AddCBV(uint32_t shaderRegister, uint32_t space,
-                                                     D3D12_SHADER_VISIBILITY visibility) {
+RootSignatureBuilder& RootSignatureBuilder::AddCBV(const RootDescriptorDesc& desc) {
     D3D12_ROOT_PARAMETER1 param = {};
     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    param.Descriptor.ShaderRegister = shaderRegister;
-    param.Descriptor.RegisterSpace = space;
+    param.Descriptor.ShaderRegister = desc.shaderRegister;
+    param.Descriptor.RegisterSpace = desc.space;
     param.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
-    param.ShaderVisibility = visibility;
+    param.ShaderVisibility = desc.visibility;
     m_parameters.push_back(param);
     return *this;
 }
 
-RootSignatureBuilder& RootSignatureBuilder::AddSRV(uint32_t shaderRegister, uint32_t space,
-                                                     D3D12_SHADER_VISIBILITY visibility) {
+RootSignatureBuilder& RootSignatureBuilder::AddSRV(const RootDescriptorDesc& desc) {
     D3D12_ROOT_PARAMETER1 param = {};
     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    param.Descriptor.ShaderRegister = shaderRegister;
-    param.Descriptor.RegisterSpace = space;
+    param.Descriptor.ShaderRegister = desc.shaderRegister;
+    param.Descriptor.RegisterSpace = desc.space;
     param.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
-    param.ShaderVisibility = visibility;
+    param.ShaderVisibility = desc.visibility;
     m_parameters.push_back(param);
     return *this;
 }
 
-RootSignatureBuilder& RootSignatureBuilder::AddUAV(uint32_t shaderRegister, uint32_t space,
-                                                     D3D12_SHADER_VISIBILITY visibility) {
+RootSignatureBuilder& RootSignatureBuilder::AddUAV(const RootDescriptorDesc& desc) {
     D3D12_ROOT_PARAMETER1 param = {};
     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
-    param.Descriptor.ShaderRegister = shaderRegister;
-    param.Descriptor.RegisterSpace = space;
+    param.Descriptor.ShaderRegister = desc.shaderRegister;
+    param.Descriptor.RegisterSpace = desc.space;
     param.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
-    param.ShaderVisibility = visibility;
+    param.ShaderVisibility = desc.visibility;
     m_parameters.push_back(param);
     return *this;
 }
 
-RootSignatureBuilder& RootSignatureBuilder::AddConstants(uint32_t num32BitValues,
-                                                           uint32_t shaderRegister,
-                                                           uint32_t space,
-                                                           D3D12_SHADER_VISIBILITY visibility) {
+RootSignatureBuilder& RootSignatureBuilder::AddConstants(const RootConstantsDesc& desc) {
     D3D12_ROOT_PARAMETER1 param = {};
     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-    param.Constants.ShaderRegister = shaderRegister;
-    param.Constants.RegisterSpace = space;
-    param.Constants.Num32BitValues = num32BitValues;
-    param.ShaderVisibility = visibility;
+    param.Constants.ShaderRegister = desc.shaderRegister;
+    param.Constants.RegisterSpace = desc.space;
+    param.Constants.Num32BitValues = desc.num32BitValues;
+    param.ShaderVisibility = desc.visibility;
     m_parameters.push_back(param);
     return *this;
 }
 
-RootSignatureBuilder& RootSignatureBuilder::AddDescriptorTable(D3D12_DESCRIPTOR_RANGE_TYPE rangeType,
-                                                                 uint32_t numDescriptors,
-                                                                 uint32_t baseShaderRegister,
-                                                                 uint32_t space,
-                                                                 D3D12_SHADER_VISIBILITY visibility) {
+RootSignatureBuilder& RootSignatureBuilder::AddDescriptorTable(const DescriptorTableDesc& desc) {
     D3D12_DESCRIPTOR_RANGE1 range = {};
-    range.RangeType = rangeType;
-    range.NumDescriptors = numDescriptors;
-    range.BaseShaderRegister = baseShaderRegister;
-    range.RegisterSpace = space;
+    range.RangeType = desc.rangeType;
+    range.NumDescriptors = desc.numDescriptors;
+    range.BaseShaderRegister = desc.baseShaderRegister;
+    range.RegisterSpace = desc.space;
     range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
     m_ranges.push_back(range);
@@ -74,17 +64,15 @@ RootSignatureBuilder& RootSignatureBuilder::AddDescriptorTable(D3D12_DESCRIPTOR_
     param.DescriptorTable.NumDescriptorRanges = 1;
     // Will be patched in Build() to point to the correct range
     param.DescriptorTable.pDescriptorRanges = reinterpret_cast<const D3D12_DESCRIPTOR_RANGE1*>(m_ranges.size() - 1);
-    param.ShaderVisibility = visibility;
+    param.ShaderVisibility = desc.visibility;
     m_parameters.push_back(param);
     return *this;
 }
 
 // ── Samplers / Flags ─────────────────────────────────────────────────
-RootSignatureBuilder& RootSignatureBuilder::AddStaticSampler(uint32_t shaderRegister, uint32_t space,
-                                                               D3D12_FILTER filter,
-                                                               D3D12_SHADER_VISIBILITY visibility) {
+RootSignatureBuilder& RootSignatureBuilder::AddStaticSampler(const StaticSamplerDesc& desc) {
     D3D12_STATIC_SAMPLER_DESC sampler = {};
-    sampler.Filter = filter;
+    sampler.Filter = desc.filter;
     sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -94,9 +82,9 @@ RootSignatureBuilder& RootSignatureBuilder::AddStaticSampler(uint32_t shaderRegi
     sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
     sampler.MinLOD = 0.0f;
     sampler.MaxLOD = D3D12_FLOAT32_MAX;
-    sampler.ShaderRegister = shaderRegister;
-    sampler.RegisterSpace = space;
-    sampler.ShaderVisibility = visibility;
+    sampler.ShaderRegister = desc.shaderRegister;
+    sampler.RegisterSpace = desc.space;
+    sampler.ShaderVisibility = desc.visibility;
     m_staticSamplers.push_back(sampler);
     return *this;
 }
@@ -131,15 +119,14 @@ ComPtr<ID3D12RootSignature> RootSignatureBuilder::Build(ID3D12Device* device) {
     if (FAILED(hr)) {
         if (errorBlob) {
             SE_LOG_ERROR("Root signature serialization error: {}",
-                        static_cast<const char*>(errorBlob->GetBufferPointer()));
+                         static_cast<const char*>(errorBlob->GetBufferPointer()));
         }
         return nullptr;
     }
 
     ComPtr<ID3D12RootSignature> rootSignature;
-    hr = device->CreateRootSignature(0, serializedRootSig->GetBufferPointer(),
-                                      serializedRootSig->GetBufferSize(),
-                                      IID_PPV_ARGS(&rootSignature));
+    hr = device->CreateRootSignature(0, serializedRootSig->GetBufferPointer(), serializedRootSig->GetBufferSize(),
+                                     IID_PPV_ARGS(&rootSignature));
     if (FAILED(hr)) {
         SE_LOG_ERROR("Failed to create root signature");
         return nullptr;

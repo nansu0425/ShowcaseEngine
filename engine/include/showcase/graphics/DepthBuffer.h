@@ -11,10 +11,17 @@ using Microsoft::WRL::ComPtr;
 
 namespace showcase {
 
+struct DepthBufferDesc {
+    ID3D12Device* device = nullptr;
+    D3D12MA::Allocator* allocator = nullptr;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    DXGI_FORMAT format = DXGI_FORMAT_D32_FLOAT;
+};
+
 class DepthBuffer {
 public:
-    [[nodiscard]] bool Init(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t width, uint32_t height,
-                            DXGI_FORMAT format = DXGI_FORMAT_D32_FLOAT);
+    [[nodiscard]] bool Init(const DepthBufferDesc& desc);
     void Shutdown(DescriptorHeap& srvHeap);
     void Resize(ID3D12Device* device, D3D12MA::Allocator* allocator, uint32_t width, uint32_t height);
 
