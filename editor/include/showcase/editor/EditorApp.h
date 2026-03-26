@@ -3,6 +3,7 @@
 #include <showcase/core/Input.h>
 #include <showcase/core/Timer.h>
 #include <showcase/core/Window.h>
+#include <showcase/editor/CommandHistory.h>
 #include <showcase/editor/Console.h>
 #include <showcase/editor/EditorController.h>
 #include <showcase/editor/ImGuiLayer.h>
@@ -70,6 +71,7 @@ private:
     SceneRenderer m_sceneRenderer;
     Scene m_scene;
     EditorController m_editorController;
+    CommandHistory m_commandHistory;
 
     AssetManager m_assetManager;
 

@@ -5,6 +5,7 @@ add_executable(ShowcaseEditor WIN32
     src/Console.cpp
     src/ViewportPanel.cpp
     src/EditorController.cpp
+    src/CommandHistory.cpp
     src/NativeDialog.cpp
 )
 

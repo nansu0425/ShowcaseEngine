@@ -7,9 +7,11 @@
 #include <ImGuizmo.h>
 
 #include <functional>
+#include <optional>
 
 namespace showcase {
 
+class CommandHistory;
 class Input;
 struct Model;
 class ViewportPanel;
@@ -35,6 +37,9 @@ public:
 
     using ResolveModelCallback = std::function<Model*(const std::string&)>;
     void SetResolveModelCallback(ResolveModelCallback cb) { m_resolveModelCallback = std::move(cb); }
+
+    void SetCommandHistory(CommandHistory* history) { m_commandHistory = history; }
+    int& GetSelectedObjectIdRef() { return m_selectedObjectId; }
 
     // State persistence
     ImGuizmo::OPERATION GetGizmoOperation() const { return m_gizmoOperation; }
@@ -71,6 +76,21 @@ private:
     AddObjectCallback m_addObjectCallback;
     AssetListCallback m_assetListCallback;
     ResolveModelCallback m_resolveModelCallback;
+
+    CommandHistory* m_commandHistory = nullptr;
+
+    // Gizmo drag coalescing
+    bool m_gizmoDragging = false;
+    Vector3 m_gizmoStartPos;
+    Vector3 m_gizmoStartRot;
+    Vector3 m_gizmoStartScale;
+
+    // Inspector drag start values
+    Vector3 m_dragStartPos;
+    Vector3 m_dragStartRot;
+    Vector3 m_dragStartScale;
+    std::string m_dragStartName;
+    std::optional<Vector4> m_dragStartColor;
 };
 
 } // namespace showcase

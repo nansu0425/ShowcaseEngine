@@ -116,6 +116,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `ImGuiLayer` | `ImGuiLayer.h` | ImGui context init, DX12 backend, frame begin/end |
 | `Console` | `Console.h` | Log viewer (via `LogListener`), command system, circular buffer (2048 entries) |
 | `EditorController` | `EditorController.h` | Object picking, ImGuizmo gizmos (W/E/R), Scene Hierarchy + Inspector panels (component-based UI) |
+| `CommandHistory` | `CommandHistory.h` | Undo/redo command pattern: `Command` base, `CommandHistory` stack manager, concrete commands (Transform, Rename, ChangeModel, ChangeBaseColor, AddComponent, AddObject, RemoveObject) |
 | `NativeDialog` | `NativeDialog.h` | Win32 native dialogs: confirm (yes/no/cancel), file open/save |
 
 ---

@@ -121,6 +121,12 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
     m_editorController.SetResolveModelCallback(
         [this](const std::string& src) -> Model* { return m_assetManager.LoadModel(src); });
 
+    m_commandHistory.SetDirtyCallback([this]() {
+        m_sceneDirty = true;
+        UpdateWindowTitle();
+    });
+    m_editorController.SetCommandHistory(&m_commandHistory);
+
     ScanAssets();
 
     UpdateWindowTitle();
@@ -332,6 +338,7 @@ void EditorApp::NewScene() {
     m_assetManager.Shutdown();
 
     m_editorController.ClearSelection();
+    m_commandHistory.Clear();
     BuildDefaultScene();
 
     // Reset camera to default
@@ -366,6 +373,7 @@ void EditorApp::OpenScene() {
     m_assetManager.Init(m_renderContext, m_sceneRenderer);
 
     m_editorController.ClearSelection();
+    m_commandHistory.Clear();
 
     JsonDocument doc;
     if (!doc.LoadFromFile(path)) {
@@ -476,6 +484,21 @@ void EditorApp::RenderMainMenuBar() {
             if (ImGui::MenuItem("Import Asset...")) {
                 ImportAsset();
             }
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Edit")) {
+            std::string undoLabel = m_commandHistory.CanUndo() ? "Undo " + m_commandHistory.GetUndoName() : "Undo";
+            if (ImGui::MenuItem(undoLabel.c_str(), nullptr, false, m_commandHistory.CanUndo())) {
+                m_commandHistory.Undo();
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("Ctrl+Z");
+            std::string redoLabel = m_commandHistory.CanRedo() ? "Redo " + m_commandHistory.GetRedoName() : "Redo";
+            if (ImGui::MenuItem(redoLabel.c_str(), nullptr, false, m_commandHistory.CanRedo())) {
+                m_commandHistory.Redo();
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("Ctrl+Y / Ctrl+Shift+Z");
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Tools")) {
@@ -644,6 +667,12 @@ int EditorApp::Run() {
             if (m_input.IsKeyDown(Key::kControl)) {
                 if (m_input.IsKeyDown(Key::kShift) && m_input.IsKeyPressed('S')) {
                     SaveSceneAs();
+                } else if (m_input.IsKeyDown(Key::kShift) && m_input.IsKeyPressed('Z')) {
+                    m_commandHistory.Redo();
+                } else if (m_input.IsKeyPressed('Z')) {
+                    m_commandHistory.Undo();
+                } else if (m_input.IsKeyPressed('Y')) {
+                    m_commandHistory.Redo();
                 } else if (m_input.IsKeyPressed('S')) {
                     SaveScene();
                 } else if (m_input.IsKeyPressed('O')) {

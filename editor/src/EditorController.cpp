@@ -2,6 +2,7 @@
 
 #include <showcase/core/Input.h>
 #include <showcase/core/Profiler.h>
+#include <showcase/editor/CommandHistory.h>
 #include <showcase/editor/ViewportPanel.h>
 
 #include <imgui.h>
@@ -36,10 +37,9 @@ void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& r
             m_gizmoMode = (m_gizmoMode == ImGuizmo::LOCAL) ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
         }
         if (input.IsKeyPressed(Key::kDelete) && m_selectedObjectId > 0) {
-            if (scene.RemoveObject(static_cast<uint32_t>(m_selectedObjectId))) {
-                m_selectedObjectId = -1;
-                if (m_dirtyCallback)
-                    m_dirtyCallback();
+            if (m_commandHistory) {
+                m_commandHistory->ExecuteCommand(std::make_unique<RemoveObjectCommand>(
+                    scene, m_selectedObjectId, static_cast<uint32_t>(m_selectedObjectId)));
             }
         }
     }
@@ -97,6 +97,13 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                  m_useSnap ? snap : nullptr);
 
             if (ImGuizmo::IsUsing()) {
+                if (!m_gizmoDragging) {
+                    m_gizmoDragging = true;
+                    m_gizmoStartPos = selected->position;
+                    m_gizmoStartRot = selected->rotation;
+                    m_gizmoStartScale = selected->scale;
+                }
+
                 Vector3 newPos, newScale;
                 Quaternion newRot;
                 if (world.Decompose(newScale, newRot, newPos)) {
@@ -112,6 +119,13 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                     if (m_dirtyCallback)
                         m_dirtyCallback();
                 }
+            } else if (m_gizmoDragging) {
+                m_gizmoDragging = false;
+                if (m_commandHistory) {
+                    m_commandHistory->RecordCommand(std::make_unique<TransformCommand>(
+                        scene, selected->id, m_gizmoStartPos, m_gizmoStartRot, m_gizmoStartScale, selected->position,
+                        selected->rotation, selected->scale));
+                }
             }
         }
     }
@@ -121,10 +135,9 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
         if (ImGui::Button("+")) {
             if (m_addObjectCallback) {
                 SceneObject* newObj = m_addObjectCallback("");
-                if (newObj) {
-                    m_selectedObjectId = static_cast<int>(newObj->id);
-                    if (m_dirtyCallback)
-                        m_dirtyCallback();
+                if (newObj && m_commandHistory) {
+                    m_commandHistory->ExecuteCommand(
+                        std::make_unique<AddObjectCommand>(scene, m_selectedObjectId, *newObj));
                 }
             }
         }
@@ -136,10 +149,10 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
         if (!hasSelection)
             ImGui::BeginDisabled();
         if (ImGui::Button("-")) {
-            scene.RemoveObject(static_cast<uint32_t>(m_selectedObjectId));
-            m_selectedObjectId = -1;
-            if (m_dirtyCallback)
-                m_dirtyCallback();
+            if (m_commandHistory) {
+                m_commandHistory->ExecuteCommand(std::make_unique<RemoveObjectCommand>(
+                    scene, m_selectedObjectId, static_cast<uint32_t>(m_selectedObjectId)));
+            }
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
             ImGui::SetTooltip("Remove selected object (Del)");
@@ -157,12 +170,10 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
             }
             if (ImGui::BeginPopupContextItem()) {
                 if (ImGui::MenuItem("Delete")) {
-                    if (static_cast<int>(obj.id) == m_selectedObjectId) {
-                        m_selectedObjectId = -1;
+                    if (m_commandHistory) {
+                        m_commandHistory->ExecuteCommand(
+                            std::make_unique<RemoveObjectCommand>(scene, m_selectedObjectId, obj.id));
                     }
-                    scene.RemoveObject(obj.id);
-                    if (m_dirtyCallback)
-                        m_dirtyCallback();
                     ImGui::EndPopup();
                     ImGui::PopID();
                     break;
@@ -186,6 +197,15 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 if (m_dirtyCallback)
                     m_dirtyCallback();
             }
+            if (ImGui::IsItemActivated()) {
+                m_dragStartName = selected->name;
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                if (m_commandHistory && selected->name != m_dragStartName) {
+                    m_commandHistory->RecordCommand(
+                        std::make_unique<RenameCommand>(scene, selected->id, m_dragStartName, selected->name));
+                }
+            }
             ImGui::SameLine();
             ImGui::TextDisabled("ID: %u", selected->id);
             ImGui::Separator();
@@ -193,15 +213,54 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
             // ── Transform (always shown) ──
             if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
                 bool changed = false;
+
                 if (ImGui::DragFloat3("Position", &selected->position.x, 0.1f)) {
                     changed = true;
                 }
+                if (ImGui::IsItemActivated()) {
+                    m_dragStartPos = selected->position;
+                    m_dragStartRot = selected->rotation;
+                    m_dragStartScale = selected->scale;
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    if (m_commandHistory) {
+                        m_commandHistory->RecordCommand(std::make_unique<TransformCommand>(
+                            scene, selected->id, m_dragStartPos, m_dragStartRot, m_dragStartScale, selected->position,
+                            selected->rotation, selected->scale));
+                    }
+                }
+
                 if (ImGui::DragFloat3("Rotation", &selected->rotation.x, 1.0f)) {
                     changed = true;
                 }
+                if (ImGui::IsItemActivated()) {
+                    m_dragStartPos = selected->position;
+                    m_dragStartRot = selected->rotation;
+                    m_dragStartScale = selected->scale;
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    if (m_commandHistory) {
+                        m_commandHistory->RecordCommand(std::make_unique<TransformCommand>(
+                            scene, selected->id, m_dragStartPos, m_dragStartRot, m_dragStartScale, selected->position,
+                            selected->rotation, selected->scale));
+                    }
+                }
+
                 if (ImGui::DragFloat3("Scale", &selected->scale.x, 0.1f, 0.01f, 100.0f)) {
                     selected->scale = ClampScale(selected->scale);
                     changed = true;
+                }
+                if (ImGui::IsItemActivated()) {
+                    m_dragStartPos = selected->position;
+                    m_dragStartRot = selected->rotation;
+                    m_dragStartScale = selected->scale;
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    if (m_commandHistory) {
+                        m_commandHistory->RecordCommand(std::make_unique<TransformCommand>(
+                            scene, selected->id, m_dragStartPos, m_dragStartRot, m_dragStartScale, selected->position,
+                            selected->rotation, selected->scale));
+                    }
                 }
 
                 if (changed) {
@@ -222,27 +281,24 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                     if (ImGui::BeginCombo("Model", preview)) {
                         // "(none)" option to clear model
                         if (ImGui::Selectable("(none)", currentSource.empty())) {
-                            selected->modelComp->modelSource.clear();
-                            selected->modelComp->model = nullptr;
-                            if (m_dirtyCallback)
-                                m_dirtyCallback();
+                            if (m_commandHistory) {
+                                m_commandHistory->ExecuteCommand(std::make_unique<ChangeModelCommand>(
+                                    scene, selected->id, currentSource, "", m_resolveModelCallback));
+                            }
                         }
 
                         // List available assets
                         if (m_assetListCallback) {
                             auto sources = m_assetListCallback();
                             for (const auto& src : sources) {
-                                bool isSelected = (src == currentSource);
-                                if (ImGui::Selectable(src.c_str(), isSelected)) {
-                                    selected->modelComp->modelSource = src;
-                                    if (m_resolveModelCallback) {
-                                        selected->modelComp->model = m_resolveModelCallback(src);
+                                bool isCurrent = (src == currentSource);
+                                if (ImGui::Selectable(src.c_str(), isCurrent)) {
+                                    if (m_commandHistory) {
+                                        m_commandHistory->ExecuteCommand(std::make_unique<ChangeModelCommand>(
+                                            scene, selected->id, currentSource, src, m_resolveModelCallback));
                                     }
-                                    selected->UpdateAABB();
-                                    if (m_dirtyCallback)
-                                        m_dirtyCallback();
                                 }
-                                if (isSelected)
+                                if (isCurrent)
                                     ImGui::SetItemDefaultFocus();
                             }
                         }
@@ -254,13 +310,13 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
 
                     bool hasOverride = selected->modelComp->baseColor.has_value();
                     if (ImGui::Checkbox("Base Color Override", &hasOverride)) {
-                        if (hasOverride) {
-                            selected->modelComp->baseColor = Vector4(0.7f, 0.7f, 0.7f, 1.0f);
-                        } else {
-                            selected->modelComp->baseColor = std::nullopt;
+                        std::optional<Vector4> oldColor = selected->modelComp->baseColor;
+                        std::optional<Vector4> newColor =
+                            hasOverride ? std::optional(Vector4(0.7f, 0.7f, 0.7f, 1.0f)) : std::nullopt;
+                        if (m_commandHistory) {
+                            m_commandHistory->ExecuteCommand(
+                                std::make_unique<ChangeBaseColorCommand>(scene, selected->id, oldColor, newColor));
                         }
-                        if (m_dirtyCallback)
-                            m_dirtyCallback();
                     }
                     if (selected->modelComp->baseColor.has_value()) {
                         float color[3] = {selected->modelComp->baseColor->x, selected->modelComp->baseColor->y,
@@ -270,14 +326,24 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                             if (m_dirtyCallback)
                                 m_dirtyCallback();
                         }
+                        if (ImGui::IsItemActivated()) {
+                            m_dragStartColor = selected->modelComp->baseColor;
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) {
+                            if (m_commandHistory) {
+                                m_commandHistory->RecordCommand(std::make_unique<ChangeBaseColorCommand>(
+                                    scene, selected->id, m_dragStartColor, selected->modelComp->baseColor));
+                            }
+                        }
                     }
                 }
 
                 // Remove component if header close button was clicked
                 if (!headerOpen) {
-                    selected->modelComp = std::nullopt;
-                    if (m_dirtyCallback)
-                        m_dirtyCallback();
+                    if (m_commandHistory) {
+                        m_commandHistory->ExecuteCommand(std::make_unique<AddComponentCommand>(
+                            scene, selected->id, selected->modelComp, std::nullopt));
+                    }
                 }
             }
 
@@ -292,9 +358,10 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
             if (ImGui::BeginPopup("AddComponentPopup")) {
                 if (!selected->modelComp.has_value()) {
                     if (ImGui::MenuItem("Model")) {
-                        selected->modelComp = ModelComponent{};
-                        if (m_dirtyCallback)
-                            m_dirtyCallback();
+                        if (m_commandHistory) {
+                            m_commandHistory->ExecuteCommand(std::make_unique<AddComponentCommand>(
+                                scene, selected->id, std::nullopt, ModelComponent{}));
+                        }
                     }
                 } else {
                     ImGui::TextDisabled("All components added");

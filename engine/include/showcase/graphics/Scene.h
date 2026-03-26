@@ -50,9 +50,11 @@ public:
     [[nodiscard]] bool LoadFromFile(const std::string& filePath);
 
     SceneObject* FindById(uint32_t id);
+    SceneObject& InsertObject(SceneObject obj, size_t index);
     std::vector<SceneObject>& GetObjects();
     const std::vector<SceneObject>& GetObjects() const;
     size_t GetObjectCount() const;
+    size_t GetObjectIndex(uint32_t id) const;
 
 private:
     std::vector<SceneObject> m_objects;

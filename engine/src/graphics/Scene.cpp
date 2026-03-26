@@ -224,6 +224,23 @@ bool Scene::LoadFromFile(const std::string& filePath) {
     return true;
 }
 
+SceneObject& Scene::InsertObject(SceneObject obj, size_t index) {
+    if (obj.id >= m_nextId) {
+        m_nextId = obj.id + 1;
+    }
+    index = std::min(index, m_objects.size());
+    auto it = m_objects.insert(m_objects.begin() + static_cast<ptrdiff_t>(index), std::move(obj));
+    return *it;
+}
+
+size_t Scene::GetObjectIndex(uint32_t id) const {
+    for (size_t i = 0; i < m_objects.size(); ++i) {
+        if (m_objects[i].id == id)
+            return i;
+    }
+    return m_objects.size();
+}
+
 std::vector<SceneObject>& Scene::GetObjects() {
     return m_objects;
 }
