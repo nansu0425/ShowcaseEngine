@@ -59,6 +59,10 @@ private:
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12PipelineState> m_pipelineStateDoubleSided;
 
+    // Selection outline
+    ComPtr<ID3D12RootSignature> m_outlineRootSignature;
+    ComPtr<ID3D12PipelineState> m_outlinePSO;
+
     // Constant buffers
     Buffer m_perFrameCB;
     Buffer m_perObjectCB;

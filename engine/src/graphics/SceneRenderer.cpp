@@ -264,6 +264,45 @@ void SceneRenderer::Init(RenderContext& ctx) {
         m_objectIdPSODoubleSided = PipelineState::CreateGraphicsPSO(device, idDescDS);
     }
 
+    // Selection outline pass
+    {
+        D3D12_SHADER_BYTECODE outlineVs = ctx.GetShaderManager().LoadShader("shaders/outline_vs_vs.cso");
+        D3D12_SHADER_BYTECODE outlinePs = ctx.GetShaderManager().LoadShader("shaders/outline_ps_ps.cso");
+
+        // Root signature: slot 0 = root constants (8 DWORDs, b0), slot 1 = SRV descriptor table (t0)
+        m_outlineRootSignature =
+            RootSignatureBuilder()
+                .AddConstants({8, 0}) // 8 x 32-bit values at b0
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                .Build(device);
+
+        GraphicsPipelineDesc outlineDesc;
+        outlineDesc.rootSignature = m_outlineRootSignature.Get();
+        outlineDesc.vertexShader = outlineVs;
+        outlineDesc.pixelShader = outlinePs;
+        outlineDesc.rtvFormat = ctx.GetSwapChain().GetFormat();
+        outlineDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+
+        // Alpha blending
+        outlineDesc.blendState.RenderTarget[0].BlendEnable = TRUE;
+        outlineDesc.blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        outlineDesc.blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        outlineDesc.blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        outlineDesc.blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+        outlineDesc.blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        outlineDesc.blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+        // No backface culling (fullscreen triangle winding)
+        outlineDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+
+        // No depth test/write
+        outlineDesc.depthStencilState.DepthEnable = FALSE;
+        outlineDesc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+        m_outlinePSO = PipelineState::CreateGraphicsPSO(device, outlineDesc);
+    }
+
     // Constant buffers (upload heap, 256-byte aligned)
     if (!m_perFrameCB.InitAsUploadBuffer(device, allocator, sizeof(PerFrameData)) ||
         !m_perObjectCB.InitAsUploadBuffer(device, allocator, sizeof(PerObjectData) * kMaxObjects) ||
@@ -340,6 +379,8 @@ void SceneRenderer::Shutdown() {
     m_perFrameCB.Shutdown();
     m_perObjectCB.Shutdown();
     m_perMaterialCB.Shutdown();
+    m_outlinePSO.Reset();
+    m_outlineRootSignature.Reset();
     m_pipelineState.Reset();
     m_pipelineStateDoubleSided.Reset();
     m_rootSignature.Reset();
@@ -417,7 +458,7 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                 PerMaterialData matData;
                 matData.baseColorFactor = Vector4(0.7f, 0.7f, 0.7f, 1.0f);
                 matData.hasTexture = 0;
-                matData.selectionTint = isSelected ? 1.0f : 0.0f;
+                matData.selectionTint = 0.0f;
                 matData.alphaCutoff = 0.5f;
                 matData.alphaMode = 0;
 
@@ -475,6 +516,40 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     }
 
     SE_PLOT("Draw Calls", static_cast<int64_t>(objectIndex));
+
+    // Selection outline pass (uses previous frame's object ID RT).
+    // The SRV descriptor table uses PIXEL visibility, so the resource only needs
+    // PIXEL_SHADER_RESOURCE — which is already the state from RenderObjectIds().
+    if (selectedObjectId >= 0 && m_objectIdRT.GetResource()) {
+        cmdList->SetGraphicsRootSignature(m_outlineRootSignature.Get());
+        cmdList->SetPipelineState(m_outlinePSO.Get());
+        cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        // Root constants: selectedObjectId, texelSize, pad, outlineColor
+        struct {
+            uint32_t selectedObjectId;
+            float texelSizeX;
+            float texelSizeY;
+            float _pad0;
+            float outlineColorR;
+            float outlineColorG;
+            float outlineColorB;
+            float outlineColorA;
+        } outlineParams;
+
+        outlineParams.selectedObjectId = static_cast<uint32_t>(selectedObjectId);
+        outlineParams.texelSizeX = 1.0f / static_cast<float>(m_objectIdRT.GetWidth());
+        outlineParams.texelSizeY = 1.0f / static_cast<float>(m_objectIdRT.GetHeight());
+        outlineParams._pad0 = 0.0f;
+        outlineParams.outlineColorR = 1.0f;
+        outlineParams.outlineColorG = 0.55f;
+        outlineParams.outlineColorB = 0.0f;
+        outlineParams.outlineColorA = 0.8f;
+
+        cmdList->SetGraphicsRoot32BitConstants(0, 8, &outlineParams, 0);
+        cmdList->SetGraphicsRootDescriptorTable(1, m_objectIdRT.GetSRVHandle().gpu);
+        cmdList->DrawInstanced(3, 1, 0, 0);
+    }
 }
 
 // ── GPU Object-ID Picking ────────────────────────────────────────────

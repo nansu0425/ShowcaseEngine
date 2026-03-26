@@ -106,7 +106,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `AssetManager` | `AssetManager.h` | Central ownership of all `Model` instances (builtin + file-loaded); deduplicates by source key |
 | `ModelComponent` | `Scene.h` | Optional component: `modelSource` string, resolved `Model*` pointer, and optional `baseColor` material override |
 | `Scene` | `Scene.h` | Flat collection of `SceneObject` with auto-incrementing IDs |
-| `SceneRenderer` | `SceneRenderer.h` | Root signature, PSO, constant buffers, draw loop, GPU object-ID picking |
+| `SceneRenderer` | `SceneRenderer.h` | Root signatures, PSOs (mesh + selection outline), constant buffers, draw loop, GPU object-ID picking |
 
 ### 2.3 Editor Module — `editor/include/showcase/editor/`
 
@@ -191,7 +191,7 @@ EditorApp::Run()
 │   │   │   ├── Update per-material CB at offset (color, texture flag)
 │   │   │   ├── Set root CBVs + SRV descriptor table
 │   │   │   └── DrawIndexedInstanced()
-│   │   └── (selected object gets highlight tint via per-material CB)
+│   │   └── Selection outline pass (fullscreen triangle, samples object-ID RT)
 │   ├── ViewportPanel::EndRender()             // transition offscreen → SRV
 │   │                                                       │
 │   └───────────────────────────────────────────────────────┘

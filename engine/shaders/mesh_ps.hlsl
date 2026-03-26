@@ -32,12 +32,6 @@ float4 main(PSInput input) : SV_TARGET
 
     float3 color = baseColor.rgb;
 
-    if (selectionTint > 0.0)
-    {
-        float3 highlight = float3(0.2, 0.5, 1.0);
-        color = lerp(color, color + highlight * 0.3, selectionTint);
-    }
-
     if (primitiveHighlight > 0.0)
     {
         float3 highlight = float3(1.0, 0.6, 0.1);
