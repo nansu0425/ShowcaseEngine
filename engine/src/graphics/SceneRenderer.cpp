@@ -25,7 +25,8 @@ struct alignas(256) PerMaterialData {
     Vector4 baseColorFactor;
     int hasTexture;
     float selectionTint;
-    float _pad[2];
+    float alphaCutoff;
+    int alphaMode;
 };
 
 static_assert(sizeof(PerFrameData) <= 256);
@@ -298,6 +299,13 @@ void SceneRenderer::Init(RenderContext& ctx) {
 
     m_pipelineState = PipelineState::CreateGraphicsPSO(device, psoDesc);
 
+    // Double-sided PSO (no back-face culling)
+    {
+        GraphicsPipelineDesc doubleSidedDesc = psoDesc;
+        doubleSidedDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        m_pipelineStateDoubleSided = PipelineState::CreateGraphicsPSO(device, doubleSidedDesc);
+    }
+
     // Constant buffers (upload heap, 256-byte aligned)
     if (!m_perFrameCB.InitAsUploadBuffer(device, allocator, sizeof(PerFrameData)) ||
         !m_perObjectCB.InitAsUploadBuffer(device, allocator, sizeof(PerObjectData) * kMaxObjects) ||
@@ -344,6 +352,7 @@ void SceneRenderer::Shutdown() {
     m_perObjectCB.Shutdown();
     m_perMaterialCB.Shutdown();
     m_pipelineState.Reset();
+    m_pipelineStateDoubleSided.Reset();
     m_rootSignature.Reset();
 }
 
@@ -360,6 +369,7 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
 
     cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
     cmdList->SetPipelineState(m_pipelineState.Get());
+    ID3D12PipelineState* currentPSO = m_pipelineState.Get();
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Update PerFrame CB
@@ -395,9 +405,16 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                 matData.baseColorFactor = Vector4(0.7f, 0.7f, 0.7f, 1.0f);
                 matData.hasTexture = 0;
                 matData.selectionTint = isSelected ? 1.0f : 0.0f;
+                matData.alphaCutoff = 0.5f;
+                matData.alphaMode = 0;
 
                 if (prim.material) {
                     matData.baseColorFactor = prim.material->baseColorFactor;
+
+                    if (prim.material->alphaMode == AlphaMode::Mask) {
+                        matData.alphaMode = 1;
+                        matData.alphaCutoff = prim.material->alphaCutoff;
+                    }
 
                     if (prim.material->baseColorTexture) {
                         matData.hasTexture = 1;
@@ -405,8 +422,20 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                     } else {
                         cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
                     }
+
+                    // Switch PSO for double-sided materials
+                    ID3D12PipelineState* requiredPSO =
+                        prim.material->doubleSided ? m_pipelineStateDoubleSided.Get() : m_pipelineState.Get();
+                    if (requiredPSO != currentPSO) {
+                        cmdList->SetPipelineState(requiredPSO);
+                        currentPSO = requiredPSO;
+                    }
                 } else {
                     cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
+                    if (currentPSO != m_pipelineState.Get()) {
+                        cmdList->SetPipelineState(m_pipelineState.Get());
+                        currentPSO = m_pipelineState.Get();
+                    }
                 }
 
                 // Per-object color override takes priority over material color

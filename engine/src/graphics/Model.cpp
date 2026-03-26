@@ -101,6 +101,14 @@ static void LoadMaterials(const tinygltf::Model& gltfModel, const std::vector<st
             }
         }
 
+        if (gltfMat.alphaMode == "MASK") {
+            mat->alphaMode = AlphaMode::Mask;
+        } else if (gltfMat.alphaMode == "BLEND") {
+            mat->alphaMode = AlphaMode::Blend;
+        }
+        mat->alphaCutoff = static_cast<float>(gltfMat.alphaCutoff);
+        mat->doubleSided = gltfMat.doubleSided;
+
         outMaterials[i] = std::move(mat);
     }
 }

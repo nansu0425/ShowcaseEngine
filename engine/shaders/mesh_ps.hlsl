@@ -6,7 +6,8 @@ cbuffer PerMaterial : register(b2)
     float4 baseColorFactor;
     int hasTexture;
     float selectionTint;
-    float2 _pad1;
+    float alphaCutoff;
+    int alphaMode;
 };
 
 struct PSInput
@@ -21,6 +22,11 @@ float4 main(PSInput input) : SV_TARGET
     if (hasTexture)
     {
         baseColor *= baseColorTex.Sample(linearSampler, input.texCoord);
+    }
+
+    if (alphaMode == 1)
+    {
+        clip(baseColor.a - alphaCutoff);
     }
 
     float3 color = baseColor.rgb;

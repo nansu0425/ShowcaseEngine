@@ -19,9 +19,18 @@ struct ModelVertex {
     Vector2 texCoord;
 };
 
+enum class AlphaMode {
+    Opaque,
+    Mask,
+    Blend
+};
+
 struct Material {
     Vector4 baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f};
     std::shared_ptr<Texture> baseColorTexture;
+    AlphaMode alphaMode = AlphaMode::Opaque;
+    float alphaCutoff = 0.5f;
+    bool doubleSided = false;
 };
 
 struct MeshPrimitive {

@@ -38,6 +38,7 @@ private:
     // Pipeline
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12PipelineState> m_pipelineState;
+    ComPtr<ID3D12PipelineState> m_pipelineStateDoubleSided;
 
     // Constant buffers
     Buffer m_perFrameCB;
