@@ -1,37 +1,37 @@
 # Lighting Roadmap
 
-Phased lighting implementation plan for ShowcaseEngine. Each phase produces a visible improvement suitable for YouTube content targeting non-developers. The **Cornell Box** scene serves as the standard demo scene throughout all phases — its enclosed room with colored walls makes every lighting change dramatically visible.
+Phased lighting implementation plan for ShowcaseEngine. Each phase produces a visible improvement suitable for YouTube content targeting non-developers. The **Sponza Atrium** scene serves as the standard demo scene throughout all phases — its complex architecture with columns, arches, and varied materials makes every lighting change dramatically visible.
 
-## Demo Scene: Cornell Box
+## Demo Scene: Sponza Atrium
 
-A 5m × 5m × 5m enclosed room:
-- **Left wall**: Red — **Right wall**: Green — **Others**: White
-- Interior objects: Tall box (rotated cube) + Sphere
-- Camera viewing from the open front
+A detailed architectural scene of a Venetian palace courtyard (glTF model with PBR data):
+- **Complex geometry**: Columns, arches, balconies, and vegetation provide natural shadow casters and receivers
+- **25 PBR materials**: Stone, metal, fabric, and foliage — each responds differently to lighting
+- **Texture data**: 24 normal maps and 24 metallic-roughness maps embedded in the glTF, ready to unlock as the pipeline matures
 
-This scene was designed in 1984 at Cornell University specifically to test lighting accuracy. Colored walls reveal color bleeding (GI), flat surfaces show shadow reception, and the sphere's curved surface highlights shading quality at every phase.
+Sponza is an industry-standard benchmark scene for real-time rendering. Its architectural complexity reveals shading quality at every phase — columns show diffuse gradients, stone surfaces highlight specular and normal mapping, arches cast dramatic shadows, and tight corners expose ambient occlusion.
 
 ---
 
 ## Phase 0: Scene Setup
 
-> **Viewer impact**: Baseline — flat colors, no sense of depth or lighting
+> **Viewer impact**: Baseline — textured but flat, no sense of depth or lighting
 
 ### Goal
-Build the Cornell Box scene from engine primitives before any lighting code exists. This becomes the "before" reference for all subsequent phases.
+Load the Sponza Atrium scene before any lighting code exists. This becomes the "before" reference for all subsequent phases.
 
 ### Technical scope
-- Add `builtin:plane` and `builtin:sphere` primitives to engine
-- Add per-object `ModelComponent::baseColor` override to assign different colors to shared primitives
-- Create `cornell_box.scene` file with walls, box, and sphere
+- Load Sponza glTF model with all base color textures rendering correctly
+- Ensure alpha-masked materials (vegetation) display properly
+- Create `sponza.scene` file with camera positioned inside the atrium
 
 ### Prerequisites
 None (starting point)
 
 ### Key systems affected
-- SceneRenderer (geometry generation)
-- AssetManager (primitive registration)
-- Scene (color override, serialization)
+- SceneRenderer (glTF rendering)
+- Model loader (base color texture extraction)
+- Scene (camera setup, serialization)
 
 ### Visual impact: N/A (foundation)
 
@@ -39,7 +39,7 @@ None (starting point)
 
 ## Phase 1: Diffuse Light (Lambertian)
 
-> **Viewer impact**: "The flat world suddenly becomes 3D — surfaces facing the light are bright, others are dark"
+> **Viewer impact**: "The flat atrium suddenly becomes 3D — columns cast bright faces toward the light while their backs go dark"
 
 ### Goal
 Add a single directional light with Lambertian diffuse shading. This is the single biggest visual leap in the entire roadmap.
@@ -66,7 +66,7 @@ Phase 0 (scene exists with normals in vertex data)
 
 ## Phase 2: Specular Highlight (Blinn-Phong)
 
-> **Viewer impact**: "The sphere now has a shiny bright spot that moves as I move the camera"
+> **Viewer impact**: "Stone columns catch bright highlights, metal railings gleam as I move the camera"
 
 ### Goal
 Add view-dependent specular highlights using the Blinn-Phong model.
@@ -90,21 +90,22 @@ Phase 1 (diffuse lighting, world normals in pixel shader)
 
 ---
 
-## Phase 3: Multiple Lights (Point Light)
+## Phase 3: Multiple Lights (Point & Spot)
 
-> **Viewer impact**: "A light bulb inside the room — things near it glow, things far away stay dark"
+> **Viewer impact**: "Warm point lights glow under the arches, a spotlight picks out a single column — the atrium comes alive"
 
 ### Goal
-Support multiple light sources with distance-based attenuation.
+Support multiple light sources with distance-based and cone-based attenuation.
 
 ### Technical scope
 - Define light data structure (type, position, direction, color, intensity, range)
-- Distance-based attenuation for point lights
+- Point light: distance-based attenuation (light bulb — radiates in all directions, fades with distance)
+- Spot light: inner/outer cone angle with directional falloff (flashlight — aimed beam that fades at the edges)
 - Scene-level light storage and serialization
 - Editor UI: add/position lights, visualize light gizmos
 
 ### Content point
-"Light in real life gets weaker with distance — games simulate this with a mathematical falloff curve. Moving the light around changes everything in real time"
+"Three kinds of light in games — the sun (directional), a light bulb (point), and a flashlight (spot). Each fades differently, and placing them in a scene is how game developers set the mood"
 
 ### Prerequisites
 Phase 2 (specular model to show point light reflections)
@@ -120,7 +121,7 @@ Phase 2 (specular model to show point light reflections)
 
 ## Phase 4: Shadow Mapping
 
-> **Viewer impact**: "Shadows appear behind the box and sphere!"
+> **Viewer impact**: "Columns cast long shadows across the atrium floor, arches project shadow patterns onto the walls!"
 
 ### Goal
 Render shadows from the directional light using a depth map.
@@ -147,19 +148,16 @@ Phase 1 (directional light exists)
 
 ## Phase 5: Normal Mapping
 
-> **Viewer impact**: "The wall looks bumpy even though it's completely flat geometry!"
+> **Viewer impact**: "The stone walls look rough and weathered even though the geometry is flat!"
 
 ### Goal
-Add tangent-space normal mapping to simulate surface detail without additional geometry.
+Add tangent-space normal mapping to simulate surface detail without additional geometry. Sponza's glTF already contains 24 normal map textures — this phase unlocks them.
 
 ### Technical scope
 - Extend vertex format with tangent vectors (float4, w = handedness)
 - Compute TBN matrix (tangent, bitangent, normal) in vertex shader
 - Sample normal map texture, transform from tangent space to world space
-- Update glTF loader to extract tangent data
-
-### Demo scene note
-Cornell Box's clean flat surfaces don't showcase normal mapping well. A separate demo scene with textured surfaces (e.g. stone, wood, brick) will be needed — to be designed at implementation time.
+- Update glTF loader to extract tangent data and normal map textures (data exists in file but is currently ignored)
 
 ### Content point
 "Games' most powerful illusion — a flat surface that looks bumpy. The normal map tells each pixel to pretend it's facing a slightly different direction, and the lighting math does the rest"
@@ -170,7 +168,7 @@ Phase 1 (diffuse lighting reacts to normals)
 ### Key systems affected
 - Vertex format (ModelVertex)
 - Shaders (TBN computation)
-- Model loader (tangent extraction)
+- Model loader (tangent and normal map extraction)
 - Material system (normal map texture slot)
 
 ### Visual impact: ★★★★☆
@@ -179,19 +177,16 @@ Phase 1 (diffuse lighting reacts to normals)
 
 ## Phase 6: PBR (Physically Based Rendering)
 
-> **Viewer impact**: "Metal looks like metal, plastic looks like plastic — same lighting, completely different look"
+> **Viewer impact**: "The same Sponza scene, but now stone looks rough, metal railings gleam, and fabric absorbs light — each material feels real"
 
 ### Goal
-Replace Blinn-Phong with a physically based BRDF using the metallic/roughness workflow.
+Replace Blinn-Phong with a physically based BRDF using the metallic/roughness workflow. Sponza's glTF already contains 25 PBR materials with metallic/roughness textures — this phase unlocks them.
 
 ### Technical scope
 - Physically based BRDF replacing Blinn-Phong specular
 - Metallic/roughness material parameters (already in glTF PBR spec)
 - Energy conservation between diffuse and specular
-- Update glTF loader to extract metallic/roughness values and textures
-
-### Demo scene note
-Cornell Box lacks material variety. A separate demo scene comparing multiple materials (metal, plastic, rough, smooth) will be needed — to be designed at implementation time.
+- Update glTF loader to extract metallic/roughness values and textures (data exists in file but is currently ignored)
 
 ### Content point
 "Modern games use real physics equations for light — the same math explains why metal reflects differently from rubber. Two numbers (metallic, roughness) control everything"
@@ -210,10 +205,10 @@ Phase 2 (specular model to replace), Phase 5 (normal maps enhance PBR)
 
 ## Phase 7: Ambient Occlusion (SSAO)
 
-> **Viewer impact**: "Corners and crevices are naturally darker — subtle but everything feels more grounded"
+> **Viewer impact**: "Where columns meet the floor, where arches curve into walls — every crevice darkens naturally"
 
 ### Goal
-Add Screen-Space Ambient Occlusion to darken areas where ambient light is occluded.
+Add Screen-Space Ambient Occlusion to darken areas where ambient light is occluded. Sponza's dense architectural geometry — column bases, arch interiors, balcony undersides — makes SSAO differences immediately visible.
 
 ### Technical scope
 - Screen-space technique to darken occluded areas (corners, crevices, contact points)
@@ -234,31 +229,6 @@ Phase 1 (ambient lighting term to modulate)
 
 ---
 
-## Phase 8: Global Illumination
-
-> **Viewer impact**: "The white object near the red wall turns slightly red — light bounces between surfaces!"
-
-### Goal
-Add indirect lighting so light bounces between surfaces, carrying color. This is the Cornell Box's signature effect.
-
-### Technical scope
-- At minimum: one-bounce indirect diffuse
-- Cornell Box red/green color bleeding as primary validation target
-
-### Content point
-"The holy grail of real-time graphics — light that bounces. When light hits the red wall and reflects onto nearby surfaces, everything gets a red tint. This is what separates 'good' lighting from 'photorealistic'"
-
-### Prerequisites
-All previous phases (full lighting pipeline)
-
-### Key systems affected
-- Major rendering pipeline changes (technique-dependent)
-- Potentially new data structures (probes, voxels)
-
-### Visual impact: ★★★★★
-
----
-
 ## Summary
 
 | Phase | Feature | Visual Impact | Content Hook |
@@ -266,15 +236,34 @@ All previous phases (full lighting pipeline)
 | 0 | Scene Setup | — | Baseline "before" |
 | 1 | Diffuse Light | ★★★★★ | "Flat to 3D with one dot product" |
 | 2 | Specular Highlight | ★★★☆☆ | "Your viewpoint changes everything" |
-| 3 | Multiple Lights | ★★★★☆ | "Distance makes light fade" |
-| 4 | Shadow Mapping | ★★★★★ | "Light has its own camera" |
+| 3 | Multiple Lights (Point & Spot) | ★★★★☆ | "Sun, bulb, and flashlight" |
+| 4 | Shadow Mapping | ★★★★★ | "Columns and arches cast shadows" |
 | 5 | Normal Mapping | ★★★★☆ | "Games' greatest illusion" |
 | 6 | PBR | ★★★★☆ | "Physics makes materials real" |
 | 7 | Ambient Occlusion | ★★★☆☆ | "Why corners are dark" |
-| 8 | Global Illumination | ★★★★★ | "Light that bounces" |
+
+---
+
+## YouTube Episodes
+
+Each episode groups related phases into a single video with a clear theme for non-developer viewers.
+
+| Episode | Phases | Theme |
+|---------|--------|-------|
+| 1 | 0 → 1 → 2 | "빛이 세상을 바꾼다" |
+| 2 | 3 | "다중 광원" |
+| 3 | 4 | "그림자의 원리" |
+| 4 | 5 → 6 | "재질의 비밀" |
+| 5 | 7 | "구석이 어두운 이유" |
+
+- **Ep 1** — Unlit → diffuse → specular: a single light transforms the flat Sponza atrium into a 3D space
+- **Ep 2** — Point lights and spot lights: place lights interactively in the editor, show distance attenuation and cone falloff
+- **Ep 3** — Shadow mapping: columns and arches cast dramatic shadows across the atrium floor
+- **Ep 4** — Normal mapping + PBR: unlock the texture data already embedded in Sponza's glTF — stone becomes rough, metal gleams
+- **Ep 5** — SSAO: where columns meet the floor, where arches curve into walls — every crevice darkens naturally
 
 ---
 
 ## Beyond This Roadmap
 
-**Ray Tracing** is a fundamentally different rendering paradigm (tracing light rays instead of rasterizing triangles) that can solve shadows, reflections, and GI more accurately. It will be covered as a separate series — the rasterization techniques above provide the conceptual foundation that makes ray tracing's advantages intuitive to understand.
+**Ray Tracing** is a fundamentally different rendering paradigm (tracing light rays instead of rasterizing triangles) that can solve shadows, reflections, and GI more accurately. **Global Illumination** — where light bounces between surfaces carrying color — is best demonstrated with ray tracing rather than rasterization approximations. Both will be covered as a separate series — the rasterization techniques above provide the conceptual foundation that makes ray tracing's advantages intuitive to understand.
