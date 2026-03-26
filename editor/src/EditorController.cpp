@@ -82,6 +82,11 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
     m_viewportMax = viewport.GetImageMax();
     m_viewportHovered = ImGui::IsMouseHoveringRect(m_viewportMin, m_viewportMax, false);
 
+    // Clear any ImGui widget focus when right-clicking viewport (e.g., console input)
+    if (m_viewportHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        ImGui::FocusWindow(nullptr);
+    }
+
     // -- Gizmo rendering --
     auto* vpWindow = ImGui::FindWindowByName("Viewport");
     if (vpWindow && !vpWindow->Hidden && m_selectedObjectId > 0) {
