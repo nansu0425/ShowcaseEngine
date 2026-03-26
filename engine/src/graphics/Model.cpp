@@ -101,6 +101,7 @@ static bool LoadTextures(const GLTFTextureLoadDesc& desc, std::vector<std::share
             SE_LOG_ERROR("Failed to load texture at index {}", i);
             return false;
         }
+        outTextures[i]->SetSourceURI(image.uri);
     }
 
     cmdList.Close();
@@ -125,6 +126,8 @@ static void LoadMaterials(const GLTFMaterialLoadDesc& desc, std::vector<std::sha
     for (size_t i = 0; i < gltfModel.materials.size(); ++i) {
         const auto& gltfMat = gltfModel.materials[i];
         std::shared_ptr<Material> mat = std::make_shared<Material>();
+
+        mat->name = gltfMat.name;
 
         const auto& pbr = gltfMat.pbrMetallicRoughness;
         mat->baseColorFactor =
@@ -393,6 +396,7 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
         ie.height = static_cast<uint32_t>(image.height);
         ie.data = image.image.data();
         ie.dataSize = image.image.size();
+        ie.sourceURI = image.uri;
         cacheData.images.push_back(ie);
     }
 
@@ -400,6 +404,7 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
     for (size_t i = 0; i < gltfModel.materials.size(); ++i) {
         const auto& gltfMat = gltfModel.materials[i];
         ModelCacheWriteData::MaterialEntry me;
+        me.name = gltfMat.name;
         const auto& pbr = gltfMat.pbrMetallicRoughness;
         me.baseColorFactor[0] = static_cast<float>(pbr.baseColorFactor[0]);
         me.baseColorFactor[1] = static_cast<float>(pbr.baseColorFactor[1]);
@@ -467,6 +472,7 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
             }
 
             if (gltfPrim.material >= 0 && gltfPrim.material < static_cast<int>(materials.size())) {
+                prim.materialIndex = gltfPrim.material;
                 prim.material = materials[gltfPrim.material];
             }
             prim.localAABB = ComputeLocalAABB(vertices);

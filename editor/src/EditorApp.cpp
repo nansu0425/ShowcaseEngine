@@ -701,7 +701,8 @@ int EditorApp::Run() {
             // Phase 1: Render scene to off-screen viewport render target
             m_viewport.BeginRender(m_renderContext.GetCommandList());
             m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
-                                   m_editorController.GetSelectedObjectId());
+                                   m_editorController.GetSelectedObjectId(),
+                                   m_editorController.GetPrimitiveHighlight());
             m_viewport.EndRender(m_renderContext.GetCommandList());
 
             // Render object IDs for GPU picking

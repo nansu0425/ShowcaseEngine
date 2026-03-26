@@ -18,12 +18,19 @@ namespace showcase {
 
 class RenderContext;
 
+struct PrimitiveHighlight {
+    int objectId = -1;
+    int meshIndex = -1;
+    int primIndex = -1;
+};
+
 class SceneRenderer {
 public:
     void Init(RenderContext& ctx);
     void Shutdown();
     void OnResize(uint32_t width, uint32_t height);
-    void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId);
+    void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
+                const PrimitiveHighlight& highlight = {});
 
     /// Renders object IDs to the pick buffer. Call after Render() each frame.
     void RenderObjectIds(RenderContext& ctx, Camera& camera, Scene& scene);

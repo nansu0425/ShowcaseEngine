@@ -25,6 +25,7 @@ struct alignas(256) PerMaterialData {
     float selectionTint;
     float alphaCutoff;
     int alphaMode;
+    float primitiveHighlight;
 };
 
 static_assert(sizeof(PerFrameData) <= 256);
@@ -370,7 +371,8 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
 
 // ── Render ───────────────────────────────────────────────────────────
 
-void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId) {
+void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
+                           const PrimitiveHighlight& highlight) {
     SE_ZONE_SCOPED_C(profile::kColorRendering);
     SE_PLOT("Scene Objects", static_cast<int64_t>(scene.GetObjects().size()));
     auto* cmdList = ctx.GetCommandList().Get();
@@ -397,8 +399,11 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
 
         bool isSelected = (static_cast<int>(sceneObj.id) == selectedObjectId);
 
-        for (const auto& mesh : sceneObj.modelComp->model->meshes) {
-            for (const auto& prim : mesh.primitives) {
+        const auto& meshes = sceneObj.modelComp->model->meshes;
+        for (size_t mi = 0; mi < meshes.size(); ++mi) {
+            const auto& mesh = meshes[mi];
+            for (size_t pi = 0; pi < mesh.primitives.size(); ++pi) {
+                const auto& prim = mesh.primitives[pi];
                 if (prim.indexCount == 0 || objectIndex >= kMaxObjects)
                     continue;
 
@@ -415,6 +420,11 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                 matData.selectionTint = isSelected ? 1.0f : 0.0f;
                 matData.alphaCutoff = 0.5f;
                 matData.alphaMode = 0;
+
+                bool isPrimHighlighted = isSelected && static_cast<int>(sceneObj.id) == highlight.objectId &&
+                                         static_cast<int>(mi) == highlight.meshIndex &&
+                                         static_cast<int>(pi) == highlight.primIndex;
+                matData.primitiveHighlight = isPrimHighlighted ? 1.0f : 0.0f;
 
                 if (prim.material) {
                     matData.baseColorFactor = prim.material->baseColorFactor;

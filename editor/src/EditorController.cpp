@@ -73,6 +73,57 @@ void EditorController::Update(const EditorUpdateDesc& desc) {
     }
 }
 
+// ── Primitive Details (Model Info panel helper) ──────────────────
+
+static void RenderPrimitiveDetails(const MeshPrimitive& prim) {
+    ImGui::Text("Triangles: %u", prim.indexCount / 3);
+
+    if (prim.material) {
+        char matLabel[256];
+        snprintf(matLabel, sizeof(matLabel), "Material [%d] %s", prim.materialIndex,
+                 prim.material->name.empty() ? "(unnamed)" : prim.material->name.c_str());
+        if (ImGui::TreeNode(matLabel)) {
+            const auto& c = prim.material->baseColorFactor;
+            ImGui::ColorButton("##baseColor", ImVec4(c.x, c.y, c.z, c.w), ImGuiColorEditFlags_NoTooltip);
+            ImGui::SameLine();
+            ImGui::Text("Base Color: (%.2f, %.2f, %.2f, %.2f)", c.x, c.y, c.z, c.w);
+
+            if (prim.material->baseColorTexture) {
+                uint32_t w = prim.material->baseColorTexture->GetWidth();
+                uint32_t h = prim.material->baseColorTexture->GetHeight();
+                const auto& uri = prim.material->baseColorTexture->GetSourceURI();
+                if (!uri.empty()) {
+                    ImGui::TextColored(ImVec4(0.4f, 0.8f, 0.4f, 1.0f), "Texture: %ux%u [%s]", w, h, uri.c_str());
+                } else {
+                    ImGui::TextColored(ImVec4(0.4f, 0.8f, 0.4f, 1.0f), "Texture: %ux%u", w, h);
+                }
+
+                // Texture preview
+                D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = prim.material->baseColorTexture->GetSRVHandle().gpu;
+                float previewSize = 128.0f;
+                ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(previewSize, previewSize));
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Texture: No Texture");
+            }
+
+            if (prim.material->alphaMode == AlphaMode::Mask) {
+                ImGui::Text("Alpha: Mask (cutoff: %.2f)", prim.material->alphaCutoff);
+            } else if (prim.material->alphaMode == AlphaMode::Blend) {
+                ImGui::Text("Alpha: Blend");
+            } else {
+                ImGui::Text("Alpha: Opaque");
+            }
+
+            if (prim.material->doubleSided)
+                ImGui::Text("Double-sided: Yes");
+
+            ImGui::TreePop();
+        }
+    } else {
+        ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "No Material");
+    }
+}
+
 // ── UI ────────────────────────────────────────────────────────────
 
 void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
@@ -339,9 +390,52 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         }
                         ImGui::EndCombo();
                     }
-                    // ── Material ──
+                    // ── Model Info ──
+                    if (selected->modelComp->model) {
+                        const auto* model = selected->modelComp->model;
+                        ImGui::Spacing();
+                        ImGui::SeparatorText("Model Info");
+
+                        // Reset hover state each frame
+                        m_hoveredMeshIdx = -1;
+                        m_hoveredPrimIdx = -1;
+
+                        uint32_t totalPrims = 0;
+                        for (const auto& mesh : model->meshes) {
+                            totalPrims += static_cast<uint32_t>(mesh.primitives.size());
+                        }
+                        ImGui::Text("Meshes: %zu | Primitives: %u", model->meshes.size(), totalPrims);
+
+                        for (size_t mi = 0; mi < model->meshes.size(); ++mi) {
+                            const auto& mesh = model->meshes[mi];
+                            const char* meshName = mesh.name.empty() ? "(unnamed)" : mesh.name.c_str();
+                            char meshLabel[256];
+                            snprintf(meshLabel, sizeof(meshLabel), "[%zu] %s (%zu primitive%s)", mi, meshName,
+                                     mesh.primitives.size(), mesh.primitives.size() == 1 ? "" : "s");
+
+                            if (ImGui::TreeNode(meshLabel)) {
+                                for (size_t pi = 0; pi < mesh.primitives.size(); ++pi) {
+                                    ImGui::PushID(static_cast<int>(pi));
+                                    char primLabel[128];
+                                    snprintf(primLabel, sizeof(primLabel), "Primitive %zu", pi);
+                                    if (ImGui::TreeNode(primLabel)) {
+                                        RenderPrimitiveDetails(mesh.primitives[pi]);
+                                        ImGui::TreePop();
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        m_hoveredMeshIdx = static_cast<int>(mi);
+                                        m_hoveredPrimIdx = static_cast<int>(pi);
+                                    }
+                                    ImGui::PopID();
+                                }
+                                ImGui::TreePop();
+                            }
+                        }
+                    }
+
+                    // ── Material Override ──
                     ImGui::Spacing();
-                    ImGui::SeparatorText("Material");
+                    ImGui::SeparatorText("Material Override");
 
                     bool hasOverride = selected->modelComp->baseColor.has_value();
                     if (ImGui::Checkbox("Base Color Override", &hasOverride)) {

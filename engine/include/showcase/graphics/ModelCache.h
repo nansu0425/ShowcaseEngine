@@ -19,11 +19,13 @@ struct ModelCacheWriteData {
         uint32_t height = 0;
         const uint8_t* data = nullptr; // pointer into tinygltf image buffer
         uint64_t dataSize = 0;
+        std::string sourceURI;
     };
     std::vector<ImageEntry> images;
 
     // Materials referencing images by index
     struct MaterialEntry {
+        std::string name;
         float baseColorFactor[4] = {1.f, 1.f, 1.f, 1.f};
         int32_t baseColorTextureIndex = -1;
         uint32_t alphaMode = 0; // 0=Opaque, 1=Mask, 2=Blend

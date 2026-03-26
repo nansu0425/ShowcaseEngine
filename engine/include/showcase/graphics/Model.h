@@ -26,6 +26,7 @@ enum class AlphaMode {
 };
 
 struct Material {
+    std::string name;
     Vector4 baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f};
     std::shared_ptr<Texture> baseColorTexture;
     AlphaMode alphaMode = AlphaMode::Opaque;
@@ -37,6 +38,7 @@ struct MeshPrimitive {
     Buffer vertexBuffer;
     Buffer indexBuffer;
     uint32_t indexCount = 0;
+    int32_t materialIndex = -1;
     std::shared_ptr<Material> material;
     BoundingBox localAABB;
 };

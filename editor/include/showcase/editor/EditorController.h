@@ -35,6 +35,10 @@ public:
     void ClearSelection() { m_selectedObjectId = -1; }
     void SetSelection(uint32_t id) { m_selectedObjectId = static_cast<int>(id); }
 
+    PrimitiveHighlight GetPrimitiveHighlight() const {
+        return {m_selectedObjectId, m_hoveredMeshIdx, m_hoveredPrimIdx};
+    }
+
     using DirtyCallback = std::function<void()>;
     void SetDirtyCallback(DirtyCallback cb) { m_dirtyCallback = std::move(cb); }
 
@@ -67,6 +71,8 @@ public:
 
 private:
     int m_selectedObjectId = -1;
+    int m_hoveredMeshIdx = -1;
+    int m_hoveredPrimIdx = -1;
 
     // Viewport picking state (1-frame delayed from OnImGui)
     ImVec2 m_viewportMin = {};

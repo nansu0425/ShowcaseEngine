@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 
 #include <cstdint>
+#include <string>
 
 using Microsoft::WRL::ComPtr;
 
@@ -36,6 +37,8 @@ public:
     DescriptorHandle GetSRVHandle() const { return m_srvHandle; }
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
+    const std::string& GetSourceURI() const { return m_sourceURI; }
+    void SetSourceURI(std::string uri) { m_sourceURI = std::move(uri); }
 
 private:
     ComPtr<ID3D12Resource> m_resource;
@@ -45,6 +48,7 @@ private:
     DescriptorHandle m_srvHandle;
     uint32_t m_width = 0;
     uint32_t m_height = 0;
+    std::string m_sourceURI;
 };
 
 } // namespace showcase

@@ -8,6 +8,7 @@ cbuffer PerMaterial : register(b2)
     float selectionTint;
     float alphaCutoff;
     int alphaMode;
+    float primitiveHighlight;
 };
 
 struct PSInput
@@ -35,6 +36,12 @@ float4 main(PSInput input) : SV_TARGET
     {
         float3 highlight = float3(0.2, 0.5, 1.0);
         color = lerp(color, color + highlight * 0.3, selectionTint);
+    }
+
+    if (primitiveHighlight > 0.0)
+    {
+        float3 highlight = float3(1.0, 0.6, 0.1);
+        color = lerp(color, color + highlight * 0.4, primitiveHighlight);
     }
 
     return float4(color, baseColor.a);

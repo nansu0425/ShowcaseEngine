@@ -12,7 +12,7 @@ namespace showcase {
 
 // ── Cache file format constants ─────────────────────────────────
 static constexpr uint32_t kCacheMagic = 0x53454341; // "SECA"
-static constexpr uint32_t kCacheVersion = 3;
+static constexpr uint32_t kCacheVersion = 4;
 
 #pragma pack(push, 1)
 struct CacheHeader {
@@ -30,9 +30,11 @@ struct CacheImageEntry {
     uint32_t height;
     uint64_t dataOffset;
     uint64_t dataSize;
+    uint32_t uriLength;
 };
 
 struct CacheMaterialEntry {
+    uint32_t nameLength;
     float baseColorFactor[4];
     int32_t baseColorTextureIndex;
     uint32_t alphaMode;
@@ -107,21 +109,44 @@ bool ModelCache::LoadFromCache(RenderContext& ctx, const std::string& cachePath,
     auto* device = ctx.GetDevice().GetDevice();
     auto* allocator = ctx.GetDevice().GetAllocator();
 
-    // Read image table
-    std::vector<CacheImageEntry> imageTable(header.imageCount);
-    if (header.imageCount > 0) {
-        if (fread(imageTable.data(), sizeof(CacheImageEntry), header.imageCount, f) != header.imageCount) {
+    // Read image table (variable-length: entry + URI string)
+    struct ImageReadInfo {
+        CacheImageEntry entry;
+        std::string uri;
+    };
+    std::vector<ImageReadInfo> imageTable(header.imageCount);
+    for (uint32_t i = 0; i < header.imageCount; ++i) {
+        if (fread(&imageTable[i].entry, sizeof(CacheImageEntry), 1, f) != 1) {
             fclose(f);
             return false;
         }
+        if (imageTable[i].entry.uriLength > 0) {
+            imageTable[i].uri.resize(imageTable[i].entry.uriLength);
+            if (fread(imageTable[i].uri.data(), 1, imageTable[i].entry.uriLength, f) != imageTable[i].entry.uriLength) {
+                fclose(f);
+                return false;
+            }
+        }
     }
 
-    // Read material table
-    std::vector<CacheMaterialEntry> materialTable(header.materialCount);
-    if (header.materialCount > 0) {
-        if (fread(materialTable.data(), sizeof(CacheMaterialEntry), header.materialCount, f) != header.materialCount) {
+    // Read material table (variable-length: entry + name string)
+    struct MaterialReadInfo {
+        CacheMaterialEntry entry;
+        std::string name;
+    };
+    std::vector<MaterialReadInfo> materialTable(header.materialCount);
+    for (uint32_t i = 0; i < header.materialCount; ++i) {
+        if (fread(&materialTable[i].entry, sizeof(CacheMaterialEntry), 1, f) != 1) {
             fclose(f);
             return false;
+        }
+        if (materialTable[i].entry.nameLength > 0) {
+            materialTable[i].name.resize(materialTable[i].entry.nameLength);
+            if (fread(materialTable[i].name.data(), 1, materialTable[i].entry.nameLength, f) !=
+                materialTable[i].entry.nameLength) {
+                fclose(f);
+                return false;
+            }
         }
     }
 
@@ -173,7 +198,7 @@ bool ModelCache::LoadFromCache(RenderContext& ctx, const std::string& cachePath,
         cmdList.Reset();
 
         for (uint32_t i = 0; i < header.imageCount; ++i) {
-            const auto& ie = imageTable[i];
+            const auto& ie = imageTable[i].entry;
             std::vector<uint8_t> pixels(ie.dataSize);
             if (_fseeki64(f, static_cast<long long>(ie.dataOffset), SEEK_SET) != 0 ||
                 fread(pixels.data(), 1, ie.dataSize, f) != ie.dataSize) {
@@ -191,6 +216,7 @@ bool ModelCache::LoadFromCache(RenderContext& ctx, const std::string& cachePath,
                 fclose(f);
                 return false;
             }
+            textures[i]->SetSourceURI(imageTable[i].uri);
         }
 
         cmdList.Close();
@@ -207,8 +233,9 @@ bool ModelCache::LoadFromCache(RenderContext& ctx, const std::string& cachePath,
     // Reconstruct materials
     std::vector<std::shared_ptr<Material>> materials(header.materialCount);
     for (uint32_t i = 0; i < header.materialCount; ++i) {
-        const auto& me = materialTable[i];
+        const auto& me = materialTable[i].entry;
         auto mat = std::make_shared<Material>();
+        mat->name = materialTable[i].name;
         mat->baseColorFactor =
             Vector4(me.baseColorFactor[0], me.baseColorFactor[1], me.baseColorFactor[2], me.baseColorFactor[3]);
         if (me.baseColorTextureIndex >= 0 && me.baseColorTextureIndex < static_cast<int32_t>(textures.size())) {
@@ -266,6 +293,7 @@ bool ModelCache::LoadFromCache(RenderContext& ctx, const std::string& cachePath,
                 }
             }
 
+            prim.materialIndex = pe.materialIndex;
             if (pe.materialIndex >= 0 && pe.materialIndex < static_cast<int32_t>(materials.size())) {
                 prim.material = materials[pe.materialIndex];
             }
@@ -314,8 +342,10 @@ bool ModelCache::WriteCache(const std::string& cachePath, const ModelCacheWriteD
 
     // Calculate data offsets: header → image table → material table → mesh headers → model AABB → bulk data
     uint64_t offset = sizeof(CacheHeader);
-    offset += sizeof(CacheImageEntry) * data.images.size();
-    offset += sizeof(CacheMaterialEntry) * data.materials.size();
+    for (const auto& img : data.images)
+        offset += sizeof(CacheImageEntry) + img.sourceURI.size();
+    for (const auto& mat : data.materials)
+        offset += sizeof(CacheMaterialEntry) + mat.name.size();
 
     // Mesh headers size
     for (const auto& mesh : data.meshes) {
@@ -334,6 +364,7 @@ bool ModelCache::WriteCache(const std::string& cachePath, const ModelCacheWriteD
         imageTable[i].height = data.images[i].height;
         imageTable[i].dataOffset = offset;
         imageTable[i].dataSize = data.images[i].dataSize;
+        imageTable[i].uriLength = static_cast<uint32_t>(data.images[i].sourceURI.size());
         offset += data.images[i].dataSize;
     }
 
@@ -342,6 +373,7 @@ bool ModelCache::WriteCache(const std::string& cachePath, const ModelCacheWriteD
     for (size_t i = 0; i < data.materials.size(); ++i) {
         const auto& src = data.materials[i];
         auto& dst = materialTable[i];
+        dst.nameLength = static_cast<uint32_t>(src.name.size());
         memcpy(dst.baseColorFactor, src.baseColorFactor, sizeof(float) * 4);
         dst.baseColorTextureIndex = src.baseColorTextureIndex;
         dst.alphaMode = src.alphaMode;
@@ -370,13 +402,19 @@ bool ModelCache::WriteCache(const std::string& cachePath, const ModelCacheWriteD
     // Write header
     writeBytes(&header, sizeof(header), 1);
 
-    // Write image table
-    if (!imageTable.empty())
-        writeBytes(imageTable.data(), sizeof(CacheImageEntry), imageTable.size());
+    // Write image table (per-entry + URI string)
+    for (size_t i = 0; i < imageTable.size(); ++i) {
+        writeBytes(&imageTable[i], sizeof(CacheImageEntry), 1);
+        if (!data.images[i].sourceURI.empty())
+            writeBytes(data.images[i].sourceURI.data(), 1, data.images[i].sourceURI.size());
+    }
 
-    // Write material table
-    if (!materialTable.empty())
-        writeBytes(materialTable.data(), sizeof(CacheMaterialEntry), materialTable.size());
+    // Write material table (per-entry + name string)
+    for (size_t i = 0; i < materialTable.size(); ++i) {
+        writeBytes(&materialTable[i], sizeof(CacheMaterialEntry), 1);
+        if (!data.materials[i].name.empty())
+            writeBytes(data.materials[i].name.data(), 1, data.materials[i].name.size());
+    }
 
     // Write mesh headers and primitive tables
     for (size_t mi = 0; mi < data.meshes.size(); ++mi) {
