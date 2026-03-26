@@ -1,0 +1,21 @@
+{
+  "version": 3,
+  "camera": {
+    "position": [0.0, 5.0, 0.0],
+    "yaw": 1.5708,
+    "pitch": 0.0
+  },
+  "objects": [
+    {
+      "name": "Sponza Atrium",
+      "position": [0.0, 0.0, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
+      "scale": [1.0, 1.0, 1.0],
+      "components": {
+        "model": {
+          "mesh": "file:assets/models/Sponza/Sponza.gltf"
+        }
+      }
+    }
+  ]
+}

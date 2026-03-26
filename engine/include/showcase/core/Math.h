@@ -47,6 +47,15 @@ inline Matrix PerspectiveFovLH(float fovY, float aspect, float nearZ, float farZ
     return DirectX::XMMatrixPerspectiveFovLH(fovY, aspect, nearZ, farZ);
 }
 
+// Identity matrix
+inline Matrix MatrixIdentity() {
+    return DirectX::XMMatrixIdentity();
+}
+
+inline bool IsMatrixIdentity(const Matrix& m) {
+    return DirectX::XMMatrixIsIdentity(m);
+}
+
 // AABB creation from min/max corner points
 [[nodiscard]] inline BoundingBox CreateAABB(const Vector3& minPt, const Vector3& maxPt) {
     BoundingBox aabb;

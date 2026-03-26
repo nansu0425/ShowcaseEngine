@@ -105,9 +105,61 @@ static void LoadMaterials(const tinygltf::Model& gltfModel, const std::vector<st
     }
 }
 
+// ── Node transform helpers ───────────────────────────────────────────
+struct MeshInstance {
+    int meshIndex;
+    Matrix transform;
+};
+
+static Matrix ComputeNodeLocalTransform(const tinygltf::Node& node) {
+    if (!node.matrix.empty()) {
+        // glTF stores column-major, SimpleMath uses row-major → transpose on construction
+        return Matrix(
+            static_cast<float>(node.matrix[0]), static_cast<float>(node.matrix[4]), static_cast<float>(node.matrix[8]),
+            static_cast<float>(node.matrix[12]), static_cast<float>(node.matrix[1]), static_cast<float>(node.matrix[5]),
+            static_cast<float>(node.matrix[9]), static_cast<float>(node.matrix[13]), static_cast<float>(node.matrix[2]),
+            static_cast<float>(node.matrix[6]), static_cast<float>(node.matrix[10]),
+            static_cast<float>(node.matrix[14]), static_cast<float>(node.matrix[3]), static_cast<float>(node.matrix[7]),
+            static_cast<float>(node.matrix[11]), static_cast<float>(node.matrix[15]));
+    }
+
+    Matrix S = MatrixIdentity();
+    Matrix R = MatrixIdentity();
+    Matrix T = MatrixIdentity();
+
+    if (!node.scale.empty())
+        S = Matrix::CreateScale(static_cast<float>(node.scale[0]), static_cast<float>(node.scale[1]),
+                                static_cast<float>(node.scale[2]));
+    if (!node.rotation.empty())
+        R = Matrix::CreateFromQuaternion(
+            Quaternion(static_cast<float>(node.rotation[0]), static_cast<float>(node.rotation[1]),
+                       static_cast<float>(node.rotation[2]), static_cast<float>(node.rotation[3])));
+    if (!node.translation.empty())
+        T = Matrix::CreateTranslation(static_cast<float>(node.translation[0]), static_cast<float>(node.translation[1]),
+                                      static_cast<float>(node.translation[2]));
+
+    return S * R * T;
+}
+
+static void GatherMeshInstances(const tinygltf::Model& gltfModel, int nodeIndex, const Matrix& parentTransform,
+                                std::vector<MeshInstance>& outInstances) {
+    const auto& node = gltfModel.nodes[nodeIndex];
+    Matrix localTransform = ComputeNodeLocalTransform(node);
+    Matrix worldTransform = localTransform * parentTransform;
+
+    if (node.mesh >= 0) {
+        outInstances.push_back({node.mesh, worldTransform});
+    }
+
+    for (int childIdx : node.children) {
+        GatherMeshInstances(gltfModel, childIdx, worldTransform, outInstances);
+    }
+}
+
 // ── Mesh extraction ──────────────────────────────────────────────────
 static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel, const tinygltf::Primitive& gltfPrim,
-                                      std::vector<ModelVertex>& vertices, std::vector<uint32_t>& indices) {
+                                      std::vector<ModelVertex>& vertices, std::vector<uint32_t>& indices,
+                                      const Matrix& nodeTransform) {
     // Position
     const auto posIt = gltfPrim.attributes.find("POSITION");
     if (posIt == gltfPrim.attributes.end())
@@ -190,6 +242,20 @@ static void ExtractVerticesAndIndices(const tinygltf::Model& gltfModel, const ti
             }
         }
     }
+
+    // Bake node transform into vertex positions and normals
+    if (!IsMatrixIdentity(nodeTransform)) {
+        Matrix normalMatrix = nodeTransform;
+        normalMatrix.m[3][0] = normalMatrix.m[3][1] = normalMatrix.m[3][2] = 0.f;
+        normalMatrix.m[3][3] = 1.f;
+        normalMatrix = normalMatrix.Invert().Transpose();
+
+        for (auto& v : vertices) {
+            v.position = Vector3::Transform(v.position, nodeTransform);
+            v.normal = Vector3::TransformNormal(v.normal, normalMatrix);
+            v.normal.Normalize();
+        }
+    }
 }
 
 // ── AABB computation ─────────────────────────────────────────────────
@@ -244,14 +310,29 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
     std::vector<std::shared_ptr<Material>> materials;
     LoadMaterials(gltfModel, textures, materials);
 
-    // Load meshes
-    outModel.meshes.resize(gltfModel.meshes.size());
+    // Gather mesh instances from node hierarchy (applies node transforms)
+    std::vector<MeshInstance> instances;
+    if (!gltfModel.scenes.empty()) {
+        int sceneIdx = gltfModel.defaultScene >= 0 ? gltfModel.defaultScene : 0;
+        const auto& scene = gltfModel.scenes[sceneIdx];
+        for (int rootIdx : scene.nodes) {
+            GatherMeshInstances(gltfModel, rootIdx, MatrixIdentity(), instances);
+        }
+    } else {
+        for (int i = 0; i < static_cast<int>(gltfModel.meshes.size()); ++i) {
+            instances.push_back({i, MatrixIdentity()});
+        }
+    }
+
+    // Load meshes — one engine Mesh per node instance
+    outModel.meshes.resize(instances.size());
 
     Vector3 modelMin(FLT_MAX, FLT_MAX, FLT_MAX);
     Vector3 modelMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-    for (size_t mi = 0; mi < gltfModel.meshes.size(); ++mi) {
-        const auto& gltfMesh = gltfModel.meshes[mi];
+    for (size_t mi = 0; mi < instances.size(); ++mi) {
+        const auto& inst = instances[mi];
+        const auto& gltfMesh = gltfModel.meshes[inst.meshIndex];
         auto& mesh = outModel.meshes[mi];
         mesh.name = gltfMesh.name;
         mesh.primitives.resize(gltfMesh.primitives.size());
@@ -262,7 +343,7 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
 
             std::vector<ModelVertex> vertices;
             std::vector<uint32_t> indices;
-            ExtractVerticesAndIndices(gltfModel, gltfPrim, vertices, indices);
+            ExtractVerticesAndIndices(gltfModel, gltfPrim, vertices, indices, inst.transform);
 
             if (vertices.empty())
                 continue;
@@ -301,8 +382,8 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
 
     outModel.localAABB = CreateAABB(modelMin, modelMax);
 
-    SE_LOG_INFO("Loaded glTF: {} ({} meshes, {} materials, {} textures)", filepath, outModel.meshes.size(),
-                materials.size(), textures.size());
+    SE_LOG_INFO("Loaded glTF: {} ({} meshes from {} instances, {} materials, {} textures)", filepath,
+                gltfModel.meshes.size(), instances.size(), materials.size(), textures.size());
     return true;
 }
 

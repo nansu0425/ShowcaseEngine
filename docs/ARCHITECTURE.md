@@ -258,7 +258,7 @@ Root[3]  Table     SRV t0  Base color texture (or default white)
          Static sampler s0  Linear wrap
 ```
 
-Max objects: `kMaxObjects = 64`.
+Max objects: `kMaxObjects = 256`.
 
 ---
 

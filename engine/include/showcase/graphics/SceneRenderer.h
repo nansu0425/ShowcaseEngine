@@ -33,7 +33,7 @@ public:
     Texture& GetDefaultWhiteTexture() { return m_defaultWhiteTex; }
 
 private:
-    static constexpr uint32_t kMaxObjects = 64;
+    static constexpr uint32_t kMaxObjects = 256;
 
     // Pipeline
     ComPtr<ID3D12RootSignature> m_rootSignature;

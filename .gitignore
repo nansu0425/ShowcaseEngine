@@ -36,3 +36,6 @@ imgui.ini
 
 # Local tools/binaries (PresentMon, etc.)
 tools/
+
+# Large glTF assets (downloaded separately)
+assets/models/Sponza/
