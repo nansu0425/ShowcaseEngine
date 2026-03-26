@@ -1,7 +1,7 @@
 cbuffer OutlineParams : register(b0)
 {
     uint selectedObjectId;
-    float2 texelSize;
+    uint2 rtSize;
     float _pad0;
     float4 outlineColor;
 };
@@ -30,7 +30,12 @@ float4 main(PSInput input) : SV_TARGET
             if (x == 0 && y == 0)
                 continue;
 
-            uint neighborId = objectIdTex.Load(int3(pixel + int2(x, y), 0));
+            int2 neighborPixel = pixel + int2(x, y);
+            if (neighborPixel.x < 0 || neighborPixel.y < 0 || neighborPixel.x >= int(rtSize.x) ||
+                neighborPixel.y >= int(rtSize.y))
+                continue;
+
+            uint neighborId = objectIdTex.Load(int3(neighborPixel, 0));
             bool neighborIsSelected = (neighborId == selectedObjectId);
 
             if (centerIsSelected != neighborIsSelected)

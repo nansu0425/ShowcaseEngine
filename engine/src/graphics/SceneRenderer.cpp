@@ -528,9 +528,9 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
         // Root constants: selectedObjectId, texelSize, pad, outlineColor
         struct {
             uint32_t selectedObjectId;
-            float texelSizeX;
-            float texelSizeY;
-            float _pad0;
+            uint32_t rtWidth;
+            uint32_t rtHeight;
+            uint32_t _pad0;
             float outlineColorR;
             float outlineColorG;
             float outlineColorB;
@@ -538,9 +538,9 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
         } outlineParams;
 
         outlineParams.selectedObjectId = static_cast<uint32_t>(selectedObjectId);
-        outlineParams.texelSizeX = 1.0f / static_cast<float>(m_objectIdRT.GetWidth());
-        outlineParams.texelSizeY = 1.0f / static_cast<float>(m_objectIdRT.GetHeight());
-        outlineParams._pad0 = 0.0f;
+        outlineParams.rtWidth = m_objectIdRT.GetWidth();
+        outlineParams.rtHeight = m_objectIdRT.GetHeight();
+        outlineParams._pad0 = 0;
         outlineParams.outlineColorR = 1.0f;
         outlineParams.outlineColorG = 0.55f;
         outlineParams.outlineColorB = 0.0f;
