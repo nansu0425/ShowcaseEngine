@@ -8,18 +8,42 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include <algorithm>
+
 namespace showcase {
 
 // ── Update ────────────────────────────────────────────────────────
 
-void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport) {
+void EditorController::Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport,
+                              RenderContext& renderContext) {
     SE_ZONE_SCOPED_C(profile::kColorUpdate);
-    Camera& camera = viewport.GetCamera();
+
+    // Check for completed GPU pick result from previous frame
+    if (m_pickPending && renderer.IsPickComplete(renderContext)) {
+        m_selectedObjectId = renderer.GetPickResult(renderContext);
+        m_pickPending = false;
+    }
 
     // Left-click picking (not during right-click camera rotation, not when using gizmo)
     if (input.IsMouseButtonPressed(0) && !input.IsMouseButtonDown(1) && m_viewportHovered && !ImGuizmo::IsOver()) {
-        m_selectedObjectId = renderer.PickObject(input.GetMouseX(), input.GetMouseY(), camera, scene, m_viewportMin.x,
-                                                 m_viewportMin.y, m_viewportMax.x, m_viewportMax.y);
+        // Convert screen coordinates to ID RT pixel coordinates
+        float vpWidth = m_viewportMax.x - m_viewportMin.x;
+        float vpHeight = m_viewportMax.y - m_viewportMin.y;
+        if (vpWidth > 0 && vpHeight > 0) {
+            float localX = static_cast<float>(input.GetMouseX()) - m_viewportMin.x;
+            float localY = static_cast<float>(input.GetMouseY()) - m_viewportMin.y;
+            float normX = localX / vpWidth;
+            float normY = localY / vpHeight;
+
+            int pixelX = static_cast<int>(normX * viewport.GetWidth());
+            int pixelY = static_cast<int>(normY * viewport.GetHeight());
+
+            pixelX = std::clamp(pixelX, 0, static_cast<int>(viewport.GetWidth()) - 1);
+            pixelY = std::clamp(pixelY, 0, static_cast<int>(viewport.GetHeight()) - 1);
+
+            renderer.RequestPick(pixelX, pixelY);
+            m_pickPending = true;
+        }
     }
 
     // Gizmo shortcuts (only when right-click not held, to avoid camera movement conflict)

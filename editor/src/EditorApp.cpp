@@ -693,7 +693,7 @@ int EditorApp::Run() {
 
             // Update
             m_viewport.UpdateCamera(m_input, dt);
-            m_editorController.Update(m_input, m_scene, m_sceneRenderer, m_viewport);
+            m_editorController.Update(m_input, m_scene, m_sceneRenderer, m_viewport, m_renderContext);
 
             // Begin render frame
             m_renderContext.BeginFrame();
@@ -703,6 +703,9 @@ int EditorApp::Run() {
             m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
                                    m_editorController.GetSelectedObjectId());
             m_viewport.EndRender(m_renderContext.GetCommandList());
+
+            // Render object IDs for GPU picking
+            m_sceneRenderer.RenderObjectIds(m_renderContext, m_viewport.GetCamera(), m_scene);
 
             // Phase 2: Render ImGui to back buffer
             float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};

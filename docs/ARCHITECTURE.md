@@ -105,7 +105,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `AssetManager` | `AssetManager.h` | Central ownership of all `Model` instances (builtin + file-loaded); deduplicates by source key |
 | `ModelComponent` | `Scene.h` | Optional component: `modelSource` string, resolved `Model*` pointer, and optional `baseColor` material override |
 | `Scene` | `Scene.h` | Flat collection of `SceneObject` with auto-incrementing IDs |
-| `SceneRenderer` | `SceneRenderer.h` | Root signature, PSO, constant buffers, draw loop, object picking |
+| `SceneRenderer` | `SceneRenderer.h` | Root signature, PSO, constant buffers, draw loop, GPU object-ID picking |
 
 ### 2.3 Editor Module — `editor/include/showcase/editor/`
 
@@ -256,6 +256,7 @@ Root[0]  CBV  b0   Per-frame data (view-projection matrix, camera position)
 Root[1]  CBV  b1   Per-object data (world matrix) — offset per object
 Root[2]  CBV  b2   Per-material data (base color, texture flag) — offset per object
 Root[3]  Table     SRV t0  Base color texture (or default white)
+Root[4]  Constants b3      Object ID (1 DWORD — GPU picking pass only)
          Static sampler s0  Linear wrap
 ```
 
@@ -306,13 +307,13 @@ Scenes are saved/loaded as `.scene` JSON files. `Scene::Serialize()` / `Scene::D
 
 ### Object picking
 
-`SceneRenderer::PickObject()` performs CPU-side **ray-AABB intersection in local space**:
-1. Convert mouse coordinates to NDC via inverse view-projection matrix
-2. Create ray in world space
-3. For each object: transform ray into local space, test against local AABB
-4. Return closest hit object ID
+**GPU object-ID picking** renders all objects to an `R32_UINT` render target with each object's unique ID as the pixel value:
+1. `SceneRenderer::RenderObjectIds()` draws all objects using `object_id_ps.hlsl` (outputs `uint objectId` via root constant b3)
+2. On left-click, `EditorController` converts screen coordinates to ID RT pixels and calls `SceneRenderer::RequestPick(px, py)`
+3. The pick pixel is copied to a readback buffer via `CopyTextureRegion`
+4. Next frame, `EditorController` reads the result via `GetPickResult()` (1-frame delay avoids GPU stall)
 
-Testing in local space correctly handles rotated objects (world-space AABB is axis-aligned and can be inaccurate for rotated geometry).
+This provides pixel-perfect selection — alpha-masked transparent regions are properly handled via `clip()` in the ID shader.
 
 ### Data model
 
@@ -347,7 +348,7 @@ Material (shared via shared_ptr)
 | Math library | SimpleMath (DirectXTK12) | Familiar API, header-only, wraps DirectXMath |
 | Coordinate system | Left-handed | Matches DirectX conventions; use `*LH` matrix helpers |
 | Shader model | SM 6.0 via DXC | Modern HLSL features without requiring SM 6.6+ |
-| Object picking | CPU ray-AABB (local space) | Simple, no GPU readback latency, handles rotation |
+| Object picking | GPU object-ID render target + 1-frame readback | Pixel-perfect selection, handles alpha masking |
 | Constant buffers | Offset-based upload heap | Prevents aliasing/flickering with per-object slots |
 | glTF loading | tinygltf (header-only) | Lightweight, glTF 2.0 only, minimal dependencies |
 | Editor UI | ImGui docking + ImGuizmo | Rapid iteration, built-in docking layout, 3D gizmos |

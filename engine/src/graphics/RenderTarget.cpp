@@ -5,10 +5,15 @@
 namespace showcase {
 
 // ── Init / Shutdown ──────────────────────────────────────────────────
-bool RenderTarget::Init(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                         DescriptorHeap& srvHeap,
-                         uint32_t width, uint32_t height, DXGI_FORMAT format) {
+bool RenderTarget::Init(ID3D12Device* device, D3D12MA::Allocator* allocator, DescriptorHeap& srvHeap, uint32_t width,
+                        uint32_t height, DXGI_FORMAT format, const float* clearColor) {
     m_format = format;
+    if (clearColor) {
+        m_clearColor[0] = clearColor[0];
+        m_clearColor[1] = clearColor[1];
+        m_clearColor[2] = clearColor[2];
+        m_clearColor[3] = clearColor[3];
+    }
 
     if (!m_rtvHeap.Init(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1, false)) {
         SE_LOG_ERROR("Failed to create RTV descriptor heap for render target");
@@ -34,9 +39,8 @@ void RenderTarget::Shutdown(DescriptorHeap& srvHeap) {
 }
 
 // ── Resize ───────────────────────────────────────────────────────────
-void RenderTarget::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                            DescriptorHeap& srvHeap,
-                            uint32_t width, uint32_t height) {
+void RenderTarget::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator, DescriptorHeap& srvHeap, uint32_t width,
+                          uint32_t height) {
     if (m_srvHandle.IsValid()) {
         srvHeap.Free(m_srvHandle);
         m_srvHandle = {};
@@ -49,19 +53,17 @@ void RenderTarget::Resize(ID3D12Device* device, D3D12MA::Allocator* allocator,
 }
 
 // ── Internal ─────────────────────────────────────────────────────────
-bool RenderTarget::CreateResources(ID3D12Device* device, D3D12MA::Allocator* allocator,
-                                    DescriptorHeap& srvHeap,
-                                    uint32_t width, uint32_t height) {
+bool RenderTarget::CreateResources(ID3D12Device* device, D3D12MA::Allocator* allocator, DescriptorHeap& srvHeap,
+                                   uint32_t width, uint32_t height) {
     m_width = width;
     m_height = height;
 
-    float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = m_format;
-    clearValue.Color[0] = clearColor[0];
-    clearValue.Color[1] = clearColor[1];
-    clearValue.Color[2] = clearColor[2];
-    clearValue.Color[3] = clearColor[3];
+    clearValue.Color[0] = m_clearColor[0];
+    clearValue.Color[1] = m_clearColor[1];
+    clearValue.Color[2] = m_clearColor[2];
+    clearValue.Color[3] = m_clearColor[3];
 
     D3D12_RESOURCE_DESC resourceDesc = {};
     resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -76,12 +78,8 @@ bool RenderTarget::CreateResources(ID3D12Device* device, D3D12MA::Allocator* all
     D3D12MA::ALLOCATION_DESC allocDesc = {};
     allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 
-    HRESULT hr = allocator->CreateResource(
-        &allocDesc, &resourceDesc,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        &clearValue,
-        &m_allocation,
-        IID_PPV_ARGS(&m_resource));
+    HRESULT hr = allocator->CreateResource(&allocDesc, &resourceDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                                           &clearValue, &m_allocation, IID_PPV_ARGS(&m_resource));
 
     if (FAILED(hr)) {
         SE_LOG_ERROR("Failed to create render target resource");

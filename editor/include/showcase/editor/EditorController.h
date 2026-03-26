@@ -14,11 +14,13 @@ namespace showcase {
 class CommandHistory;
 class Input;
 struct Model;
+class RenderContext;
 class ViewportPanel;
 
 class EditorController {
 public:
-    void Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport);
+    void Update(const Input& input, Scene& scene, SceneRenderer& renderer, ViewportPanel& viewport,
+                RenderContext& renderContext);
     void RenderUI(Scene& scene, ViewportPanel& viewport);
     void RenderToolbar(ViewportPanel& viewport);
 
@@ -63,6 +65,7 @@ private:
     ImVec2 m_viewportMin = {};
     ImVec2 m_viewportMax = {};
     bool m_viewportHovered = false;
+    bool m_pickPending = false;
 
     // Gizmo
     ImGuizmo::OPERATION m_gizmoOperation = ImGuizmo::TRANSLATE;

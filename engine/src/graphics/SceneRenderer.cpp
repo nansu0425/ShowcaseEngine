@@ -7,8 +7,6 @@
 #include <showcase/graphics/RenderContext.h>
 #include <showcase/graphics/RootSignature.h>
 
-#include <cfloat>
-
 namespace showcase {
 
 struct alignas(256) PerFrameData {
@@ -207,61 +205,6 @@ void SceneRenderer::CreateSphereModel(RenderContext& ctx, Model& outModel) {
     outModel.localAABB = BoundingBox(Vector3(0.f, 0.f, 0.f), Vector3(0.5f, 0.5f, 0.5f));
 }
 
-// ── Ray picking ──────────────────────────────────────────────────────
-
-int SceneRenderer::PickObject(int mouseX, int mouseY, const Camera& camera, const Scene& scene, float vpMinX,
-                              float vpMinY, float vpMaxX, float vpMaxY) const {
-    float vpWidth = vpMaxX - vpMinX;
-    float vpHeight = vpMaxY - vpMinY;
-    if (vpWidth <= 0 || vpHeight <= 0)
-        return -1;
-
-    float localX = static_cast<float>(mouseX) - vpMinX;
-    float localY = static_cast<float>(mouseY) - vpMinY;
-
-    float ndcX = (localX / vpWidth) * 2.0f - 1.0f;
-    float ndcY = 1.0f - (localY / vpHeight) * 2.0f;
-
-    Matrix vp = camera.GetViewProjectionMatrix();
-    Matrix invVP = vp.Invert();
-
-    Vector3 nearPt = Vector3::Transform(Vector3(ndcX, ndcY, 0.0f), invVP);
-    Vector3 farPt = Vector3::Transform(Vector3(ndcX, ndcY, 1.0f), invVP);
-
-    Vector3 rayOrigin = nearPt;
-    Vector3 rayDir = farPt - nearPt;
-    rayDir.Normalize();
-
-    int closestId = -1;
-    float closestDist = FLT_MAX;
-
-    for (const auto& obj : scene.GetObjects()) {
-        if (!obj.HasModel())
-            continue;
-
-        // Transform ray into object local space for accurate rotated picking
-        Matrix invWorld = obj.worldTransform.Invert();
-        Vector3 localOrigin = Vector3::Transform(rayOrigin, invWorld);
-        Vector3 localDir = Vector3::TransformNormal(rayDir, invWorld);
-        localDir.Normalize();
-
-        float dist = 0.0f;
-        if (obj.modelComp->model->localAABB.Intersects(localOrigin, localDir, dist)) {
-            // Convert local-space hit point back to world-space distance
-            Vector3 localHit = localOrigin + localDir * dist;
-            Vector3 worldHit = Vector3::Transform(localHit, obj.worldTransform);
-            float worldDist = (worldHit - rayOrigin).Length();
-
-            if (worldDist < closestDist) {
-                closestDist = worldDist;
-                closestId = static_cast<int>(obj.id);
-            }
-        }
-    }
-
-    return closestId;
-}
-
 // ── Init / Shutdown ──────────────────────────────────────────────────
 
 void SceneRenderer::Init(RenderContext& ctx) {
@@ -270,12 +213,13 @@ void SceneRenderer::Init(RenderContext& ctx) {
     auto* allocator = ctx.GetDevice().GetAllocator();
 
     // Root signature: CBV b0 (PerFrame), CBV b1 (PerObject), CBV b2 (PerMaterial),
-    //                 DescriptorTable(SRV t0), DescriptorTable(SRV t1), StaticSampler s0
+    //                 DescriptorTable(SRV t0), Constants b3 (objectId), StaticSampler s0
     m_rootSignature = RootSignatureBuilder()
                           .AddCBV(0)                                                 // slot 0: PerFrame
                           .AddCBV(1)                                                 // slot 1: PerObject
                           .AddCBV(2)                                                 // slot 2: PerMaterial
                           .AddDescriptorTable(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0) // slot 3: baseColorTex t0
+                          .AddConstants(1, 3)                                        // slot 4: objectId (b3, 1 DWORD)
                           .AddStaticSampler(0)                                       // s0: linear wrap
                           .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
                           .Build(device);
@@ -306,6 +250,19 @@ void SceneRenderer::Init(RenderContext& ctx) {
         m_pipelineStateDoubleSided = PipelineState::CreateGraphicsPSO(device, doubleSidedDesc);
     }
 
+    // Object ID pass PSOs
+    {
+        D3D12_SHADER_BYTECODE idPs = ctx.GetShaderManager().LoadShader("shaders/object_id_ps_ps.cso");
+        GraphicsPipelineDesc idDesc = psoDesc;
+        idDesc.pixelShader = idPs;
+        idDesc.rtvFormat = DXGI_FORMAT_R32_UINT;
+        m_objectIdPSO = PipelineState::CreateGraphicsPSO(device, idDesc);
+
+        GraphicsPipelineDesc idDescDS = idDesc;
+        idDescDS.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        m_objectIdPSODoubleSided = PipelineState::CreateGraphicsPSO(device, idDescDS);
+    }
+
     // Constant buffers (upload heap, 256-byte aligned)
     if (!m_perFrameCB.InitAsUploadBuffer(device, allocator, sizeof(PerFrameData)) ||
         !m_perObjectCB.InitAsUploadBuffer(device, allocator, sizeof(PerObjectData) * kMaxObjects) ||
@@ -314,7 +271,9 @@ void SceneRenderer::Init(RenderContext& ctx) {
         return;
     }
 
-    // Store SRV heap pointer for cleanup
+    // Store device pointers for later use (resize, etc.)
+    m_device = device;
+    m_allocator = allocator;
     m_srvHeap = &ctx.GetSrvHeap();
 
     // Create 1x1 white default texture for untextured geometry
@@ -341,13 +300,42 @@ void SceneRenderer::Init(RenderContext& ctx) {
         texCmdList.Shutdown();
     }
 
+    // Readback buffer for GPU picking (single uint32)
+    {
+        D3D12_RESOURCE_DESC readbackDesc = {};
+        readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        readbackDesc.Width = 256; // D3D12 minimum alignment
+        readbackDesc.Height = 1;
+        readbackDesc.DepthOrArraySize = 1;
+        readbackDesc.MipLevels = 1;
+        readbackDesc.Format = DXGI_FORMAT_UNKNOWN;
+        readbackDesc.SampleDesc.Count = 1;
+        readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        D3D12_HEAP_PROPERTIES heapProps = {};
+        heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+
+        HRESULT hr = device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &readbackDesc,
+                                                     D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                                     IID_PPV_ARGS(&m_pickReadbackBuffer));
+        if (FAILED(hr)) {
+            SE_LOG_ERROR("Failed to create pick readback buffer");
+            return;
+        }
+    }
+
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
 void SceneRenderer::Shutdown() {
     if (m_srvHeap) {
         m_defaultWhiteTex.Shutdown(*m_srvHeap);
+        m_objectIdRT.Shutdown(*m_srvHeap);
+        m_objectIdDepth.Shutdown(*m_srvHeap);
     }
+    m_pickReadbackBuffer.Reset();
+    m_objectIdPSO.Reset();
+    m_objectIdPSODoubleSided.Reset();
     m_perFrameCB.Shutdown();
     m_perObjectCB.Shutdown();
     m_perMaterialCB.Shutdown();
@@ -358,6 +346,26 @@ void SceneRenderer::Shutdown() {
 
 void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
     m_aspectRatio = height > 0 ? static_cast<float>(width) / height : 1.0f;
+
+    if (!m_device || !m_srvHeap || width == 0 || height == 0)
+        return;
+
+    float idClearColor[] = {0.0f, 0.0f, 0.0f, 0.0f};
+    if (m_objectIdRT.GetResource()) {
+        m_objectIdRT.Resize(m_device, m_allocator, *m_srvHeap, width, height);
+    } else {
+        if (!m_objectIdRT.Init(m_device, m_allocator, *m_srvHeap, width, height, DXGI_FORMAT_R32_UINT, idClearColor)) {
+            SE_LOG_ERROR("Failed to init object ID render target");
+        }
+    }
+
+    if (m_objectIdDepth.GetResource()) {
+        m_objectIdDepth.Resize(m_device, m_allocator, width, height);
+    } else {
+        if (!m_objectIdDepth.Init(m_device, m_allocator, width, height)) {
+            SE_LOG_ERROR("Failed to init object ID depth buffer");
+        }
+    }
 }
 
 // ── Render ───────────────────────────────────────────────────────────
@@ -457,6 +465,191 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     }
 
     SE_PLOT("Draw Calls", static_cast<int64_t>(objectIndex));
+}
+
+// ── GPU Object-ID Picking ────────────────────────────────────────────
+
+void SceneRenderer::RenderObjectIds(RenderContext& ctx, Camera& camera, Scene& scene) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+
+    if (!m_objectIdRT.GetResource())
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Transition ID RT to render target
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = m_objectIdRT.GetResource();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    // Clear ID RT to 0 (no object)
+    float clearValues[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_objectIdRT.GetRTV();
+    cmdList->ClearRenderTargetView(rtvHandle, clearValues, 0, nullptr);
+
+    // Clear depth
+    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_objectIdDepth.GetDSV();
+    cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+    // Set render target
+    cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+
+    // Set viewport and scissor to match ID RT dimensions
+    D3D12_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(m_objectIdRT.GetWidth());
+    viewport.Height = static_cast<float>(m_objectIdRT.GetHeight());
+    viewport.MaxDepth = 1.0f;
+    cmdList->RSSetViewports(1, &viewport);
+
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_objectIdRT.GetWidth()),
+                          static_cast<LONG>(m_objectIdRT.GetHeight())};
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    // Set pipeline state
+    cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
+    cmdList->SetPipelineState(m_objectIdPSO.Get());
+    ID3D12PipelineState* currentPSO = m_objectIdPSO.Get();
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Reuse PerFrame CB (already uploaded by Render())
+    cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB.GetResource()->GetGPUVirtualAddress());
+
+    uint32_t objectIndex = 0;
+    D3D12_GPU_VIRTUAL_ADDRESS objCbBase = m_perObjectCB.GetResource()->GetGPUVirtualAddress();
+    D3D12_GPU_VIRTUAL_ADDRESS matCbBase = m_perMaterialCB.GetResource()->GetGPUVirtualAddress();
+
+    for (const auto& sceneObj : scene.GetObjects()) {
+        if (!sceneObj.HasModel())
+            continue;
+
+        for (const auto& mesh : sceneObj.modelComp->model->meshes) {
+            for (const auto& prim : mesh.primitives) {
+                if (prim.indexCount == 0 || objectIndex >= kMaxObjects)
+                    continue;
+
+                // Reuse per-object and per-material CBs (already uploaded by Render())
+                cmdList->SetGraphicsRootConstantBufferView(1, objCbBase + objectIndex * sizeof(PerObjectData));
+                cmdList->SetGraphicsRootConstantBufferView(2, matCbBase + objectIndex * sizeof(PerMaterialData));
+
+                // Set texture for alpha testing
+                if (prim.material && prim.material->baseColorTexture) {
+                    cmdList->SetGraphicsRootDescriptorTable(3, prim.material->baseColorTexture->GetSRVHandle().gpu);
+                } else {
+                    cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
+                }
+
+                // Set object ID via root constant (slot 4)
+                uint32_t objId = sceneObj.id;
+                cmdList->SetGraphicsRoot32BitConstant(4, objId, 0);
+
+                // Switch PSO for double-sided materials
+                if (prim.material) {
+                    ID3D12PipelineState* requiredPSO =
+                        prim.material->doubleSided ? m_objectIdPSODoubleSided.Get() : m_objectIdPSO.Get();
+                    if (requiredPSO != currentPSO) {
+                        cmdList->SetPipelineState(requiredPSO);
+                        currentPSO = requiredPSO;
+                    }
+                } else if (currentPSO != m_objectIdPSO.Get()) {
+                    cmdList->SetPipelineState(m_objectIdPSO.Get());
+                    currentPSO = m_objectIdPSO.Get();
+                }
+
+                D3D12_VERTEX_BUFFER_VIEW vbView = prim.vertexBuffer.GetVertexBufferView();
+                D3D12_INDEX_BUFFER_VIEW ibView = prim.indexBuffer.GetIndexBufferView();
+                cmdList->IASetVertexBuffers(0, 1, &vbView);
+                cmdList->IASetIndexBuffer(&ibView);
+                cmdList->DrawIndexedInstanced(prim.indexCount, 1, 0, 0, 0);
+                objectIndex++;
+            }
+        }
+    }
+
+    // If a pick was requested, copy the target pixel to the readback buffer
+    if (m_pickRequested) {
+        m_pickRequested = false;
+
+        // Transition to copy source
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        cmdList->ResourceBarrier(1, &barrier);
+
+        // Copy 1x1 pixel region
+        D3D12_TEXTURE_COPY_LOCATION srcLoc = {};
+        srcLoc.pResource = m_objectIdRT.GetResource();
+        srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        srcLoc.SubresourceIndex = 0;
+
+        D3D12_TEXTURE_COPY_LOCATION dstLoc = {};
+        dstLoc.pResource = m_pickReadbackBuffer.Get();
+        dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        dstLoc.PlacedFootprint.Offset = 0;
+        dstLoc.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R32_UINT;
+        dstLoc.PlacedFootprint.Footprint.Width = 1;
+        dstLoc.PlacedFootprint.Footprint.Height = 1;
+        dstLoc.PlacedFootprint.Footprint.Depth = 1;
+        dstLoc.PlacedFootprint.Footprint.RowPitch = 256; // D3D12 minimum alignment
+
+        D3D12_BOX srcBox = {};
+        srcBox.left = static_cast<UINT>(m_pickX);
+        srcBox.top = static_cast<UINT>(m_pickY);
+        srcBox.right = srcBox.left + 1;
+        srcBox.bottom = srcBox.top + 1;
+        srcBox.front = 0;
+        srcBox.back = 1;
+
+        cmdList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, &srcBox);
+
+        // Transition back to SRV
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        cmdList->ResourceBarrier(1, &barrier);
+
+        // Record fence value — result will be available after this frame's GPU work completes
+        m_pickFenceValue = ctx.GetDirectQueue().GetCurrentFenceValue() + 1;
+        m_pickReady = true;
+    } else {
+        // Transition back to SRV
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        cmdList->ResourceBarrier(1, &barrier);
+    }
+}
+
+void SceneRenderer::RequestPick(int pixelX, int pixelY) {
+    m_pickX = pixelX;
+    m_pickY = pixelY;
+    m_pickRequested = true;
+    m_pickReady = false;
+}
+
+bool SceneRenderer::IsPickComplete(RenderContext& ctx) const {
+    return m_pickReady && ctx.GetDirectQueue().IsFenceComplete(m_pickFenceValue);
+}
+
+int SceneRenderer::GetPickResult(RenderContext& ctx) {
+    if (!IsPickComplete(ctx))
+        return -1;
+
+    m_pickReady = false;
+
+    uint32_t* data = nullptr;
+    D3D12_RANGE readRange = {0, sizeof(uint32_t)};
+    HRESULT hr = m_pickReadbackBuffer->Map(0, &readRange, reinterpret_cast<void**>(&data));
+    if (FAILED(hr))
+        return -1;
+
+    uint32_t pickedId = *data;
+
+    D3D12_RANGE writeRange = {0, 0};
+    m_pickReadbackBuffer->Unmap(0, &writeRange);
+
+    m_lastPickResult = (pickedId == 0) ? -1 : static_cast<int>(pickedId);
+    return m_lastPickResult;
 }
 
 } // namespace showcase
