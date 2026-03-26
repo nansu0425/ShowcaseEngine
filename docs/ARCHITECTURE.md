@@ -61,7 +61,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Timer` | `Timer.h` | Frame delta time and FPS calculation |
 | `Log` | `Log.h` | spdlog wrapper with `SE_LOG_*` macros |
 | `LogListener` | `LogListener.h` | Abstract log listener interface (`LogLevel`, `LogMessage`) for non-spdlog consumers |
-| `FileSystem` | `FileSystem.h` | Path utility (`GetExecutableDir()`) |
+| `FileSystem` | `FileSystem.h` | Filesystem utilities: executable directory, file last-write time, file content hashing (FNV-1a) |
 | `Profiler` | `Profiler.h` | Tracy wrapper macros (`SE_ZONE_SCOPED`, `SE_FRAME_MARK`, etc.); no-op when Tracy is disabled |
 
 ### 2.2 Graphics Module — `engine/include/showcase/graphics/`
@@ -101,6 +101,7 @@ The project is split into two CMake targets with a strict dependency direction:
 |-------|------|---------|
 | `Camera` | `Camera.h` | View/projection matrices, frustum extraction |
 | `Model` | `Model.h` | Meshes with shared materials/textures, local AABB; glTF loading via `ModelLoader` |
+| `ModelCache` | `ModelCache.h` | Binary cache for glTF models: validity check (FNV-1a hash), load, and write |
 | `Material` | `Model.h` | Base color factor + optional `shared_ptr<Texture>` for base color texture |
 | `AssetManager` | `AssetManager.h` | Central ownership of all `Model` instances (builtin + file-loaded); deduplicates by source key |
 | `ModelComponent` | `Scene.h` | Optional component: `modelSource` string, resolved `Model*` pointer, and optional `baseColor` material override |

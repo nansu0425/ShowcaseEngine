@@ -2,6 +2,7 @@
 
 #include <showcase/core/Log.h>
 #include <showcase/core/Profiler.h>
+#include <showcase/graphics/ModelCache.h>
 #include <showcase/graphics/RenderContext.h>
 
 #define TINYGLTF_IMPLEMENTATION
@@ -326,6 +327,16 @@ static BoundingBox ComputeLocalAABB(const std::vector<ModelVertex>& vertices) {
 bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Model& outModel) {
     SE_ZONE_SCOPED_C(profile::kColorAssetIO);
     SE_ZONE_TEXT(filepath.c_str(), filepath.size());
+
+    // Try loading from binary cache first
+    std::string cachePath = ModelCache::GetCachePath(filepath);
+    if (ModelCache::IsCacheValid(filepath)) {
+        if (ModelCache::LoadFromCache(ctx, cachePath, outModel)) {
+            return true;
+        }
+        SE_LOG_WARN("Cache load failed, falling back to glTF: {}", filepath);
+    }
+
     auto* device = ctx.GetDevice().GetDevice();
     auto* allocator = ctx.GetDevice().GetAllocator();
     tinygltf::Model gltfModel;
@@ -371,8 +382,45 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
         }
     }
 
+    // Collect cache write data alongside mesh loading
+    ModelCacheWriteData cacheData;
+    cacheData.gltfPath = &filepath;
+
+    // Collect image data for cache (TinyGLTF provides pre-decoded RGBA pixels)
+    for (const auto& image : gltfModel.images) {
+        ModelCacheWriteData::ImageEntry ie;
+        ie.width = static_cast<uint32_t>(image.width);
+        ie.height = static_cast<uint32_t>(image.height);
+        ie.data = image.image.data();
+        ie.dataSize = image.image.size();
+        cacheData.images.push_back(ie);
+    }
+
+    // Collect material data for cache
+    for (size_t i = 0; i < gltfModel.materials.size(); ++i) {
+        const auto& gltfMat = gltfModel.materials[i];
+        ModelCacheWriteData::MaterialEntry me;
+        const auto& pbr = gltfMat.pbrMetallicRoughness;
+        me.baseColorFactor[0] = static_cast<float>(pbr.baseColorFactor[0]);
+        me.baseColorFactor[1] = static_cast<float>(pbr.baseColorFactor[1]);
+        me.baseColorFactor[2] = static_cast<float>(pbr.baseColorFactor[2]);
+        me.baseColorFactor[3] = static_cast<float>(pbr.baseColorFactor[3]);
+        if (pbr.baseColorTexture.index >= 0) {
+            const auto& texInfo = gltfModel.textures[pbr.baseColorTexture.index];
+            me.baseColorTextureIndex = texInfo.source;
+        }
+        if (gltfMat.alphaMode == "MASK")
+            me.alphaMode = 1;
+        else if (gltfMat.alphaMode == "BLEND")
+            me.alphaMode = 2;
+        me.alphaCutoff = static_cast<float>(gltfMat.alphaCutoff);
+        me.doubleSided = gltfMat.doubleSided ? 1 : 0;
+        cacheData.materials.push_back(me);
+    }
+
     // Load meshes — one engine Mesh per node instance
     outModel.meshes.resize(instances.size());
+    cacheData.meshes.resize(instances.size());
 
     Vector3 modelMin(FLT_MAX, FLT_MAX, FLT_MAX);
     Vector3 modelMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
@@ -383,6 +431,10 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
         auto& mesh = outModel.meshes[mi];
         mesh.name = gltfMesh.name;
         mesh.primitives.resize(gltfMesh.primitives.size());
+
+        auto& cacheMesh = cacheData.meshes[mi];
+        cacheMesh.name = gltfMesh.name;
+        cacheMesh.primitives.resize(gltfMesh.primitives.size());
 
         for (size_t pi = 0; pi < gltfMesh.primitives.size(); ++pi) {
             const auto& gltfPrim = gltfMesh.primitives[pi];
@@ -419,6 +471,13 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
             }
             prim.localAABB = ComputeLocalAABB(vertices);
 
+            // Collect for cache
+            auto& cachePrim = cacheMesh.primitives[pi];
+            cachePrim.materialIndex = gltfPrim.material;
+            cachePrim.vertices = std::move(vertices);
+            cachePrim.indices = std::move(indices);
+            cachePrim.localAABB = prim.localAABB;
+
             // Expand model AABB
             Vector3 center(prim.localAABB.Center);
             Vector3 extents(prim.localAABB.Extents);
@@ -428,6 +487,10 @@ bool ModelLoader::LoadGLTF(RenderContext& ctx, const std::string& filepath, Mode
     }
 
     outModel.localAABB = CreateAABB(modelMin, modelMax);
+    cacheData.modelAABB = outModel.localAABB;
+
+    // Write binary cache for next load
+    ModelCache::WriteCache(cachePath, cacheData);
 
     SE_LOG_INFO("Loaded glTF: {} ({} meshes from {} instances, {} materials, {} textures)", filepath,
                 gltfModel.meshes.size(), instances.size(), materials.size(), textures.size());
