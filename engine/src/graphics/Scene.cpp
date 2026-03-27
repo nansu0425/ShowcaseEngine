@@ -75,6 +75,38 @@ SceneObject* Scene::FindById(uint32_t id) {
     return nullptr;
 }
 
+static std::string ExtractBaseName(const std::string& name) {
+    if (name.size() < 4 || name.back() != ')')
+        return name;
+    size_t open = name.rfind(" (");
+    if (open == std::string::npos)
+        return name;
+    for (size_t i = open + 2; i < name.size() - 1; ++i) {
+        if (!std::isdigit(static_cast<unsigned char>(name[i])))
+            return name;
+    }
+    return name.substr(0, open);
+}
+
+std::string Scene::GenerateUniqueName(const std::string& baseName) const {
+    std::string base = ExtractBaseName(baseName);
+    int maxNumber = 0;
+    for (const auto& obj : m_objects) {
+        if (obj.name == base) {
+            maxNumber = std::max(maxNumber, 1);
+        } else {
+            std::string objBase = ExtractBaseName(obj.name);
+            if (objBase == base && obj.name.size() > base.size()) {
+                int num = std::atoi(obj.name.c_str() + base.size() + 2);
+                maxNumber = std::max(maxNumber, num + 1);
+            }
+        }
+    }
+    if (maxNumber == 0)
+        return baseName;
+    return base + " (" + std::to_string(maxNumber) + ")";
+}
+
 void Scene::Clear() {
     m_objects.clear();
     m_nextId = 1;

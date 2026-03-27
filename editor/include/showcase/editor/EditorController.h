@@ -120,6 +120,7 @@ private:
         uint32_t objectId;
     };
     void DragLightProperty(const DragLightPropertyDesc& desc);
+    void DuplicateSelectedObject(Scene& scene);
 };
 
 } // namespace showcase

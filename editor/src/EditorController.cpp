@@ -226,6 +226,9 @@ void EditorController::Update(const EditorUpdateDesc& desc) {
                     scene, m_selectedObjectId, static_cast<uint32_t>(m_selectedObjectId)));
             }
         }
+        if (input.IsKeyDown(Key::kControl) && input.IsKeyPressed('D') && m_selectedObjectId > 0) {
+            DuplicateSelectedObject(scene);
+        }
     }
 }
 
@@ -419,6 +422,15 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 m_selectedObjectId = static_cast<int>(obj.id);
             }
             if (ImGui::BeginPopupContextItem()) {
+                if (ImGui::MenuItem("Duplicate")) {
+                    m_selectedObjectId = static_cast<int>(obj.id);
+                    DuplicateSelectedObject(scene);
+                    ImGui::EndPopup();
+                    ImGui::PopID();
+                    break;
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Ctrl+D");
                 if (ImGui::MenuItem("Delete")) {
                     if (m_commandHistory) {
                         m_commandHistory->ExecuteCommand(
@@ -772,6 +784,36 @@ void EditorController::DragLightProperty(const DragLightPropertyDesc& desc) {
                 ChangeLightPropertiesCommandDesc{desc.scene, desc.objectId, m_dragStartLightProps, *desc.light}));
         }
     }
+}
+
+// ── Duplicate ─────────────────────────────────────────────────────
+
+void EditorController::DuplicateSelectedObject(Scene& scene) {
+    if (m_selectedObjectId <= 0 || !m_commandHistory)
+        return;
+
+    SceneObject* original = scene.FindById(static_cast<uint32_t>(m_selectedObjectId));
+    if (!original)
+        return;
+
+    // Copy all data from the original
+    SceneObject copy = *original;
+    copy.id = scene.AllocateId();
+    copy.name = scene.GenerateUniqueName(original->name);
+    copy.position.x += 1.0f;
+    copy.RecomputeWorldTransform();
+
+    // Resolve Model* pointer from modelSource
+    if (copy.modelComp.has_value() && !copy.modelComp->modelSource.empty() && m_resolveModelCallback) {
+        copy.modelComp->model = m_resolveModelCallback(copy.modelComp->modelSource);
+    }
+    copy.UpdateAABB();
+
+    // Insert right after the original
+    size_t insertIndex = scene.GetObjectIndex(original->id) + 1;
+    scene.InsertObject(copy, insertIndex);
+
+    m_commandHistory->ExecuteCommand(std::make_unique<AddObjectCommand>(scene, m_selectedObjectId, std::move(copy)));
 }
 
 // ── Toolbar ───────────────────────────────────────────────────────

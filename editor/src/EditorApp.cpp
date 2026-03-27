@@ -98,13 +98,15 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
 
     m_editorController.SetAddObjectCallback([this](const std::string& modelSource) -> SceneObject* {
         if (modelSource.empty()) {
-            SceneObject& obj = m_scene.AddObject({nullptr, "Empty", Vector3(0, 1, 0)});
+            std::string name = m_scene.GenerateUniqueName("Empty");
+            SceneObject& obj = m_scene.AddObject({nullptr, name, Vector3(0, 1, 0)});
             return &obj;
         }
         Model* model = m_assetManager.LoadModel(modelSource);
         if (!model)
             return nullptr;
-        SceneObject& obj = m_scene.AddObject({model, "Cube", Vector3(0, 1, 0)});
+        std::string name = m_scene.GenerateUniqueName("Cube");
+        SceneObject& obj = m_scene.AddObject({model, name, Vector3(0, 1, 0)});
         obj.modelComp->modelSource = modelSource;
         return &obj;
     });

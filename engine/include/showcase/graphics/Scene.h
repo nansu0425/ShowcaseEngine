@@ -97,6 +97,8 @@ public:
     SceneObject& InsertObject(SceneObject obj, size_t index);
     std::vector<SceneObject>& GetObjects();
     const std::vector<SceneObject>& GetObjects() const;
+    uint32_t AllocateId() { return m_nextId++; }
+    std::string GenerateUniqueName(const std::string& baseName) const;
     size_t GetObjectCount() const;
     size_t GetObjectIndex(uint32_t id) const;
     std::optional<DirectionalLightData> GetDirectionalLight() const;
