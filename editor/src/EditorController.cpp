@@ -418,13 +418,14 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                     ImGui::PushID(static_cast<int>(pi));
                                     char primLabel[128];
                                     snprintf(primLabel, sizeof(primLabel), "Primitive %zu", pi);
-                                    if (ImGui::TreeNode(primLabel)) {
-                                        RenderPrimitiveDetails(mesh.primitives[pi]);
-                                        ImGui::TreePop();
-                                    }
+                                    bool open = ImGui::TreeNode(primLabel);
                                     if (ImGui::IsItemHovered()) {
                                         m_hoveredMeshIdx = static_cast<int>(mi);
                                         m_hoveredPrimIdx = static_cast<int>(pi);
+                                    }
+                                    if (open) {
+                                        RenderPrimitiveDetails(mesh.primitives[pi]);
+                                        ImGui::TreePop();
                                     }
                                     ImGui::PopID();
                                 }
