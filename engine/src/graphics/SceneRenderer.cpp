@@ -13,6 +13,13 @@ struct alignas(256) PerFrameData {
     Matrix viewProjection;
     Vector3 cameraPosition;
     float _pad0;
+
+    Vector3 lightDirection;
+    float lightAmbient;
+    Vector3 lightColor;
+    float lightSpecularPower;
+    int lightingEnabled;
+    Vector3 _pad1;
 };
 
 struct alignas(256) PerObjectData {
@@ -429,9 +436,19 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
 
     // Update PerFrame CB (use per-frame buffer to avoid CPU/GPU race)
     uint32_t fi = ctx.GetCurrentFrameIndex();
-    PerFrameData frameData;
+    PerFrameData frameData = {};
     frameData.viewProjection = camera.GetViewProjectionMatrix();
     frameData.cameraPosition = camera.GetPosition();
+
+    auto dirLight = scene.GetDirectionalLight();
+    if (dirLight.has_value()) {
+        frameData.lightDirection = dirLight->direction;
+        frameData.lightColor = dirLight->color;
+        frameData.lightAmbient = dirLight->ambientIntensity;
+        frameData.lightSpecularPower = dirLight->specularPower;
+        frameData.lightingEnabled = 1;
+    }
+
     m_perFrameCB[fi].UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB[fi].GetResource()->GetGPUVirtualAddress());
 

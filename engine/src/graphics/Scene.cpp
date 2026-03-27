@@ -103,6 +103,16 @@ void Scene::Serialize(JsonDocument& doc) const {
                 model["material"]["baseColor"].SetFloatArray({c.x, c.y, c.z, c.w});
             }
         }
+
+        if (obj.lightComp.has_value()) {
+            auto light = node["components"]["light"];
+            light["type"].Set(static_cast<int>(obj.lightComp->type));
+            const auto& c = obj.lightComp->color;
+            light["color"].SetFloatArray({c.x, c.y, c.z});
+            light["intensity"].Set(obj.lightComp->intensity);
+            light["ambientIntensity"].Set(obj.lightComp->ambientIntensity);
+            light["specularPower"].Set(obj.lightComp->specularPower);
+        }
     }
 }
 
@@ -164,6 +174,27 @@ bool Scene::Deserialize(JsonDocument& doc) {
             }
         }
 
+        // Light component
+        auto lightNode = components["light"];
+        if (lightNode.Contains("type")) {
+            LightComponent lc;
+            lc.type = static_cast<LightType>(lightNode["type"].GetInt());
+
+            auto col = lightNode["color"];
+            if (col.IsArray() && col.Size() >= 3) {
+                lc.color = Vector3(col[0].GetFloat(), col[1].GetFloat(), col[2].GetFloat());
+            }
+
+            if (lightNode.Contains("intensity"))
+                lc.intensity = lightNode["intensity"].GetFloat();
+            if (lightNode.Contains("ambientIntensity"))
+                lc.ambientIntensity = lightNode["ambientIntensity"].GetFloat();
+            if (lightNode.Contains("specularPower"))
+                lc.specularPower = lightNode["specularPower"].GetFloat();
+
+            obj.lightComp = lc;
+        }
+
         // Legacy fallback: top-level baseColorOverride → ModelComponent::baseColor
         if (obj.modelComp.has_value() && !obj.modelComp->baseColor.has_value()) {
             auto colorOverride = node["baseColorOverride"];
@@ -221,6 +252,24 @@ bool Scene::LoadFromFile(const std::string& filePath) {
 
     SE_LOG_INFO("Scene loaded: {} ({} objects)", filePath, m_objects.size());
     return true;
+}
+
+std::optional<DirectionalLightData> Scene::GetDirectionalLight() const {
+    for (const auto& obj : m_objects) {
+        if (!obj.lightComp.has_value() || obj.lightComp->type != LightType::Directional)
+            continue;
+
+        DirectionalLightData data;
+        // Forward vector (Z-axis row in row-major world matrix)
+        Vector3 forward(obj.worldTransform._31, obj.worldTransform._32, obj.worldTransform._33);
+        forward.Normalize();
+        data.direction = forward;
+        data.color = obj.lightComp->color * obj.lightComp->intensity;
+        data.ambientIntensity = obj.lightComp->ambientIntensity;
+        data.specularPower = obj.lightComp->specularPower;
+        return data;
+    }
+    return std::nullopt;
 }
 
 SceneObject& Scene::InsertObject(SceneObject obj, size_t index) {

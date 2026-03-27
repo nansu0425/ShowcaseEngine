@@ -107,6 +107,19 @@ private:
     Vector3 m_dragStartScale;
     std::string m_dragStartName;
     std::optional<Vector4> m_dragStartColor;
+    LightComponent m_dragStartLightProps;
+
+    struct DragLightPropertyDesc {
+        const char* label;
+        float* value;
+        float speed;
+        float min;
+        float max;
+        LightComponent* light;
+        Scene* scene;
+        uint32_t objectId;
+    };
+    void DragLightProperty(const DragLightPropertyDesc& desc);
 };
 
 } // namespace showcase

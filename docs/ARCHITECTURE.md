@@ -105,6 +105,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Material` | `Model.h` | Base color factor + optional `shared_ptr<Texture>` for base color texture |
 | `AssetManager` | `AssetManager.h` | Central ownership of all `Model` instances (builtin + file-loaded); deduplicates by source key |
 | `ModelComponent` | `Scene.h` | Optional component: `modelSource` string, resolved `Model*` pointer, and optional `baseColor` material override |
+| `LightComponent` | `Scene.h` | Optional component: directional light with color, intensity, ambient, specular power; direction derived from object rotation |
 | `Scene` | `Scene.h` | Flat collection of `SceneObject` with auto-incrementing IDs |
 | `SceneRenderer` | `SceneRenderer.h` | Root signatures, PSOs (mesh + selection outline), constant buffers, draw loop, GPU object-ID picking |
 
@@ -185,7 +186,7 @@ EditorApp::Run()
 │   │                                                       │
 │   ├── ViewportPanel::BeginRender()           // transition offscreen → RT
 │   ├── SceneRenderer::Render()                // set root sig, PSO
-│   │   ├── Update per-frame CB (VP matrix)
+│   │   ├── Update per-frame CB (VP matrix, lighting)
 │   │   ├── For each SceneObject:
 │   │   │   ├── Update per-object CB at offset (world matrix)
 │   │   │   ├── Update per-material CB at offset (color, texture flag)
@@ -253,7 +254,7 @@ The same pattern applies to the per-material constant buffer.
 ### Root signature layout
 
 ```
-Root[0]  CBV  b0   Per-frame data (view-projection matrix, camera position)
+Root[0]  CBV  b0   Per-frame data (view-projection matrix, camera position, directional light)
 Root[1]  CBV  b1   Per-object data (world matrix) — offset per object
 Root[2]  CBV  b2   Per-material data (base color, texture flag) — offset per object
 Root[3]  Table     SRV t0  Base color texture (or default white)
@@ -278,6 +279,15 @@ struct ModelComponent {
     optional<Vector4> baseColor; // instance-level material override (replaces Material::baseColorFactor)
 };
 
+struct LightComponent {
+    LightType type;            // Directional (only type currently)
+    Vector3 color;             // light color
+    float intensity;           // multiplied into color for shader
+    float ambientIntensity;    // ambient term strength
+    float specularPower;       // Blinn-Phong exponent
+    // Direction derived from SceneObject::rotation (forward vector of worldTransform)
+};
+
 struct SceneObject {
     uint32_t id;               // auto-incrementing ID
     string name;
@@ -290,6 +300,7 @@ struct SceneObject {
     bool occlusionCulled;
     int lodLevel;
     optional<ModelComponent> modelComp;  // present if object has renderable geometry
+    optional<LightComponent> lightComp;  // present if object is a light source
     bool HasModel() const;     // modelComp.has_value() && modelComp->model != nullptr
 };
 ```

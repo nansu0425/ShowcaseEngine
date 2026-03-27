@@ -152,6 +152,48 @@ private:
     std::optional<ModelComponent> m_oldComp, m_newComp;
 };
 
+struct AddLightComponentCommandDesc {
+    Scene* scene;
+    uint32_t objectId;
+    std::optional<LightComponent> oldComp;
+    std::optional<LightComponent> newComp;
+};
+
+class AddLightComponentCommand : public Command {
+public:
+    explicit AddLightComponentCommand(const AddLightComponentCommandDesc& desc);
+    void Execute() override;
+    void Undo() override;
+    std::string GetName() const override { return "Light Component"; }
+
+private:
+    void Apply(const std::optional<LightComponent>& comp);
+    Scene& m_scene;
+    uint32_t m_objectId;
+    std::optional<LightComponent> m_oldComp, m_newComp;
+};
+
+struct ChangeLightPropertiesCommandDesc {
+    Scene* scene;
+    uint32_t objectId;
+    LightComponent oldProps;
+    LightComponent newProps;
+};
+
+class ChangeLightPropertiesCommand : public Command {
+public:
+    explicit ChangeLightPropertiesCommand(const ChangeLightPropertiesCommandDesc& desc);
+    void Execute() override;
+    void Undo() override;
+    std::string GetName() const override { return "Change Light"; }
+
+private:
+    void Apply(const LightComponent& props);
+    Scene& m_scene;
+    uint32_t m_objectId;
+    LightComponent m_oldProps, m_newProps;
+};
+
 class AddObjectCommand : public Command {
 public:
     AddObjectCommand(Scene& scene, int& selectedObjectId, SceneObject snapshot);

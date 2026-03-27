@@ -142,6 +142,10 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
 void EditorApp::BuildDefaultScene() {
     m_assetManager.Init(m_renderContext, m_sceneRenderer);
     m_scene.Clear();
+
+    auto& light = m_scene.AddObject({nullptr, "Directional Light", {}, {50.0f, -30.0f, 0.0f}});
+    light.lightComp = LightComponent{};
+    light.RecomputeWorldTransform();
 }
 
 // ── Config persistence ───────────────────────────────────────────

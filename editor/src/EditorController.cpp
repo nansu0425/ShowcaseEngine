@@ -478,6 +478,46 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 }
             }
 
+            // ── Light Component ──
+            if (selected->lightComp.has_value()) {
+                bool lightHeaderOpen = true;
+                if (ImGui::CollapsingHeader("Light Component", &lightHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen)) {
+                    auto& light = *selected->lightComp;
+
+                    float color[3] = {light.color.x, light.color.y, light.color.z};
+                    if (ImGui::ColorEdit3("Light Color", color)) {
+                        light.color = Vector3(color[0], color[1], color[2]);
+                        if (m_dirtyCallback)
+                            m_dirtyCallback();
+                    }
+                    if (ImGui::IsItemActivated()) {
+                        m_dragStartLightProps = light;
+                    }
+                    if (ImGui::IsItemDeactivatedAfterEdit()) {
+                        if (m_commandHistory) {
+                            m_commandHistory->RecordCommand(std::make_unique<ChangeLightPropertiesCommand>(
+                                ChangeLightPropertiesCommandDesc{&scene, selected->id, m_dragStartLightProps, light}));
+                        }
+                    }
+
+                    DragLightProperty(
+                        {"Intensity", &light.intensity, 0.01f, 0.0f, 10.0f, &light, &scene, selected->id});
+                    DragLightProperty(
+                        {"Ambient", &light.ambientIntensity, 0.01f, 0.0f, 1.0f, &light, &scene, selected->id});
+                    DragLightProperty(
+                        {"Specular Power", &light.specularPower, 1.0f, 1.0f, 256.0f, &light, &scene, selected->id});
+
+                    ImGui::TextDisabled("Direction controlled by object rotation");
+                }
+
+                if (!lightHeaderOpen) {
+                    if (m_commandHistory) {
+                        m_commandHistory->ExecuteCommand(std::make_unique<AddLightComponentCommand>(
+                            AddLightComponentCommandDesc{&scene, selected->id, selected->lightComp, std::nullopt}));
+                    }
+                }
+            }
+
             // ── Add Component button ──
             ImGui::Spacing();
             ImGui::Separator();
@@ -487,14 +527,26 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 ImGui::OpenPopup("AddComponentPopup");
             }
             if (ImGui::BeginPopup("AddComponentPopup")) {
+                bool allAdded = true;
                 if (!selected->modelComp.has_value()) {
+                    allAdded = false;
                     if (ImGui::MenuItem("Model")) {
                         if (m_commandHistory) {
                             m_commandHistory->ExecuteCommand(std::make_unique<AddComponentCommand>(
                                 AddComponentCommandDesc{&scene, selected->id, std::nullopt, ModelComponent{}}));
                         }
                     }
-                } else {
+                }
+                if (!selected->lightComp.has_value()) {
+                    allAdded = false;
+                    if (ImGui::MenuItem("Directional Light")) {
+                        if (m_commandHistory) {
+                            m_commandHistory->ExecuteCommand(std::make_unique<AddLightComponentCommand>(
+                                AddLightComponentCommandDesc{&scene, selected->id, std::nullopt, LightComponent{}}));
+                        }
+                    }
+                }
+                if (allAdded) {
                     ImGui::TextDisabled("All components added");
                 }
                 ImGui::EndPopup();
@@ -505,6 +557,24 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
         }
     }
     ImGui::End();
+}
+
+// ── Light property drag helper ───────────────────────────────────
+
+void EditorController::DragLightProperty(const DragLightPropertyDesc& desc) {
+    if (ImGui::DragFloat(desc.label, desc.value, desc.speed, desc.min, desc.max)) {
+        if (m_dirtyCallback)
+            m_dirtyCallback();
+    }
+    if (ImGui::IsItemActivated()) {
+        m_dragStartLightProps = *desc.light;
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        if (m_commandHistory) {
+            m_commandHistory->RecordCommand(std::make_unique<ChangeLightPropertiesCommand>(
+                ChangeLightPropertiesCommandDesc{desc.scene, desc.objectId, m_dragStartLightProps, *desc.light}));
+        }
+    }
 }
 
 // ── Toolbar ───────────────────────────────────────────────────────

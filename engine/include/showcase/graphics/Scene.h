@@ -9,6 +9,29 @@
 
 namespace showcase {
 
+// ── Light ───────────────────────────────────────────────────────────
+
+enum class LightType : int {
+    Directional = 0,
+};
+
+struct LightComponent {
+    LightType type = LightType::Directional;
+    Vector3 color = {1.0f, 1.0f, 1.0f};
+    float intensity = 1.0f;
+    float ambientIntensity = 0.15f;
+    float specularPower = 32.0f;
+};
+
+struct DirectionalLightData {
+    Vector3 direction;
+    Vector3 color;
+    float ambientIntensity;
+    float specularPower;
+};
+
+// ── Components ──────────────────────────────────────────────────────
+
 struct ModelComponent {
     std::string modelSource;          // e.g. "builtin:cube", "file:assets/models/duck.glb"
     Model* model = nullptr;           // non-owning, resolved at runtime
@@ -28,8 +51,10 @@ struct SceneObject {
     int lodLevel = 0;
 
     std::optional<ModelComponent> modelComp;
+    std::optional<LightComponent> lightComp;
 
     bool HasModel() const { return modelComp.has_value() && modelComp->model != nullptr; }
+    bool HasLight() const { return lightComp.has_value(); }
     bool IsVisible() const;
     void RecomputeWorldTransform();
     void UpdateAABB();
@@ -62,6 +87,7 @@ public:
     const std::vector<SceneObject>& GetObjects() const;
     size_t GetObjectCount() const;
     size_t GetObjectIndex(uint32_t id) const;
+    std::optional<DirectionalLightData> GetDirectionalLight() const;
 
 private:
     std::vector<SceneObject> m_objects;

@@ -170,6 +170,46 @@ void AddComponentCommand::Apply(const std::optional<ModelComponent>& comp) {
     obj->UpdateAABB();
 }
 
+// ── AddLightComponentCommand ────────────────────────────────────────
+
+AddLightComponentCommand::AddLightComponentCommand(const AddLightComponentCommandDesc& desc)
+    : m_scene(*desc.scene), m_objectId(desc.objectId), m_oldComp(desc.oldComp), m_newComp(desc.newComp) {}
+
+void AddLightComponentCommand::Execute() {
+    Apply(m_newComp);
+}
+
+void AddLightComponentCommand::Undo() {
+    Apply(m_oldComp);
+}
+
+void AddLightComponentCommand::Apply(const std::optional<LightComponent>& comp) {
+    SceneObject* obj = m_scene.FindById(m_objectId);
+    if (!obj)
+        return;
+    obj->lightComp = comp;
+}
+
+// ── ChangeLightPropertiesCommand ───────────────────────────────────
+
+ChangeLightPropertiesCommand::ChangeLightPropertiesCommand(const ChangeLightPropertiesCommandDesc& desc)
+    : m_scene(*desc.scene), m_objectId(desc.objectId), m_oldProps(desc.oldProps), m_newProps(desc.newProps) {}
+
+void ChangeLightPropertiesCommand::Execute() {
+    Apply(m_newProps);
+}
+
+void ChangeLightPropertiesCommand::Undo() {
+    Apply(m_oldProps);
+}
+
+void ChangeLightPropertiesCommand::Apply(const LightComponent& props) {
+    SceneObject* obj = m_scene.FindById(m_objectId);
+    if (!obj || !obj->lightComp.has_value())
+        return;
+    *obj->lightComp = props;
+}
+
 // ── AddObjectCommand ────────────────────────────────────────────────
 
 AddObjectCommand::AddObjectCommand(Scene& scene, int& selectedObjectId, SceneObject snapshot)
