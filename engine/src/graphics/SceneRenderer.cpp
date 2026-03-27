@@ -303,12 +303,14 @@ void SceneRenderer::Init(RenderContext& ctx) {
         m_outlinePSO = PipelineState::CreateGraphicsPSO(device, outlineDesc);
     }
 
-    // Constant buffers (upload heap, 256-byte aligned)
-    if (!m_perFrameCB.InitAsUploadBuffer(device, allocator, sizeof(PerFrameData)) ||
-        !m_perObjectCB.InitAsUploadBuffer(device, allocator, sizeof(PerObjectData) * kMaxObjects) ||
-        !m_perMaterialCB.InitAsUploadBuffer(device, allocator, sizeof(PerMaterialData) * kMaxObjects)) {
-        SE_LOG_ERROR("Failed to create constant buffers");
-        return;
+    // Constant buffers (upload heap, 256-byte aligned, per-frame to avoid CPU/GPU race)
+    for (uint32_t i = 0; i < FrameResource::kNumFrames; ++i) {
+        if (!m_perFrameCB[i].InitAsUploadBuffer(device, allocator, sizeof(PerFrameData)) ||
+            !m_perObjectCB[i].InitAsUploadBuffer(device, allocator, sizeof(PerObjectData) * kMaxObjects) ||
+            !m_perMaterialCB[i].InitAsUploadBuffer(device, allocator, sizeof(PerMaterialData) * kMaxObjects)) {
+            SE_LOG_ERROR("Failed to create constant buffers");
+            return;
+        }
     }
 
     // Store device pointers for later use (resize, etc.)
@@ -376,9 +378,11 @@ void SceneRenderer::Shutdown() {
     m_pickReadbackBuffer.Reset();
     m_objectIdPSO.Reset();
     m_objectIdPSODoubleSided.Reset();
-    m_perFrameCB.Shutdown();
-    m_perObjectCB.Shutdown();
-    m_perMaterialCB.Shutdown();
+    for (uint32_t i = 0; i < FrameResource::kNumFrames; ++i) {
+        m_perFrameCB[i].Shutdown();
+        m_perObjectCB[i].Shutdown();
+        m_perMaterialCB[i].Shutdown();
+    }
     m_outlinePSO.Reset();
     m_outlineRootSignature.Reset();
     m_pipelineState.Reset();
@@ -423,16 +427,17 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     ID3D12PipelineState* currentPSO = m_pipelineState.Get();
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // Update PerFrame CB
+    // Update PerFrame CB (use per-frame buffer to avoid CPU/GPU race)
+    uint32_t fi = ctx.GetCurrentFrameIndex();
     PerFrameData frameData;
     frameData.viewProjection = camera.GetViewProjectionMatrix();
     frameData.cameraPosition = camera.GetPosition();
-    m_perFrameCB.UpdateData(&frameData, sizeof(frameData));
-    cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB.GetResource()->GetGPUVirtualAddress());
+    m_perFrameCB[fi].UpdateData(&frameData, sizeof(frameData));
+    cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB[fi].GetResource()->GetGPUVirtualAddress());
 
     uint32_t objectIndex = 0;
-    D3D12_GPU_VIRTUAL_ADDRESS objCbBase = m_perObjectCB.GetResource()->GetGPUVirtualAddress();
-    D3D12_GPU_VIRTUAL_ADDRESS matCbBase = m_perMaterialCB.GetResource()->GetGPUVirtualAddress();
+    D3D12_GPU_VIRTUAL_ADDRESS objCbBase = m_perObjectCB[fi].GetResource()->GetGPUVirtualAddress();
+    D3D12_GPU_VIRTUAL_ADDRESS matCbBase = m_perMaterialCB[fi].GetResource()->GetGPUVirtualAddress();
 
     for (const auto& sceneObj : scene.GetObjects()) {
         if (!sceneObj.HasModel())
@@ -451,7 +456,7 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                 // Per-object transform
                 PerObjectData objData;
                 objData.world = sceneObj.worldTransform;
-                m_perObjectCB.UpdateDataAtOffset(&objData, sizeof(objData), objectIndex * sizeof(PerObjectData));
+                m_perObjectCB[fi].UpdateDataAtOffset(&objData, sizeof(objData), objectIndex * sizeof(PerObjectData));
                 cmdList->SetGraphicsRootConstantBufferView(1, objCbBase + objectIndex * sizeof(PerObjectData));
 
                 // Per-material
@@ -502,7 +507,8 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                     matData.baseColorFactor = *sceneObj.modelComp->baseColor;
                 }
 
-                m_perMaterialCB.UpdateDataAtOffset(&matData, sizeof(matData), objectIndex * sizeof(PerMaterialData));
+                m_perMaterialCB[fi].UpdateDataAtOffset(&matData, sizeof(matData),
+                                                       objectIndex * sizeof(PerMaterialData));
                 cmdList->SetGraphicsRootConstantBufferView(2, matCbBase + objectIndex * sizeof(PerMaterialData));
 
                 D3D12_VERTEX_BUFFER_VIEW vbView = prim.vertexBuffer.GetVertexBufferView();
@@ -601,11 +607,12 @@ void SceneRenderer::RenderObjectIds(RenderContext& ctx, Camera& camera, Scene& s
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Reuse PerFrame CB (already uploaded by Render())
-    cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB.GetResource()->GetGPUVirtualAddress());
+    uint32_t fi = ctx.GetCurrentFrameIndex();
+    cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB[fi].GetResource()->GetGPUVirtualAddress());
 
     uint32_t objectIndex = 0;
-    D3D12_GPU_VIRTUAL_ADDRESS objCbBase = m_perObjectCB.GetResource()->GetGPUVirtualAddress();
-    D3D12_GPU_VIRTUAL_ADDRESS matCbBase = m_perMaterialCB.GetResource()->GetGPUVirtualAddress();
+    D3D12_GPU_VIRTUAL_ADDRESS objCbBase = m_perObjectCB[fi].GetResource()->GetGPUVirtualAddress();
+    D3D12_GPU_VIRTUAL_ADDRESS matCbBase = m_perMaterialCB[fi].GetResource()->GetGPUVirtualAddress();
 
     for (const auto& sceneObj : scene.GetObjects()) {
         if (!sceneObj.HasModel())

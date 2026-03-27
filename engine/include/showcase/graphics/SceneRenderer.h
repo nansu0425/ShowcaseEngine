@@ -3,6 +3,7 @@
 #include <showcase/graphics/Buffer.h>
 #include <showcase/graphics/Camera.h>
 #include <showcase/graphics/DepthBuffer.h>
+#include <showcase/graphics/FrameResource.h>
 #include <showcase/graphics/Model.h>
 #include <showcase/graphics/RenderTarget.h>
 #include <showcase/graphics/Scene.h>
@@ -63,10 +64,10 @@ private:
     ComPtr<ID3D12RootSignature> m_outlineRootSignature;
     ComPtr<ID3D12PipelineState> m_outlinePSO;
 
-    // Constant buffers
-    Buffer m_perFrameCB;
-    Buffer m_perObjectCB;
-    Buffer m_perMaterialCB;
+    // Constant buffers (per-frame to avoid CPU/GPU race on upload heap)
+    Buffer m_perFrameCB[FrameResource::kNumFrames];
+    Buffer m_perObjectCB[FrameResource::kNumFrames];
+    Buffer m_perMaterialCB[FrameResource::kNumFrames];
 
     // Default white texture for untextured geometry
     Texture m_defaultWhiteTex;
