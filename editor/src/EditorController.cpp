@@ -180,6 +180,7 @@ static void DrawSpotLightGizmo(const SceneObject& obj, const Matrix& viewProj, c
 
     constexpr ImU32 kColor = IM_COL32(50, 255, 100, 255);
     constexpr ImU32 kConeColor = IM_COL32(50, 255, 100, 120);
+    constexpr ImU32 kInnerConeColor = IM_COL32(50, 255, 100, 70);
     constexpr float kLineThickness = 2.5f;
     constexpr float kArrowHeadWidth = 5.0f;
     constexpr int kConeSegments = 24;
@@ -200,6 +201,8 @@ static void DrawSpotLightGizmo(const SceneObject& obj, const Matrix& viewProj, c
     float range = obj.lightComp->range;
     float outerRad = std::tan(ToRadians(obj.lightComp->outerAngle));
     float coneRadius = range * outerRad;
+    float innerRad = std::tan(ToRadians(obj.lightComp->innerAngle));
+    float innerConeRadius = range * innerRad;
 
     drawList->PushClipRect(vpMin, vpMax, true);
 
@@ -233,6 +236,23 @@ static void DrawSpotLightGizmo(const SceneObject& obj, const Matrix& viewProj, c
         float angle = kTwoPi * static_cast<float>(i) / 4.0f;
         Vector3 edgePoint = coneTip + right * std::cos(angle) * coneRadius + up * std::sin(angle) * coneRadius;
         DrawLine3D(pos, edgePoint, viewProj, vpMin, vpMax, drawList, kConeColor, kLineThickness);
+    }
+
+    // Inner cone circle at range distance
+    for (int i = 0; i < kConeSegments; ++i) {
+        float a0 = kTwoPi * static_cast<float>(i) / kConeSegments;
+        float a1 = kTwoPi * static_cast<float>(i + 1) / kConeSegments;
+        Vector3 p0 = coneTip + right * std::cos(a0) * innerConeRadius + up * std::sin(a0) * innerConeRadius;
+        Vector3 p1 = coneTip + right * std::cos(a1) * innerConeRadius + up * std::sin(a1) * innerConeRadius;
+        DrawLine3D(p0, p1, viewProj, vpMin, vpMax, drawList, kInnerConeColor, kLineThickness);
+    }
+
+    // Four inner cone edge lines
+    for (int i = 0; i < 4; ++i) {
+        float angle = kTwoPi * static_cast<float>(i) / 4.0f;
+        Vector3 edgePoint =
+            coneTip + right * std::cos(angle) * innerConeRadius + up * std::sin(angle) * innerConeRadius;
+        DrawLine3D(pos, edgePoint, viewProj, vpMin, vpMax, drawList, kInnerConeColor, kLineThickness);
     }
 
     drawList->PopClipRect();
