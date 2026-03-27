@@ -606,6 +606,30 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 if (ImGui::CollapsingHeader("Light Component", &lightHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen)) {
                     auto& light = *selected->lightComp;
 
+                    // Light type combo
+                    const char* typeNames[] = {"Directional", "Ambient"};
+                    int currentType = static_cast<int>(light.type);
+                    if (ImGui::BeginCombo("Type", typeNames[currentType])) {
+                        for (int i = 0; i < IM_ARRAYSIZE(typeNames); ++i) {
+                            bool isSelected = (currentType == i);
+                            if (ImGui::Selectable(typeNames[i], isSelected)) {
+                                if (i != currentType) {
+                                    LightComponent oldProps = light;
+                                    light.type = static_cast<LightType>(i);
+                                    if (m_dirtyCallback)
+                                        m_dirtyCallback();
+                                    if (m_commandHistory) {
+                                        m_commandHistory->RecordCommand(std::make_unique<ChangeLightPropertiesCommand>(
+                                            ChangeLightPropertiesCommandDesc{&scene, selected->id, oldProps, light}));
+                                    }
+                                }
+                            }
+                            if (isSelected)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+
                     float color[3] = {light.color.x, light.color.y, light.color.z};
                     if (ImGui::ColorEdit3("Light Color", color)) {
                         light.color = Vector3(color[0], color[1], color[2]);
@@ -661,19 +685,10 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 }
                 if (!selected->lightComp.has_value()) {
                     allAdded = false;
-                    if (ImGui::MenuItem("Directional Light")) {
+                    if (ImGui::MenuItem("Light")) {
                         if (m_commandHistory) {
                             m_commandHistory->ExecuteCommand(std::make_unique<AddLightComponentCommand>(
                                 AddLightComponentCommandDesc{&scene, selected->id, std::nullopt, LightComponent{}}));
-                        }
-                    }
-                    if (ImGui::MenuItem("Ambient Light")) {
-                        if (m_commandHistory) {
-                            LightComponent ambient;
-                            ambient.type = LightType::Ambient;
-                            ambient.intensity = 0.15f;
-                            m_commandHistory->ExecuteCommand(std::make_unique<AddLightComponentCommand>(
-                                AddLightComponentCommandDesc{&scene, selected->id, std::nullopt, ambient}));
                         }
                     }
                 }
