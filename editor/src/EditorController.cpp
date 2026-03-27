@@ -34,9 +34,42 @@ static void DrawLine3D(const Vector3& a, const Vector3& b, const Matrix& viewPro
         drawList->AddLine(sa, sb, color, thickness);
 }
 
+// Draw a filled-triangle arrowhead in screen space (ImGuizmo style).
+// tipWorld = arrow tip in 3D, baseWorld = a point back along the shaft.
+static void DrawArrowHead3D(const Vector3& tipWorld, const Vector3& baseWorld, const Matrix& viewProj,
+                            const ImVec2& vpMin, const ImVec2& vpMax, ImDrawList* drawList, ImU32 color,
+                            float halfWidth) {
+    ImVec2 sTip, sBase;
+    if (!WorldToScreen(tipWorld, viewProj, vpMin, vpMax, sTip) ||
+        !WorldToScreen(baseWorld, viewProj, vpMin, vpMax, sBase))
+        return;
+
+    // Screen-space direction and perpendicular (like ImGuizmo's DrawTranslationGizmo)
+    ImVec2 dir(sTip.x - sBase.x, sTip.y - sBase.y);
+    float len = std::sqrt(dir.x * dir.x + dir.y * dir.y);
+    if (len < 1e-4f)
+        return;
+    dir.x /= len;
+    dir.y /= len;
+    ImVec2 ortho(-dir.y * halfWidth, dir.x * halfWidth);
+
+    drawList->AddTriangleFilled(sTip, ImVec2(sBase.x + ortho.x, sBase.y + ortho.y),
+                                ImVec2(sBase.x - ortho.x, sBase.y - ortho.y), color);
+}
+
 static void DrawDirectionalLightGizmo(const SceneObject& obj, const Matrix& viewProj, const ImVec2& vpMin,
                                       const ImVec2& vpMax, ImDrawList* drawList) {
     const Vector3 pos = obj.position;
+
+    // Compute constant-screen-size scale factor (same technique as ImGuizmo).
+    // clip.w at the gizmo origin gives the perspective divisor — multiplying
+    // world-space offsets by (clip.w * clipSpaceSize) keeps the gizmo the same
+    // pixel size regardless of camera distance.
+    Vector4 clip = Vector4::Transform(Vector4(pos.x, pos.y, pos.z, 1.0f), viewProj);
+    if (clip.w <= 0.0f)
+        return;
+    constexpr float kGizmoClipSize = 0.1f;
+    float s = clip.w * kGizmoClipSize; // world-space scale for constant screen size
 
     // Forward vector from world transform Z-axis row
     Vector3 forward(obj.worldTransform._31, obj.worldTransform._32, obj.worldTransform._33);
@@ -52,37 +85,44 @@ static void DrawDirectionalLightGizmo(const SceneObject& obj, const Matrix& view
     up.Normalize();
 
     constexpr ImU32 kColor = IM_COL32(255, 200, 50, 255);
-    constexpr float kArrowThickness = 2.0f;
-    constexpr float kRayThickness = 1.5f;
+    constexpr float kLineThickness = 3.0f;
+    constexpr float kArrowHeadWidth = 6.0f;
 
     drawList->PushClipRect(vpMin, vpMax, true);
 
-    // Direction arrow: P → P + F * 2.0
-    Vector3 tip = pos + forward * 2.0f;
-    DrawLine3D(pos, tip, viewProj, vpMin, vpMax, drawList, kColor, kArrowThickness);
+    // Center filled circle
+    ImVec2 sCenter;
+    if (WorldToScreen(pos, viewProj, vpMin, vpMax, sCenter))
+        drawList->AddCircleFilled(sCenter, 5.0f, kColor);
 
-    // Arrowhead
-    Vector3 back = pos + forward * 1.6f;
-    DrawLine3D(tip, back + right * 0.25f, viewProj, vpMin, vpMax, drawList, kColor, kArrowThickness);
-    DrawLine3D(tip, back - right * 0.25f, viewProj, vpMin, vpMax, drawList, kColor, kArrowThickness);
+    // Direction arrow shaft + filled arrowhead
+    float arrowLen = 2.0f * s;
+    float headFrac = 0.2f;
+    Vector3 tip = pos + forward * arrowLen;
+    Vector3 headBase = pos + forward * (arrowLen * (1.0f - headFrac));
+    DrawLine3D(pos, headBase, viewProj, vpMin, vpMax, drawList, kColor, kLineThickness);
+    DrawArrowHead3D(tip, headBase, viewProj, vpMin, vpMax, drawList, kColor, kArrowHeadWidth);
 
-    // Circle ring (12 segments, radius 0.3)
+    // Circle ring perpendicular to forward
     constexpr int kCircleSegments = 12;
-    constexpr float kCircleRadius = 0.3f;
+    float circleRadius = 0.3f * s;
     for (int i = 0; i < kCircleSegments; ++i) {
         float a0 = kTwoPi * static_cast<float>(i) / kCircleSegments;
         float a1 = kTwoPi * static_cast<float>(i + 1) / kCircleSegments;
-        Vector3 p0 = pos + right * std::cos(a0) * kCircleRadius + up * std::sin(a0) * kCircleRadius;
-        Vector3 p1 = pos + right * std::cos(a1) * kCircleRadius + up * std::sin(a1) * kCircleRadius;
-        DrawLine3D(p0, p1, viewProj, vpMin, vpMax, drawList, kColor, kRayThickness);
+        Vector3 p0 = pos + right * std::cos(a0) * circleRadius + up * std::sin(a0) * circleRadius;
+        Vector3 p1 = pos + right * std::cos(a1) * circleRadius + up * std::sin(a1) * circleRadius;
+        DrawLine3D(p0, p1, viewProj, vpMin, vpMax, drawList, kColor, kLineThickness);
     }
 
-    // Emanating rays (6 rays)
+    // Emanating rays (6 rays from circle edge outward)
     constexpr int kRayCount = 6;
+    float rayInner = 0.35f * s;
+    float rayOuter = 1.0f * s;
     for (int i = 0; i < kRayCount; ++i) {
         float angle = kTwoPi * static_cast<float>(i) / kRayCount;
         Vector3 dir = right * std::cos(angle) + up * std::sin(angle);
-        DrawLine3D(pos + dir * 0.35f, pos + dir * 1.0f, viewProj, vpMin, vpMax, drawList, kColor, kRayThickness);
+        DrawLine3D(pos + dir * rayInner, pos + dir * rayOuter, viewProj, vpMin, vpMax, drawList, kColor,
+                   kLineThickness);
     }
 
     drawList->PopClipRect();
