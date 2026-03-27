@@ -1,21 +1,107 @@
 {
-  "version": 3,
   "camera": {
-    "position": [0.0, 5.0, 0.0],
-    "yaw": 1.5708,
-    "pitch": 0.0
+    "pitch": 0.15900100767612457,
+    "position": [
+      -9.779627799987793,
+      1.2968899011611938,
+      -0.16894203424453735
+    ],
+    "yaw": 7.771744251251221
   },
   "objects": [
     {
-      "name": "Sponza Atrium",
-      "position": [0.0, 0.0, 0.0],
-      "rotation": [0.0, 0.0, 0.0],
-      "scale": [1.0, 1.0, 1.0],
       "components": {
         "model": {
           "mesh": "file:assets/models/Sponza/Sponza.gltf"
         }
-      }
+      },
+      "name": "Sponza Atrium",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "components": {
+        "light": {
+          "castShadow": true,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "innerAngle": 15.0,
+          "intensity": 0.20999999344348907,
+          "outerAngle": 30.0,
+          "range": 10.0,
+          "shadowBias": 0.0010000000474974513,
+          "specularPower": 32.0,
+          "type": 1
+        }
+      },
+      "name": "ambient light",
+      "position": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "components": {
+        "light": {
+          "castShadow": true,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "innerAngle": 15.0,
+          "intensity": 1.0,
+          "outerAngle": 30.0,
+          "range": 10.0,
+          "shadowBias": 0.0010000000474974513,
+          "specularPower": 32.0,
+          "type": 0
+        }
+      },
+      "name": "directional light",
+      "position": [
+        0.0,
+        5.8245530128479,
+        0.0
+      ],
+      "rotation": [
+        69.31145477294922,
+        88.12370300292969,
+        71.32603454589844
+      ],
+      "scale": [
+        0.9997721910476685,
+        0.9997798800468445,
+        0.9998205900192261
+      ]
     }
-  ]
+  ],
+  "version": 3
 }
