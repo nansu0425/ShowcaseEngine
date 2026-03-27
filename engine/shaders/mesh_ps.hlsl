@@ -8,11 +8,13 @@ cbuffer PerFrame : register(b0)
     float _pad0;
 
     float3 lightDirection;
-    float lightAmbient;
-    float3 lightColor;
     float lightSpecularPower;
+    float3 lightColor;
+    float _pad1;
+    float3 ambientColor;
+    float _pad2;
     int lightingEnabled;
-    float3 _pad1;
+    float3 _pad3;
 };
 
 cbuffer PerMaterial : register(b2)
@@ -50,19 +52,24 @@ float4 main(PSInput input) : SV_TARGET
 
     if (lightingEnabled)
     {
-        float3 normal = normalize(input.worldNormal);
-        float3 lightDir = normalize(-lightDirection);
-        float3 viewDir = normalize(cameraPosition - input.worldPos);
-        float3 halfVec = normalize(lightDir + viewDir);
+        float3 ambient = ambientColor * color;
+        float3 diffuse = float3(0, 0, 0);
+        float3 specular = float3(0, 0, 0);
 
-        float3 ambient = lightAmbient * color;
+        if (dot(lightColor, lightColor) > 0)
+        {
+            float3 normal = normalize(input.worldNormal);
+            float3 lightDir = normalize(-lightDirection);
+            float3 viewDir = normalize(cameraPosition - input.worldPos);
+            float3 halfVec = normalize(lightDir + viewDir);
 
-        float nDotL = max(dot(normal, lightDir), 0.0);
-        float3 diffuse = nDotL * lightColor * color;
+            float nDotL = max(dot(normal, lightDir), 0.0);
+            diffuse = nDotL * lightColor * color;
 
-        float nDotH = max(dot(normal, halfVec), 0.0);
-        float spec = pow(nDotH, lightSpecularPower);
-        float3 specular = spec * lightColor;
+            float nDotH = max(dot(normal, halfVec), 0.0);
+            float spec = pow(nDotH, lightSpecularPower);
+            specular = spec * lightColor;
+        }
 
         color = ambient + diffuse + specular;
     }

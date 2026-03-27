@@ -624,12 +624,12 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
 
                     DragLightProperty(
                         {"Intensity", &light.intensity, 0.01f, 0.0f, 10.0f, &light, &scene, selected->id});
-                    DragLightProperty(
-                        {"Ambient", &light.ambientIntensity, 0.01f, 0.0f, 1.0f, &light, &scene, selected->id});
-                    DragLightProperty(
-                        {"Specular Power", &light.specularPower, 1.0f, 1.0f, 256.0f, &light, &scene, selected->id});
 
-                    ImGui::TextDisabled("Direction controlled by object rotation");
+                    if (light.type == LightType::Directional) {
+                        DragLightProperty(
+                            {"Specular Power", &light.specularPower, 1.0f, 1.0f, 256.0f, &light, &scene, selected->id});
+                        ImGui::TextDisabled("Direction controlled by object rotation");
+                    }
                 }
 
                 if (!lightHeaderOpen) {
@@ -665,6 +665,15 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         if (m_commandHistory) {
                             m_commandHistory->ExecuteCommand(std::make_unique<AddLightComponentCommand>(
                                 AddLightComponentCommandDesc{&scene, selected->id, std::nullopt, LightComponent{}}));
+                        }
+                    }
+                    if (ImGui::MenuItem("Ambient Light")) {
+                        if (m_commandHistory) {
+                            LightComponent ambient;
+                            ambient.type = LightType::Ambient;
+                            ambient.intensity = 0.15f;
+                            m_commandHistory->ExecuteCommand(std::make_unique<AddLightComponentCommand>(
+                                AddLightComponentCommandDesc{&scene, selected->id, std::nullopt, ambient}));
                         }
                     }
                 }

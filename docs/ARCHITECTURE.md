@@ -105,7 +105,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Material` | `Model.h` | Base color factor + optional `shared_ptr<Texture>` for base color texture |
 | `AssetManager` | `AssetManager.h` | Central ownership of all `Model` instances (builtin + file-loaded); deduplicates by source key |
 | `ModelComponent` | `Scene.h` | Optional component: `modelSource` string, resolved `Model*` pointer, and optional `baseColor` material override |
-| `LightComponent` | `Scene.h` | Optional component: directional light with color, intensity, ambient, specular power; direction derived from object rotation |
+| `LightComponent` | `Scene.h` | Optional component: Directional or Ambient light with color and intensity; directional adds specular power, direction derived from object rotation |
 | `Scene` | `Scene.h` | Flat collection of `SceneObject` with auto-incrementing IDs |
 | `SceneRenderer` | `SceneRenderer.h` | Root signatures, PSOs (mesh + selection outline), constant buffers, draw loop, GPU object-ID picking |
 
@@ -254,7 +254,7 @@ The same pattern applies to the per-material constant buffer.
 ### Root signature layout
 
 ```
-Root[0]  CBV  b0   Per-frame data (view-projection matrix, camera position, directional light)
+Root[0]  CBV  b0   Per-frame data (view-projection matrix, camera position, directional light, ambient light)
 Root[1]  CBV  b1   Per-object data (world matrix) — offset per object
 Root[2]  CBV  b2   Per-material data (base color, texture flag) — offset per object
 Root[3]  Table     SRV t0  Base color texture (or default white)
@@ -280,12 +280,11 @@ struct ModelComponent {
 };
 
 struct LightComponent {
-    LightType type;            // Directional (only type currently)
+    LightType type;            // Directional, Ambient
     Vector3 color;             // light color
     float intensity;           // multiplied into color for shader
-    float ambientIntensity;    // ambient term strength
-    float specularPower;       // Blinn-Phong exponent
-    // Direction derived from SceneObject::rotation (forward vector of worldTransform)
+    float specularPower;       // Blinn-Phong exponent (Directional only)
+    // Directional: direction derived from SceneObject::rotation (forward vector of worldTransform)
 };
 
 struct SceneObject {

@@ -146,6 +146,12 @@ void EditorApp::BuildDefaultScene() {
     auto& light = m_scene.AddObject({nullptr, "Directional Light", {}, {50.0f, -30.0f, 0.0f}});
     light.lightComp = LightComponent{};
     light.RecomputeWorldTransform();
+
+    auto& ambient = m_scene.AddObject({nullptr, "Ambient Light"});
+    LightComponent ambientComp;
+    ambientComp.type = LightType::Ambient;
+    ambientComp.intensity = 0.15f;
+    ambient.lightComp = ambientComp;
 }
 
 // ── Config persistence ───────────────────────────────────────────

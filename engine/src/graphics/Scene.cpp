@@ -110,7 +110,6 @@ void Scene::Serialize(JsonDocument& doc) const {
             const auto& c = obj.lightComp->color;
             light["color"].SetFloatArray({c.x, c.y, c.z});
             light["intensity"].Set(obj.lightComp->intensity);
-            light["ambientIntensity"].Set(obj.lightComp->ambientIntensity);
             light["specularPower"].Set(obj.lightComp->specularPower);
         }
     }
@@ -187,8 +186,6 @@ bool Scene::Deserialize(JsonDocument& doc) {
 
             if (lightNode.Contains("intensity"))
                 lc.intensity = lightNode["intensity"].GetFloat();
-            if (lightNode.Contains("ambientIntensity"))
-                lc.ambientIntensity = lightNode["ambientIntensity"].GetFloat();
             if (lightNode.Contains("specularPower"))
                 lc.specularPower = lightNode["specularPower"].GetFloat();
 
@@ -265,8 +262,19 @@ std::optional<DirectionalLightData> Scene::GetDirectionalLight() const {
         forward.Normalize();
         data.direction = forward;
         data.color = obj.lightComp->color * obj.lightComp->intensity;
-        data.ambientIntensity = obj.lightComp->ambientIntensity;
         data.specularPower = obj.lightComp->specularPower;
+        return data;
+    }
+    return std::nullopt;
+}
+
+std::optional<AmbientLightData> Scene::GetAmbientLight() const {
+    for (const auto& obj : m_objects) {
+        if (!obj.lightComp.has_value() || obj.lightComp->type != LightType::Ambient)
+            continue;
+
+        AmbientLightData data;
+        data.color = obj.lightComp->color * obj.lightComp->intensity;
         return data;
     }
     return std::nullopt;

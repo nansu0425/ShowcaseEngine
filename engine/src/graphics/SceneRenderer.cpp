@@ -15,11 +15,13 @@ struct alignas(256) PerFrameData {
     float _pad0;
 
     Vector3 lightDirection;
-    float lightAmbient;
-    Vector3 lightColor;
     float lightSpecularPower;
+    Vector3 lightColor;
+    float _pad1;
+    Vector3 ambientColor;
+    float _pad2;
     int lightingEnabled;
-    Vector3 _pad1;
+    Vector3 _pad3;
 };
 
 struct alignas(256) PerObjectData {
@@ -441,11 +443,17 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     frameData.cameraPosition = camera.GetPosition();
 
     auto dirLight = scene.GetDirectionalLight();
-    if (dirLight.has_value()) {
-        frameData.lightDirection = dirLight->direction;
-        frameData.lightColor = dirLight->color;
-        frameData.lightAmbient = dirLight->ambientIntensity;
-        frameData.lightSpecularPower = dirLight->specularPower;
+    auto ambientLight = scene.GetAmbientLight();
+
+    if (dirLight.has_value() || ambientLight.has_value()) {
+        if (dirLight.has_value()) {
+            frameData.lightDirection = dirLight->direction;
+            frameData.lightColor = dirLight->color;
+            frameData.lightSpecularPower = dirLight->specularPower;
+        }
+        if (ambientLight.has_value()) {
+            frameData.ambientColor = ambientLight->color;
+        }
         frameData.lightingEnabled = 1;
     }
 

@@ -13,21 +13,24 @@ namespace showcase {
 
 enum class LightType : int {
     Directional = 0,
+    Ambient = 1,
 };
 
 struct LightComponent {
     LightType type = LightType::Directional;
     Vector3 color = {1.0f, 1.0f, 1.0f};
     float intensity = 1.0f;
-    float ambientIntensity = 0.15f;
-    float specularPower = 32.0f;
+    float specularPower = 32.0f; // Directional only
 };
 
 struct DirectionalLightData {
     Vector3 direction;
     Vector3 color;
-    float ambientIntensity;
     float specularPower;
+};
+
+struct AmbientLightData {
+    Vector3 color; // color * intensity
 };
 
 // ── Components ──────────────────────────────────────────────────────
@@ -88,6 +91,7 @@ public:
     size_t GetObjectCount() const;
     size_t GetObjectIndex(uint32_t id) const;
     std::optional<DirectionalLightData> GetDirectionalLight() const;
+    std::optional<AmbientLightData> GetAmbientLight() const;
 
 private:
     std::vector<SceneObject> m_objects;
