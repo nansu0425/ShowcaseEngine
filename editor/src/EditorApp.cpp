@@ -711,6 +711,7 @@ int EditorApp::Run() {
             m_renderContext.BeginFrame();
 
             // Phase 1: Render scene to off-screen viewport render target
+            m_sceneRenderer.RenderShadowPass(m_renderContext, m_viewport.GetCamera(), m_scene);
             m_viewport.BeginRender(m_renderContext.GetCommandList());
             m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
                                    m_editorController.GetSelectedObjectId(),
@@ -792,6 +793,7 @@ int EditorApp::Run() {
             // Render scene directly to back buffer
             m_renderContext.BeginFrame();
 
+            m_sceneRenderer.RenderShadowPass(m_renderContext, m_viewport.GetCamera(), m_scene);
             float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
             m_renderContext.BeginBackBufferScenePass(clearColor);
             m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene, -1);

@@ -48,6 +48,17 @@ struct alignas(256) PerFrameData {
 
     GpuPointLight pointLights[kMaxPointLights];
     GpuSpotLight spotLights[kMaxSpotLights];
+
+    // Shadow mapping
+    Matrix lightViewProjection;
+    int shadowEnabled;
+    float shadowBias;
+    float shadowMapTexelSize; // 1.0 / shadowMapResolution
+    float _pad4;
+};
+
+struct alignas(256) ShadowPerFrameData {
+    Matrix viewProjection;
 };
 
 struct alignas(256) PerObjectData {
@@ -64,7 +75,8 @@ struct alignas(256) PerMaterialData {
 };
 
 static_assert(sizeof(GpuSpotLight) == 64);
-static_assert(sizeof(PerFrameData) <= 1024);
+static_assert(sizeof(PerFrameData) <= 1280);
+static_assert(sizeof(ShadowPerFrameData) <= 256);
 static_assert(sizeof(PerObjectData) <= 256);
 static_assert(sizeof(PerMaterialData) <= 256);
 
@@ -250,16 +262,22 @@ void SceneRenderer::Init(RenderContext& ctx) {
     auto* allocator = ctx.GetDevice().GetAllocator();
 
     // Root signature: CBV b0 (PerFrame), CBV b1 (PerObject), CBV b2 (PerMaterial),
-    //                 DescriptorTable(SRV t0), Constants b3 (objectId), StaticSampler s0
-    m_rootSignature = RootSignatureBuilder()
-                          .AddCBV({0})                                                 // slot 0: PerFrame
-                          .AddCBV({1})                                                 // slot 1: PerObject
-                          .AddCBV({2})                                                 // slot 2: PerMaterial
-                          .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0}) // slot 3: baseColorTex t0
-                          .AddConstants({1, 3})                                        // slot 4: objectId (b3, 1 DWORD)
-                          .AddStaticSampler({0})                                       // s0: linear wrap
-                          .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
-                          .Build(device);
+    //                 DescriptorTable(SRV t0), Constants b3 (objectId),
+    //                 DescriptorTable(SRV t1 shadowMap), StaticSampler s0, s1
+    m_rootSignature =
+        RootSignatureBuilder()
+            .AddCBV({0})                                                 // slot 0: PerFrame
+            .AddCBV({1})                                                 // slot 1: PerObject
+            .AddCBV({2})                                                 // slot 2: PerMaterial
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0}) // slot 3: baseColorTex t0
+            .AddConstants({1, 3})                                        // slot 4: objectId (b3, 1 DWORD)
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1}) // slot 5: shadowMap t1
+            .AddStaticSampler({0})                                       // s0: linear wrap
+            .AddStaticSampler({1, 0,                                     // s1: comparison sampler
+                               D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                               D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE})
+            .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
+            .Build(device);
 
     // Load shaders
     D3D12_SHADER_BYTECODE vs = ctx.GetShaderManager().LoadShader("shaders/mesh_vs_vs.cso");
@@ -402,6 +420,60 @@ void SceneRenderer::Init(RenderContext& ctx) {
         }
     }
 
+    // Shadow mapping resources
+    {
+        if (!m_shadowMap.Init({device, allocator, kShadowMapResolution, kShadowMapResolution, DXGI_FORMAT_D32_FLOAT})) {
+            SE_LOG_ERROR("Failed to create shadow map depth buffer");
+            return;
+        }
+        m_shadowMap.CreateSRV(device, ctx.GetSrvHeap());
+
+        // Transition shadow map from initial DEPTH_WRITE to shader resource
+        // so the first frame's barrier (SRV -> DEPTH_WRITE) is correct
+        CommandList initCmdList;
+        if (initCmdList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT)) {
+            initCmdList.Reset();
+            initCmdList.TransitionBarrier(m_shadowMap.GetResource(), D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                                          D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
+                                              D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            initCmdList.Close();
+            ctx.GetDirectQueue().ExecuteCommandList(initCmdList.Get());
+            ctx.GetDirectQueue().Flush();
+            initCmdList.Shutdown();
+        }
+        m_shadowMapReady = true;
+
+        // Shadow per-frame constant buffers
+        for (uint32_t i = 0; i < FrameResource::kNumFrames; ++i) {
+            if (!m_shadowPerFrameCB[i].InitAsUploadBuffer(device, allocator, sizeof(ShadowPerFrameData))) {
+                SE_LOG_ERROR("Failed to create shadow per-frame CB");
+                return;
+            }
+        }
+
+        // Shadow PSO (depth-only, no pixel shader)
+        GraphicsPipelineDesc shadowPsoDesc;
+        shadowPsoDesc.rootSignature = m_rootSignature.Get();
+        shadowPsoDesc.vertexShader = vs;
+        shadowPsoDesc.pixelShader = {}; // no pixel shader
+        shadowPsoDesc.inputLayout = {
+            {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+            {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+            {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        };
+        shadowPsoDesc.rtvFormat = DXGI_FORMAT_UNKNOWN; // depth-only, no render target
+        shadowPsoDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+        shadowPsoDesc.rasterizerState.DepthBias = 1500;
+        shadowPsoDesc.rasterizerState.SlopeScaledDepthBias = 1.5f;
+        shadowPsoDesc.rasterizerState.DepthBiasClamp = 0.0f;
+        m_shadowPSO = PipelineState::CreateGraphicsPSO(device, shadowPsoDesc);
+
+        // Shadow PSO double-sided
+        GraphicsPipelineDesc shadowPsoDescDS = shadowPsoDesc;
+        shadowPsoDescDS.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        m_shadowPSODoubleSided = PipelineState::CreateGraphicsPSO(device, shadowPsoDescDS);
+    }
+
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
@@ -410,6 +482,12 @@ void SceneRenderer::Shutdown() {
         m_defaultWhiteTex.Shutdown(*m_srvHeap);
         m_objectIdRT.Shutdown(*m_srvHeap);
         m_objectIdDepth.Shutdown(*m_srvHeap);
+        m_shadowMap.Shutdown(*m_srvHeap);
+    }
+    m_shadowPSO.Reset();
+    m_shadowPSODoubleSided.Reset();
+    for (uint32_t i = 0; i < FrameResource::kNumFrames; ++i) {
+        m_shadowPerFrameCB[i].Shutdown();
     }
     m_pickReadbackBuffer.Reset();
     m_objectIdPSO.Reset();
@@ -450,7 +528,184 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
     }
 }
 
+// ── Shadow Mapping ──────────────────────────────────────────────────
+
+static constexpr float kShadowDistance = 100.0f; // meters — limits shadow frustum to nearby geometry
+
+static Matrix ComputeDirectionalLightVP(const Vector3& lightDir, const Camera& camera) {
+    // Build a shadow-specific frustum with limited far plane (not the full camera far=1000m).
+    // Using the full camera frustum makes the ortho projection too large, destroying depth precision.
+    float shadowFar = std::min(camera.GetFarZ(), kShadowDistance);
+    Matrix shadowProj = PerspectiveFovLH(camera.GetFovY(), camera.GetAspectRatio(), camera.GetNearZ(), shadowFar);
+    Matrix shadowVP = camera.GetViewMatrix() * shadowProj;
+    Matrix vpInverse = shadowVP.Invert();
+
+    // NDC corners (LH: z in [0,1])
+    Vector3 ndcCorners[8] = {
+        {-1, -1, 0}, {1, -1, 0}, {-1, 1, 0}, {1, 1, 0}, // near plane
+        {-1, -1, 1}, {1, -1, 1}, {-1, 1, 1}, {1, 1, 1}, // far plane
+    };
+
+    Vector3 worldCorners[8];
+    Vector3 frustumCenter(0.0f, 0.0f, 0.0f);
+    for (int i = 0; i < 8; ++i) {
+        Vector4 worldH =
+            Vector4::Transform(Vector4(ndcCorners[i].x, ndcCorners[i].y, ndcCorners[i].z, 1.0f), vpInverse);
+        worldCorners[i] = Vector3(worldH.x, worldH.y, worldH.z) / worldH.w;
+        frustumCenter += worldCorners[i];
+    }
+    frustumCenter /= 8.0f;
+
+    // Build light view matrix
+    Vector3 up(0.0f, 1.0f, 0.0f);
+    // Avoid degenerate case when light is nearly vertical
+    if (std::abs(lightDir.Dot(up)) > 0.99f) {
+        up = Vector3(1.0f, 0.0f, 0.0f);
+    }
+
+    // Place light far enough behind the frustum center to encompass all casters
+    float frustumRadius = 0.0f;
+    for (int i = 0; i < 8; ++i) {
+        frustumRadius = std::max(frustumRadius, (worldCorners[i] - frustumCenter).Length());
+    }
+
+    Matrix lightView = LookAtLH(frustumCenter - lightDir * frustumRadius, frustumCenter, up);
+
+    // Transform frustum corners to light space and compute AABB
+    float minX = FLT_MAX, maxX = -FLT_MAX;
+    float minY = FLT_MAX, maxY = -FLT_MAX;
+    float minZ = FLT_MAX, maxZ = -FLT_MAX;
+    for (int i = 0; i < 8; ++i) {
+        Vector3 lsCorner = Vector3::Transform(worldCorners[i], lightView);
+        minX = std::min(minX, lsCorner.x);
+        maxX = std::max(maxX, lsCorner.x);
+        minY = std::min(minY, lsCorner.y);
+        maxY = std::max(maxY, lsCorner.y);
+        minZ = std::min(minZ, lsCorner.z);
+        maxZ = std::max(maxZ, lsCorner.z);
+    }
+
+    // Extend near plane to capture shadow casters behind the camera frustum
+    float zRange = maxZ - minZ;
+    minZ -= zRange;
+
+    Matrix lightProj = OrthographicOffCenterLH(minX, maxX, minY, maxY, minZ, maxZ);
+    return lightView * lightProj;
+}
+
+void SceneRenderer::RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+    auto* cmdList = ctx.GetCommandList().Get();
+    uint32_t fi = ctx.GetCurrentFrameIndex();
+
+    // Transition shadow map: SRV -> DEPTH_WRITE
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = m_shadowMap.GetResource();
+    barrier.Transition.StateBefore =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    // Clear shadow depth buffer
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_shadowMap.GetDSV();
+    cmdList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+    // Set render target: depth-only (no color RT)
+    cmdList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
+
+    // Viewport and scissor
+    D3D12_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(kShadowMapResolution);
+    viewport.Height = static_cast<float>(kShadowMapResolution);
+    viewport.MaxDepth = 1.0f;
+    cmdList->RSSetViewports(1, &viewport);
+
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(kShadowMapResolution), static_cast<LONG>(kShadowMapResolution)};
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    // Set pipeline
+    cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
+    cmdList->SetPipelineState(m_shadowPSO.Get());
+    ID3D12PipelineState* currentPSO = m_shadowPSO.Get();
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Upload shadow per-frame CB (light VP as the viewProjection field)
+    ShadowPerFrameData shadowFrameData = {};
+    shadowFrameData.viewProjection = lightViewProj;
+    m_shadowPerFrameCB[fi].UpdateData(&shadowFrameData, sizeof(shadowFrameData));
+    cmdList->SetGraphicsRootConstantBufferView(0, m_shadowPerFrameCB[fi].GetResource()->GetGPUVirtualAddress());
+
+    // Bind dummy SRV for slots 3 and 5 (textures not needed for depth-only)
+    cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
+    cmdList->SetGraphicsRootDescriptorTable(5, m_defaultWhiteTex.GetSRVHandle().gpu);
+
+    // Render all objects (depth only)
+    uint32_t objectIndex = 0;
+    D3D12_GPU_VIRTUAL_ADDRESS objCbBase = m_perObjectCB[fi].GetResource()->GetGPUVirtualAddress();
+
+    for (const auto& sceneObj : scene.GetObjects()) {
+        if (!sceneObj.HasModel())
+            continue;
+
+        for (const auto& mesh : sceneObj.modelComp->model->meshes) {
+            for (const auto& prim : mesh.primitives) {
+                if (prim.indexCount == 0 || objectIndex >= kMaxObjects)
+                    continue;
+
+                // Per-object transform
+                PerObjectData objData;
+                objData.world = sceneObj.worldTransform;
+                m_perObjectCB[fi].UpdateDataAtOffset(&objData, sizeof(objData), objectIndex * sizeof(PerObjectData));
+                cmdList->SetGraphicsRootConstantBufferView(1, objCbBase + objectIndex * sizeof(PerObjectData));
+
+                // Switch PSO for double-sided materials
+                if (prim.material && prim.material->doubleSided) {
+                    if (currentPSO != m_shadowPSODoubleSided.Get()) {
+                        cmdList->SetPipelineState(m_shadowPSODoubleSided.Get());
+                        currentPSO = m_shadowPSODoubleSided.Get();
+                    }
+                } else if (currentPSO != m_shadowPSO.Get()) {
+                    cmdList->SetPipelineState(m_shadowPSO.Get());
+                    currentPSO = m_shadowPSO.Get();
+                }
+
+                D3D12_VERTEX_BUFFER_VIEW vbView = prim.vertexBuffer.GetVertexBufferView();
+                D3D12_INDEX_BUFFER_VIEW ibView = prim.indexBuffer.GetIndexBufferView();
+                cmdList->IASetVertexBuffers(0, 1, &vbView);
+                cmdList->IASetIndexBuffer(&ibView);
+                cmdList->DrawIndexedInstanced(prim.indexCount, 1, 0, 0, 0);
+                objectIndex++;
+            }
+        }
+    }
+
+    // Transition shadow map: DEPTH_WRITE -> SRV
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    barrier.Transition.StateAfter =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    cmdList->ResourceBarrier(1, &barrier);
+}
+
 // ── Render ───────────────────────────────────────────────────────────
+
+void SceneRenderer::RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& scene) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+    m_hasShadow = false;
+
+    if (!m_shadowMapReady)
+        return;
+
+    auto dirLight = scene.GetDirectionalLight();
+    if (!dirLight.has_value() || !dirLight->castShadow)
+        return;
+
+    m_cachedLightVP = ComputeDirectionalLightVP(dirLight->direction, camera);
+    m_cachedShadowBias = dirLight->shadowBias;
+    RenderShadowMap(ctx, scene, m_cachedLightVP);
+    m_hasShadow = true;
+}
 
 void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
                            const PrimitiveHighlight& highlight) {
@@ -462,6 +717,13 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     cmdList->SetPipelineState(m_pipelineState.Get());
     ID3D12PipelineState* currentPSO = m_pipelineState.Get();
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Bind shadow map SRV (slot 5)
+    if (m_hasShadow) {
+        cmdList->SetGraphicsRootDescriptorTable(5, m_shadowMap.GetSRV().gpu);
+    } else {
+        cmdList->SetGraphicsRootDescriptorTable(5, m_defaultWhiteTex.GetSRVHandle().gpu);
+    }
 
     // Update PerFrame CB (use per-frame buffer to avoid CPU/GPU race)
     uint32_t fi = ctx.GetCurrentFrameIndex();
@@ -510,6 +772,14 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     }
     if (numSL > 0)
         frameData.lightingEnabled = 1;
+
+    // Shadow mapping data
+    if (m_hasShadow) {
+        frameData.lightViewProjection = m_cachedLightVP;
+        frameData.shadowEnabled = 1;
+        frameData.shadowBias = m_cachedShadowBias;
+        frameData.shadowMapTexelSize = 1.0f / static_cast<float>(kShadowMapResolution);
+    }
 
     m_perFrameCB[fi].UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB[fi].GetResource()->GetGPUVirtualAddress());
@@ -684,6 +954,9 @@ void SceneRenderer::RenderObjectIds(RenderContext& ctx, Camera& camera, Scene& s
     cmdList->SetPipelineState(m_objectIdPSO.Get());
     ID3D12PipelineState* currentPSO = m_objectIdPSO.Get();
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Bind dummy SRV for shadow map slot (slot 5, required by root signature)
+    cmdList->SetGraphicsRootDescriptorTable(5, m_defaultWhiteTex.GetSRVHandle().gpu);
 
     // Reuse PerFrame CB (already uploaded by Render())
     uint32_t fi = ctx.GetCurrentFrameIndex();

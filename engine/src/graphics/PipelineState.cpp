@@ -16,8 +16,12 @@ ComPtr<ID3D12PipelineState> PipelineState::CreateGraphicsPSO(ID3D12Device* devic
     psoDesc.DepthStencilState = desc.depthStencilState;
     psoDesc.InputLayout = {desc.inputLayout.data(), static_cast<UINT>(desc.inputLayout.size())};
     psoDesc.PrimitiveTopologyType = desc.primitiveTopology;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = desc.rtvFormat;
+    if (desc.rtvFormat != DXGI_FORMAT_UNKNOWN) {
+        psoDesc.NumRenderTargets = 1;
+        psoDesc.RTVFormats[0] = desc.rtvFormat;
+    } else {
+        psoDesc.NumRenderTargets = 0;
+    }
     psoDesc.DSVFormat = desc.dsvFormat;
     psoDesc.SampleDesc = {desc.sampleCount, 0};
 

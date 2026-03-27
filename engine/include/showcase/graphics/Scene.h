@@ -23,15 +23,19 @@ struct LightComponent {
     Vector3 color = {1.0f, 1.0f, 1.0f};
     float intensity = 1.0f;
     float specularPower = 32.0f;
-    float range = 10.0f;      // Point/Spot — radius of influence (meters)
-    float innerAngle = 15.0f; // Spot only — full intensity cone half-angle (degrees)
-    float outerAngle = 30.0f; // Spot only — falloff-to-zero cone half-angle (degrees)
+    float range = 10.0f;       // Point/Spot — radius of influence (meters)
+    float innerAngle = 15.0f;  // Spot only — full intensity cone half-angle (degrees)
+    float outerAngle = 30.0f;  // Spot only — falloff-to-zero cone half-angle (degrees)
+    bool castShadow = true;    // Directional only (for now)
+    float shadowBias = 0.001f; // Shader-side depth bias
 };
 
 struct DirectionalLightData {
     Vector3 direction;
     Vector3 color;
     float specularPower;
+    bool castShadow;
+    float shadowBias;
 };
 
 struct AmbientLightData {

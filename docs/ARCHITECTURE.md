@@ -182,11 +182,23 @@ EditorApp::Run()
 │
 ├── RenderContext::BeginFrame()                // fence wait, allocator reset
 │
+│   ┌── Shadow Pass ───────────────────────────────────────┐
+│   │                                                       │
+│   ├── SceneRenderer::RenderShadowPass()      // before BeginRender
+│   │   ├── Compute light view-projection (camera frustum fit)
+│   │   ├── Transition shadow map: SRV → DEPTH_WRITE
+│   │   ├── Clear shadow depth, set depth-only PSO
+│   │   ├── For each SceneObject: draw depth only
+│   │   └── Transition shadow map: DEPTH_WRITE → SRV
+│   │                                                       │
+│   └───────────────────────────────────────────────────────┘
+│
 │   ┌── Phase 1: Scene → OffscreenTarget ──────────────────┐
 │   │                                                       │
 │   ├── ViewportPanel::BeginRender()           // transition offscreen → RT
 │   ├── SceneRenderer::Render()                // set root sig, PSO
-│   │   ├── Update per-frame CB (VP matrix, lighting)
+│   │   ├── Bind shadow map SRV (slot 5)
+│   │   ├── Update per-frame CB (VP, lighting, lightViewProjection)
 │   │   ├── For each SceneObject:
 │   │   │   ├── Update per-object CB at offset (world matrix)
 │   │   │   ├── Update per-material CB at offset (color, texture flag)
@@ -254,12 +266,14 @@ The same pattern applies to the per-material constant buffer.
 ### Root signature layout
 
 ```
-Root[0]  CBV  b0   Per-frame data (view-projection matrix, camera position, directional light, ambient light)
+Root[0]  CBV  b0   Per-frame data (VP matrix, camera, lights, shadow VP matrix)
 Root[1]  CBV  b1   Per-object data (world matrix) — offset per object
 Root[2]  CBV  b2   Per-material data (base color, texture flag) — offset per object
 Root[3]  Table     SRV t0  Base color texture (or default white)
 Root[4]  Constants b3      Object ID (1 DWORD — GPU picking pass only)
+Root[5]  Table     SRV t1  Shadow map depth texture
          Static sampler s0  Linear wrap
+         Static sampler s1  Comparison sampler (border, for shadow PCF)
 ```
 
 Max objects: `kMaxObjects = 256`.
@@ -287,6 +301,8 @@ struct LightComponent {
     float range;               // Point/Spot — radius of influence (meters)
     float innerAngle;          // Spot only — full intensity cone half-angle (degrees)
     float outerAngle;          // Spot only — falloff-to-zero cone half-angle (degrees)
+    bool castShadow;           // Directional only (for now) — enables shadow map pass
+    float shadowBias;          // Shader-side depth bias for shadow acne prevention
     // Directional/Spot: direction derived from SceneObject::rotation (forward vector of worldTransform)
     // Point/Spot: position from SceneObject::position
 };

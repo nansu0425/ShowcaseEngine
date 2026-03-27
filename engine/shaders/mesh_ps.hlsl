@@ -1,5 +1,7 @@
 Texture2D baseColorTex : register(t0);
+Texture2D shadowMap : register(t1);
 SamplerState linearSampler : register(s0);
+SamplerComparisonState shadowSampler : register(s1);
 
 #define MAX_POINT_LIGHTS 8
 #define MAX_SPOT_LIGHTS 8
@@ -43,6 +45,13 @@ cbuffer PerFrame : register(b0)
 
     PointLight pointLights[MAX_POINT_LIGHTS];
     SpotLight spotLights[MAX_SPOT_LIGHTS];
+
+    // Shadow mapping
+    row_major float4x4 lightViewProjection;
+    int shadowEnabled;
+    float shadowBias;
+    float shadowMapTexelSize;
+    float _pad4;
 };
 
 cbuffer PerMaterial : register(b2)
@@ -62,6 +71,36 @@ struct PSInput
     float3 worldPos : TEXCOORD1;
     float3 worldNormal : TEXCOORD2;
 };
+
+float CalculateShadow(float3 worldPos)
+{
+    float4 lightClipPos = mul(float4(worldPos, 1.0), lightViewProjection);
+    float3 projCoords = lightClipPos.xyz / lightClipPos.w;
+
+    // NDC to UV (LH: x [-1,1] -> [0,1], y [-1,1] -> [1,0])
+    float2 shadowUV;
+    shadowUV.x = projCoords.x * 0.5 + 0.5;
+    shadowUV.y = -projCoords.y * 0.5 + 0.5;
+
+    float currentDepth = projCoords.z;
+
+    // Outside shadow map bounds = no shadow
+    if (shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0 || currentDepth > 1.0 ||
+        currentDepth < 0.0)
+        return 1.0;
+
+    // 3x3 PCF
+    float shadow = 0.0;
+    [unroll] for (int x = -1; x <= 1; x++)
+    {
+        [unroll] for (int y = -1; y <= 1; y++)
+        {
+            float2 offset = float2(x, y) * shadowMapTexelSize;
+            shadow += shadowMap.SampleCmpLevelZero(shadowSampler, shadowUV + offset, currentDepth - shadowBias);
+        }
+    }
+    return shadow / 9.0;
+}
 
 float4 main(PSInput input) : SV_TARGET
 {
@@ -90,15 +129,19 @@ float4 main(PSInput input) : SV_TARGET
         // Directional light
         if (dot(lightColor, lightColor) > 0)
         {
+            float shadow = 1.0;
+            if (shadowEnabled)
+                shadow = CalculateShadow(input.worldPos);
+
             float3 lightDir = normalize(-lightDirection);
             float3 halfVec = normalize(lightDir + viewDir);
 
             float nDotL = max(dot(normal, lightDir), 0.0);
-            diffuse = nDotL * lightColor * color;
+            diffuse = nDotL * lightColor * color * shadow;
 
             float nDotH = max(dot(normal, halfVec), 0.0);
             float spec = pow(nDotH, lightSpecularPower);
-            specular = spec * lightColor;
+            specular = spec * lightColor * shadow;
         }
 
         // Point lights

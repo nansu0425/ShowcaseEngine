@@ -47,6 +47,10 @@ inline Matrix PerspectiveFovLH(float fovY, float aspect, float nearZ, float farZ
     return DirectX::XMMatrixPerspectiveFovLH(fovY, aspect, nearZ, farZ);
 }
 
+inline Matrix OrthographicOffCenterLH(float left, float right, float bottom, float top, float nearZ, float farZ) {
+    return DirectX::XMMatrixOrthographicOffCenterLH(left, right, bottom, top, nearZ, farZ);
+}
+
 // Identity matrix
 inline Matrix MatrixIdentity() {
     return DirectX::XMMatrixIdentity();

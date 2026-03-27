@@ -73,13 +73,13 @@ RootSignatureBuilder& RootSignatureBuilder::AddDescriptorTable(const DescriptorT
 RootSignatureBuilder& RootSignatureBuilder::AddStaticSampler(const StaticSamplerDesc& desc) {
     D3D12_STATIC_SAMPLER_DESC sampler = {};
     sampler.Filter = desc.filter;
-    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.AddressU = desc.addressMode;
+    sampler.AddressV = desc.addressMode;
+    sampler.AddressW = desc.addressMode;
     sampler.MipLODBias = 0.0f;
     sampler.MaxAnisotropy = 16;
     sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-    sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    sampler.BorderColor = desc.borderColor;
     sampler.MinLOD = 0.0f;
     sampler.MaxLOD = D3D12_FLOAT32_MAX;
     sampler.ShaderRegister = desc.shaderRegister;

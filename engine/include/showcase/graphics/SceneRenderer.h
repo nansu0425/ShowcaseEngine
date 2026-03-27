@@ -30,6 +30,10 @@ public:
     void Init(RenderContext& ctx);
     void Shutdown();
     void OnResize(uint32_t width, uint32_t height);
+
+    /// Renders the shadow map from directional light. Call before BeginRender/Render.
+    void RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& scene);
+
     void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
                 const PrimitiveHighlight& highlight = {});
 
@@ -71,6 +75,19 @@ private:
 
     // Default white texture for untextured geometry
     Texture m_defaultWhiteTex;
+
+    // Shadow mapping
+    DepthBuffer m_shadowMap;
+    Buffer m_shadowPerFrameCB[FrameResource::kNumFrames];
+    ComPtr<ID3D12PipelineState> m_shadowPSO;
+    ComPtr<ID3D12PipelineState> m_shadowPSODoubleSided;
+    static constexpr uint32_t kShadowMapResolution = 2048;
+    bool m_shadowMapReady = false; // tracks initial resource barrier state
+    Matrix m_cachedLightVP = {};   // computed by RenderShadowPass, used by Render
+    bool m_hasShadow = false;      // set by RenderShadowPass for current frame
+    float m_cachedShadowBias = 0.001f;
+
+    void RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj);
 
     // Object ID picking
     ComPtr<ID3D12PipelineState> m_objectIdPSO;

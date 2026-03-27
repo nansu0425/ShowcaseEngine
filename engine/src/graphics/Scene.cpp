@@ -146,6 +146,8 @@ void Scene::Serialize(JsonDocument& doc) const {
             light["range"].Set(obj.lightComp->range);
             light["innerAngle"].Set(obj.lightComp->innerAngle);
             light["outerAngle"].Set(obj.lightComp->outerAngle);
+            light["castShadow"].Set(obj.lightComp->castShadow);
+            light["shadowBias"].Set(obj.lightComp->shadowBias);
         }
     }
 }
@@ -229,6 +231,10 @@ bool Scene::Deserialize(JsonDocument& doc) {
                 lc.innerAngle = lightNode["innerAngle"].GetFloat();
             if (lightNode.Contains("outerAngle"))
                 lc.outerAngle = lightNode["outerAngle"].GetFloat();
+            if (lightNode.Contains("castShadow"))
+                lc.castShadow = lightNode["castShadow"].GetBool();
+            if (lightNode.Contains("shadowBias"))
+                lc.shadowBias = lightNode["shadowBias"].GetFloat();
 
             obj.lightComp = lc;
         }
@@ -304,6 +310,8 @@ std::optional<DirectionalLightData> Scene::GetDirectionalLight() const {
         data.direction = forward;
         data.color = obj.lightComp->color * obj.lightComp->intensity;
         data.specularPower = obj.lightComp->specularPower;
+        data.castShadow = obj.lightComp->castShadow;
+        data.shadowBias = obj.lightComp->shadowBias;
         return data;
     }
     return std::nullopt;

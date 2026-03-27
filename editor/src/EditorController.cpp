@@ -800,6 +800,26 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                     if (light.type == LightType::Directional) {
                         DragLightProperty(
                             {"Specular Power", &light.specularPower, 1.0f, 1.0f, 256.0f, &light, &scene, selected->id});
+
+                        ImGui::Separator();
+                        ImGui::Text("Shadows");
+                        {
+                            LightComponent oldProps = light;
+                            if (ImGui::Checkbox("Cast Shadow", &light.castShadow)) {
+                                if (m_commandHistory) {
+                                    m_commandHistory->RecordCommand(std::make_unique<ChangeLightPropertiesCommand>(
+                                        ChangeLightPropertiesCommandDesc{&scene, selected->id, oldProps, light}));
+                                }
+                                if (m_dirtyCallback) {
+                                    m_dirtyCallback();
+                                }
+                            }
+                        }
+                        if (light.castShadow) {
+                            DragLightProperty(
+                                {"Shadow Bias", &light.shadowBias, 0.0001f, 0.0f, 0.01f, &light, &scene, selected->id});
+                        }
+
                         ImGui::TextDisabled("Direction controlled by object rotation");
                     }
 
