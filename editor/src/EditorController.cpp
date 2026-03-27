@@ -128,6 +128,46 @@ static void DrawDirectionalLightGizmo(const SceneObject& obj, const Matrix& view
     drawList->PopClipRect();
 }
 
+static void DrawPointLightGizmo(const SceneObject& obj, const Matrix& viewProj, const ImVec2& vpMin,
+                                const ImVec2& vpMax, ImDrawList* drawList) {
+    const Vector3 pos = obj.position;
+
+    Vector4 clip = Vector4::Transform(Vector4(pos.x, pos.y, pos.z, 1.0f), viewProj);
+    if (clip.w <= 0.0f)
+        return;
+
+    constexpr ImU32 kColor = IM_COL32(100, 200, 255, 255);
+    constexpr ImU32 kRingColor = IM_COL32(100, 200, 255, 120);
+    constexpr float kLineThickness = 2.0f;
+    constexpr int kCircleSegments = 24;
+
+    drawList->PushClipRect(vpMin, vpMax, true);
+
+    // Center filled circle
+    ImVec2 sCenter;
+    if (WorldToScreen(pos, viewProj, vpMin, vpMax, sCenter))
+        drawList->AddCircleFilled(sCenter, 6.0f, kColor);
+
+    // Range sphere wireframe: 3 orthogonal rings
+    float range = obj.lightComp->range;
+    Vector3 axes[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    Vector3 perps[3] = {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}};
+
+    for (int ring = 0; ring < 3; ++ring) {
+        Vector3 u = axes[ring];
+        Vector3 v = perps[ring];
+        for (int i = 0; i < kCircleSegments; ++i) {
+            float a0 = kTwoPi * static_cast<float>(i) / kCircleSegments;
+            float a1 = kTwoPi * static_cast<float>(i + 1) / kCircleSegments;
+            Vector3 p0 = pos + u * std::cos(a0) * range + v * std::sin(a0) * range;
+            Vector3 p1 = pos + u * std::cos(a1) * range + v * std::sin(a1) * range;
+            DrawLine3D(p0, p1, viewProj, vpMin, vpMax, drawList, kRingColor, kLineThickness);
+        }
+    }
+
+    drawList->PopClipRect();
+}
+
 // ── Update ────────────────────────────────────────────────────────
 
 void EditorController::Update(const EditorUpdateDesc& desc) {
@@ -328,10 +368,14 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 }
             }
 
-            // Draw directional light gizmo
-            if (selected->HasLight() && selected->lightComp->type == LightType::Directional) {
+            // Draw light gizmo
+            if (selected->HasLight()) {
                 Matrix vp = camera.GetViewProjectionMatrix();
-                DrawDirectionalLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
+                if (selected->lightComp->type == LightType::Directional) {
+                    DrawDirectionalLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
+                } else if (selected->lightComp->type == LightType::Point) {
+                    DrawPointLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
+                }
             }
         }
     }
@@ -607,7 +651,7 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                     auto& light = *selected->lightComp;
 
                     // Light type combo
-                    const char* typeNames[] = {"Directional", "Ambient"};
+                    const char* typeNames[] = {"Directional", "Ambient", "Point"};
                     int currentType = static_cast<int>(light.type);
                     if (ImGui::BeginCombo("Type", typeNames[currentType])) {
                         for (int i = 0; i < IM_ARRAYSIZE(typeNames); ++i) {
@@ -653,6 +697,13 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         DragLightProperty(
                             {"Specular Power", &light.specularPower, 1.0f, 1.0f, 256.0f, &light, &scene, selected->id});
                         ImGui::TextDisabled("Direction controlled by object rotation");
+                    }
+
+                    if (light.type == LightType::Point) {
+                        DragLightProperty(
+                            {"Specular Power", &light.specularPower, 1.0f, 1.0f, 256.0f, &light, &scene, selected->id});
+                        DragLightProperty({"Range", &light.range, 0.1f, 0.1f, 100.0f, &light, &scene, selected->id});
+                        ImGui::TextDisabled("Position controlled by object transform");
                     }
                 }
 

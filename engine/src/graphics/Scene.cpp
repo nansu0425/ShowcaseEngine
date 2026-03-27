@@ -111,6 +111,7 @@ void Scene::Serialize(JsonDocument& doc) const {
             light["color"].SetFloatArray({c.x, c.y, c.z});
             light["intensity"].Set(obj.lightComp->intensity);
             light["specularPower"].Set(obj.lightComp->specularPower);
+            light["range"].Set(obj.lightComp->range);
         }
     }
 }
@@ -188,6 +189,8 @@ bool Scene::Deserialize(JsonDocument& doc) {
                 lc.intensity = lightNode["intensity"].GetFloat();
             if (lightNode.Contains("specularPower"))
                 lc.specularPower = lightNode["specularPower"].GetFloat();
+            if (lightNode.Contains("range"))
+                lc.range = lightNode["range"].GetFloat();
 
             obj.lightComp = lc;
         }
@@ -278,6 +281,22 @@ std::optional<AmbientLightData> Scene::GetAmbientLight() const {
         return data;
     }
     return std::nullopt;
+}
+
+std::vector<PointLightData> Scene::GetPointLights() const {
+    std::vector<PointLightData> result;
+    for (const auto& obj : m_objects) {
+        if (!obj.lightComp.has_value() || obj.lightComp->type != LightType::Point)
+            continue;
+
+        PointLightData data;
+        data.position = obj.position;
+        data.range = obj.lightComp->range;
+        data.color = obj.lightComp->color * obj.lightComp->intensity;
+        data.specularPower = obj.lightComp->specularPower;
+        result.push_back(data);
+    }
+    return result;
 }
 
 SceneObject& Scene::InsertObject(SceneObject obj, size_t index) {

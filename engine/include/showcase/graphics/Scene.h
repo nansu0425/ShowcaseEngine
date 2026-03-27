@@ -14,13 +14,15 @@ namespace showcase {
 enum class LightType : int {
     Directional = 0,
     Ambient = 1,
+    Point = 2,
 };
 
 struct LightComponent {
     LightType type = LightType::Directional;
     Vector3 color = {1.0f, 1.0f, 1.0f};
     float intensity = 1.0f;
-    float specularPower = 32.0f; // Directional only
+    float specularPower = 32.0f;
+    float range = 10.0f; // Point only — radius of influence (meters)
 };
 
 struct DirectionalLightData {
@@ -31,6 +33,13 @@ struct DirectionalLightData {
 
 struct AmbientLightData {
     Vector3 color; // color * intensity
+};
+
+struct PointLightData {
+    Vector3 position;
+    float range;
+    Vector3 color; // color * intensity
+    float specularPower;
 };
 
 // ── Components ──────────────────────────────────────────────────────
@@ -92,6 +101,7 @@ public:
     size_t GetObjectIndex(uint32_t id) const;
     std::optional<DirectionalLightData> GetDirectionalLight() const;
     std::optional<AmbientLightData> GetAmbientLight() const;
+    std::vector<PointLightData> GetPointLights() const;
 
 private:
     std::vector<SceneObject> m_objects;

@@ -9,6 +9,15 @@
 
 namespace showcase {
 
+static constexpr int kMaxPointLights = 8;
+
+struct GpuPointLight {
+    Vector3 position;
+    float range;
+    Vector3 color;
+    float specularPower;
+};
+
 struct alignas(256) PerFrameData {
     Matrix viewProjection;
     Vector3 cameraPosition;
@@ -21,7 +30,10 @@ struct alignas(256) PerFrameData {
     Vector3 ambientColor;
     float _pad2;
     int lightingEnabled;
-    Vector3 _pad3;
+    int numPointLights;
+    float _pad3[2];
+
+    GpuPointLight pointLights[kMaxPointLights];
 };
 
 struct alignas(256) PerObjectData {
@@ -37,7 +49,7 @@ struct alignas(256) PerMaterialData {
     float primitiveHighlight;
 };
 
-static_assert(sizeof(PerFrameData) <= 256);
+static_assert(sizeof(PerFrameData) <= 512);
 static_assert(sizeof(PerObjectData) <= 256);
 static_assert(sizeof(PerMaterialData) <= 256);
 
@@ -456,6 +468,18 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
         }
         frameData.lightingEnabled = 1;
     }
+
+    std::vector<PointLightData> pointLights = scene.GetPointLights();
+    int numPL = std::min(static_cast<int>(pointLights.size()), kMaxPointLights);
+    frameData.numPointLights = numPL;
+    for (int i = 0; i < numPL; ++i) {
+        frameData.pointLights[i].position = pointLights[i].position;
+        frameData.pointLights[i].range = pointLights[i].range;
+        frameData.pointLights[i].color = pointLights[i].color;
+        frameData.pointLights[i].specularPower = pointLights[i].specularPower;
+    }
+    if (numPL > 0)
+        frameData.lightingEnabled = 1;
 
     m_perFrameCB[fi].UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB[fi].GetResource()->GetGPUVirtualAddress());

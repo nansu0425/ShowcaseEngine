@@ -1,6 +1,16 @@
 Texture2D baseColorTex : register(t0);
 SamplerState linearSampler : register(s0);
 
+#define MAX_POINT_LIGHTS 8
+
+struct PointLight
+{
+    float3 position;
+    float range;
+    float3 color;
+    float specularPower;
+};
+
 cbuffer PerFrame : register(b0)
 {
     row_major float4x4 viewProjection;
@@ -14,7 +24,10 @@ cbuffer PerFrame : register(b0)
     float3 ambientColor;
     float _pad2;
     int lightingEnabled;
-    float3 _pad3;
+    int numPointLights;
+    float2 _pad3;
+
+    PointLight pointLights[MAX_POINT_LIGHTS];
 };
 
 cbuffer PerMaterial : register(b2)
@@ -56,11 +69,13 @@ float4 main(PSInput input) : SV_TARGET
         float3 diffuse = float3(0, 0, 0);
         float3 specular = float3(0, 0, 0);
 
+        float3 normal = normalize(input.worldNormal);
+        float3 viewDir = normalize(cameraPosition - input.worldPos);
+
+        // Directional light
         if (dot(lightColor, lightColor) > 0)
         {
-            float3 normal = normalize(input.worldNormal);
             float3 lightDir = normalize(-lightDirection);
-            float3 viewDir = normalize(cameraPosition - input.worldPos);
             float3 halfVec = normalize(lightDir + viewDir);
 
             float nDotL = max(dot(normal, lightDir), 0.0);
@@ -69,6 +84,26 @@ float4 main(PSInput input) : SV_TARGET
             float nDotH = max(dot(normal, halfVec), 0.0);
             float spec = pow(nDotH, lightSpecularPower);
             specular = spec * lightColor;
+        }
+
+        // Point lights
+        for (int i = 0; i < numPointLights; i++)
+        {
+            float3 toLight = pointLights[i].position - input.worldPos;
+            float dist = length(toLight);
+            float3 plDir = toLight / max(dist, 0.0001);
+
+            float attenuation = saturate(1.0 - dist / pointLights[i].range);
+            attenuation *= attenuation;
+
+            float3 halfVec = normalize(plDir + viewDir);
+
+            float nDotL = max(dot(normal, plDir), 0.0);
+            diffuse += nDotL * pointLights[i].color * color * attenuation;
+
+            float nDotH = max(dot(normal, halfVec), 0.0);
+            float spec = pow(nDotH, pointLights[i].specularPower);
+            specular += spec * pointLights[i].color * attenuation;
         }
 
         color = ambient + diffuse + specular;
