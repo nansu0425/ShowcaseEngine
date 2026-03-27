@@ -122,6 +122,7 @@ public:
     std::optional<AmbientLightData> GetAmbientLight() const;
     std::vector<PointLightData> GetPointLights() const;
     std::vector<SpotLightData> GetSpotLights() const;
+    std::optional<BoundingBox> GetSceneAABB() const;
 
 private:
     std::vector<SceneObject> m_objects;

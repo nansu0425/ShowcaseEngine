@@ -12,6 +12,7 @@ namespace showcase {
 
 class Input;
 class RenderContext;
+struct ShadowDebugStats;
 
 using ToolbarCallback = std::function<void()>;
 
@@ -22,7 +23,7 @@ public:
 
     void BeginRender(CommandList& cmdList);
     void EndRender(CommandList& cmdList);
-    void OnImGui(float fps, float deltaTime);
+    void OnImGui(float fps, float deltaTime, const ShadowDebugStats& shadowStats);
 
     void InitCamera(const Vector3& position, const Vector3& lookAt, float fovY, float nearZ, float farZ);
     void UpdateCamera(const Input& input, float deltaTime, bool playMode = false);
@@ -38,6 +39,10 @@ public:
     void ToggleShowFPS() { m_showFPS = !m_showFPS; }
     bool GetShowFPS() const { return m_showFPS; }
     void SetShowFPS(bool show) { m_showFPS = show; }
+
+    void ToggleShowShadowInfo() { m_showShadowInfo = !m_showShadowInfo; }
+    bool GetShowShadowInfo() const { return m_showShadowInfo; }
+    void SetShowShadowInfo(bool show) { m_showShadowInfo = show; }
 
     float GetYaw() const { return m_yaw; }
     float GetPitch() const { return m_pitch; }
@@ -60,6 +65,7 @@ private:
     OffscreenTarget m_offscreenTarget;
 
     bool m_showFPS = true;
+    bool m_showShadowInfo = false;
     ToolbarCallback m_toolbarCallback;
 
     ImVec2 m_imageMin = {};

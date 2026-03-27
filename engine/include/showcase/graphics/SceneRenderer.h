@@ -25,6 +25,19 @@ struct PrimitiveHighlight {
     int primIndex = -1;
 };
 
+struct ShadowDebugStats {
+    Vector3 lightDirection;
+    float frustumWidth = 0.0f;  // ortho projection width (meters)
+    float frustumHeight = 0.0f; // ortho projection height (meters)
+    float frustumNear = 0.0f;
+    float frustumFar = 0.0f;
+    float texelsPerMeter = 0.0f; // shadow map resolution / frustum width
+    float shadowBias = 0.0f;
+    float shadowDistance = 0.0f;
+    uint32_t resolution = 0;
+    bool active = false;
+};
+
 class SceneRenderer {
 public:
     void Init(RenderContext& ctx);
@@ -56,6 +69,8 @@ public:
 
     Texture& GetDefaultWhiteTexture() { return m_defaultWhiteTex; }
 
+    const ShadowDebugStats& GetShadowDebugStats() const { return m_shadowDebugStats; }
+
 private:
     static constexpr uint32_t kMaxObjects = 256;
 
@@ -86,6 +101,7 @@ private:
     Matrix m_cachedLightVP = {};   // computed by RenderShadowPass, used by Render
     bool m_hasShadow = false;      // set by RenderShadowPass for current frame
     float m_cachedShadowBias = 0.001f;
+    ShadowDebugStats m_shadowDebugStats;
 
     void RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj);
 

@@ -397,4 +397,22 @@ size_t Scene::GetObjectCount() const {
     return m_objects.size();
 }
 
+std::optional<BoundingBox> Scene::GetSceneAABB() const {
+    bool first = true;
+    BoundingBox merged;
+    for (const auto& obj : m_objects) {
+        if (!obj.HasModel())
+            continue;
+        if (first) {
+            merged = obj.worldAABB;
+            first = false;
+        } else {
+            BoundingBox::CreateMerged(merged, merged, obj.worldAABB);
+        }
+    }
+    if (first)
+        return std::nullopt;
+    return merged;
+}
+
 } // namespace showcase

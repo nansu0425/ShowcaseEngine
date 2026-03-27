@@ -530,12 +530,37 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
 
 // ── Shadow Mapping ──────────────────────────────────────────────────
 
-static constexpr float kShadowDistance = 100.0f; // meters — limits shadow frustum to nearby geometry
+static constexpr float kMaxShadowDistance = 500.0f; // absolute upper bound (meters)
+static constexpr float kMinShadowDistance = 10.0f;  // absolute lower bound to avoid degenerate frustums
 
-static Matrix ComputeDirectionalLightVP(const Vector3& lightDir, const Camera& camera) {
+static float ComputeAdaptiveShadowDistance(const Camera& camera, const BoundingBox& sceneAABB) {
+    Vector3 camPos = camera.GetPosition();
+    Vector3 corners[8];
+    sceneAABB.GetCorners(corners);
+
+    float maxDistSq = 0.0f;
+    for (int i = 0; i < 8; ++i) {
+        float distSq = (corners[i] - camPos).LengthSquared();
+        maxDistSq = std::max(maxDistSq, distSq);
+    }
+
+    float distance = std::sqrt(maxDistSq);
+    return std::clamp(distance, kMinShadowDistance, kMaxShadowDistance);
+}
+
+struct ShadowFrustumResult {
+    Matrix lightViewProj;
+    float width;  // maxX - minX
+    float height; // maxY - minY
+    float nearZ;
+    float farZ;
+};
+
+static ShadowFrustumResult ComputeDirectionalLightVP(const Vector3& lightDir, const Camera& camera,
+                                                     float shadowDistance) {
     // Build a shadow-specific frustum with limited far plane (not the full camera far=1000m).
     // Using the full camera frustum makes the ortho projection too large, destroying depth precision.
-    float shadowFar = std::min(camera.GetFarZ(), kShadowDistance);
+    float shadowFar = std::min(camera.GetFarZ(), shadowDistance);
     Matrix shadowProj = PerspectiveFovLH(camera.GetFovY(), camera.GetAspectRatio(), camera.GetNearZ(), shadowFar);
     Matrix shadowVP = camera.GetViewMatrix() * shadowProj;
     Matrix vpInverse = shadowVP.Invert();
@@ -590,7 +615,14 @@ static Matrix ComputeDirectionalLightVP(const Vector3& lightDir, const Camera& c
     minZ -= zRange;
 
     Matrix lightProj = OrthographicOffCenterLH(minX, maxX, minY, maxY, minZ, maxZ);
-    return lightView * lightProj;
+
+    ShadowFrustumResult result;
+    result.lightViewProj = lightView * lightProj;
+    result.width = maxX - minX;
+    result.height = maxY - minY;
+    result.nearZ = minZ;
+    result.farZ = maxZ;
+    return result;
 }
 
 void SceneRenderer::RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj) {
@@ -693,6 +725,7 @@ void SceneRenderer::RenderShadowMap(RenderContext& ctx, Scene& scene, const Matr
 void SceneRenderer::RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& scene) {
     SE_ZONE_SCOPED_C(profile::kColorRendering);
     m_hasShadow = false;
+    m_shadowDebugStats = {};
 
     if (!m_shadowMapReady)
         return;
@@ -701,10 +734,31 @@ void SceneRenderer::RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& 
     if (!dirLight.has_value() || !dirLight->castShadow)
         return;
 
-    m_cachedLightVP = ComputeDirectionalLightVP(dirLight->direction, camera);
+    // Compute adaptive shadow distance from scene geometry
+    float shadowDistance = kMaxShadowDistance;
+    auto sceneAABB = scene.GetSceneAABB();
+    if (sceneAABB.has_value()) {
+        shadowDistance = ComputeAdaptiveShadowDistance(camera, *sceneAABB);
+    }
+
+    auto frustum = ComputeDirectionalLightVP(dirLight->direction, camera, shadowDistance);
+    m_cachedLightVP = frustum.lightViewProj;
     m_cachedShadowBias = dirLight->shadowBias;
     RenderShadowMap(ctx, scene, m_cachedLightVP);
     m_hasShadow = true;
+
+    // Populate debug stats
+    m_shadowDebugStats.active = true;
+    m_shadowDebugStats.lightDirection = dirLight->direction;
+    m_shadowDebugStats.frustumWidth = frustum.width;
+    m_shadowDebugStats.frustumHeight = frustum.height;
+    m_shadowDebugStats.frustumNear = frustum.nearZ;
+    m_shadowDebugStats.frustumFar = frustum.farZ;
+    m_shadowDebugStats.shadowDistance = shadowDistance;
+    m_shadowDebugStats.resolution = kShadowMapResolution;
+    m_shadowDebugStats.shadowBias = dirLight->shadowBias;
+    m_shadowDebugStats.texelsPerMeter =
+        frustum.width > 0.0f ? static_cast<float>(kShadowMapResolution) / frustum.width : 0.0f;
 }
 
 void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,

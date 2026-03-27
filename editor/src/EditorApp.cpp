@@ -60,6 +60,11 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
         return enabled ? "V-Sync enabled" : "V-Sync disabled";
     });
 
+    m_console.RegisterCommand("shadow_info", [this](const std::string&) -> std::string {
+        m_viewport.ToggleShowShadowInfo();
+        return m_viewport.GetShowShadowInfo() ? "Shadow info overlay enabled" : "Shadow info overlay disabled";
+    });
+
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext))
         return false;
 
@@ -164,6 +169,7 @@ void EditorApp::SaveEditorConfig() {
     // Viewport settings
     auto vp = doc["viewport"];
     vp["showFPS"].Set(m_viewport.GetShowFPS());
+    vp["showShadowInfo"].Set(m_viewport.GetShowShadowInfo());
     vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
     vp["cameraLookSpeed"].Set(m_viewport.cameraLookSpeed);
 
@@ -199,6 +205,9 @@ void EditorApp::LoadEditorConfig() {
     auto vp = doc["viewport"];
     if (vp.Contains("showFPS")) {
         m_viewport.SetShowFPS(vp["showFPS"].GetBool());
+    }
+    if (vp.Contains("showShadowInfo")) {
+        m_viewport.SetShowShadowInfo(vp["showShadowInfo"].GetBool());
     }
     if (vp.Contains("cameraMoveSpeed")) {
         m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].GetFloat();
@@ -529,6 +538,11 @@ void EditorApp::RenderMainMenuBar() {
 #else
             ImGui::MenuItem("Tracy Profiler (disabled)", nullptr, false, false);
 #endif
+            ImGui::Separator();
+            bool showShadowInfo = m_viewport.GetShowShadowInfo();
+            if (ImGui::MenuItem("Shadow Info", nullptr, &showShadowInfo)) {
+                m_viewport.SetShowShadowInfo(showShadowInfo);
+            }
             ImGui::EndMenu();
         }
 
@@ -760,7 +774,7 @@ int EditorApp::Run() {
             // Create full-screen DockSpace
             ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
 
-            m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
+            m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime(), m_sceneRenderer.GetShadowDebugStats());
             m_editorController.RenderUI(m_scene, m_viewport);
             m_console.Render();
             m_imguiLayer.EndFrame(m_renderContext.GetCommandList());
