@@ -9,8 +9,84 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <cmath>
 
 namespace showcase {
+
+// ── Light Gizmo Helpers ──────────────────────────────────────────
+
+static bool WorldToScreen(const Vector3& worldPos, const Matrix& viewProj, const ImVec2& vpMin, const ImVec2& vpMax,
+                          ImVec2& out) {
+    Vector4 clip = Vector4::Transform(Vector4(worldPos.x, worldPos.y, worldPos.z, 1.0f), viewProj);
+    if (clip.w <= 0.0f)
+        return false;
+    float ndcX = clip.x / clip.w;
+    float ndcY = clip.y / clip.w;
+    out.x = vpMin.x + (ndcX * 0.5f + 0.5f) * (vpMax.x - vpMin.x);
+    out.y = vpMin.y + (1.0f - (ndcY * 0.5f + 0.5f)) * (vpMax.y - vpMin.y);
+    return true;
+}
+
+static void DrawLine3D(const Vector3& a, const Vector3& b, const Matrix& viewProj, const ImVec2& vpMin,
+                       const ImVec2& vpMax, ImDrawList* drawList, ImU32 color, float thickness) {
+    ImVec2 sa, sb;
+    if (WorldToScreen(a, viewProj, vpMin, vpMax, sa) && WorldToScreen(b, viewProj, vpMin, vpMax, sb))
+        drawList->AddLine(sa, sb, color, thickness);
+}
+
+static void DrawDirectionalLightGizmo(const SceneObject& obj, const Matrix& viewProj, const ImVec2& vpMin,
+                                      const ImVec2& vpMax, ImDrawList* drawList) {
+    const Vector3 pos = obj.position;
+
+    // Forward vector from world transform Z-axis row
+    Vector3 forward(obj.worldTransform._31, obj.worldTransform._32, obj.worldTransform._33);
+    forward.Normalize();
+
+    // Build perpendicular basis
+    Vector3 worldUp(0.0f, 1.0f, 0.0f);
+    if (std::abs(forward.Dot(worldUp)) > 0.99f)
+        worldUp = Vector3(1.0f, 0.0f, 0.0f);
+    Vector3 right = worldUp.Cross(forward);
+    right.Normalize();
+    Vector3 up = forward.Cross(right);
+    up.Normalize();
+
+    constexpr ImU32 kColor = IM_COL32(255, 200, 50, 255);
+    constexpr float kArrowThickness = 2.0f;
+    constexpr float kRayThickness = 1.5f;
+
+    drawList->PushClipRect(vpMin, vpMax, true);
+
+    // Direction arrow: P → P + F * 2.0
+    Vector3 tip = pos + forward * 2.0f;
+    DrawLine3D(pos, tip, viewProj, vpMin, vpMax, drawList, kColor, kArrowThickness);
+
+    // Arrowhead
+    Vector3 back = pos + forward * 1.6f;
+    DrawLine3D(tip, back + right * 0.25f, viewProj, vpMin, vpMax, drawList, kColor, kArrowThickness);
+    DrawLine3D(tip, back - right * 0.25f, viewProj, vpMin, vpMax, drawList, kColor, kArrowThickness);
+
+    // Circle ring (12 segments, radius 0.3)
+    constexpr int kCircleSegments = 12;
+    constexpr float kCircleRadius = 0.3f;
+    for (int i = 0; i < kCircleSegments; ++i) {
+        float a0 = kTwoPi * static_cast<float>(i) / kCircleSegments;
+        float a1 = kTwoPi * static_cast<float>(i + 1) / kCircleSegments;
+        Vector3 p0 = pos + right * std::cos(a0) * kCircleRadius + up * std::sin(a0) * kCircleRadius;
+        Vector3 p1 = pos + right * std::cos(a1) * kCircleRadius + up * std::sin(a1) * kCircleRadius;
+        DrawLine3D(p0, p1, viewProj, vpMin, vpMax, drawList, kColor, kRayThickness);
+    }
+
+    // Emanating rays (6 rays)
+    constexpr int kRayCount = 6;
+    for (int i = 0; i < kRayCount; ++i) {
+        float angle = kTwoPi * static_cast<float>(i) / kRayCount;
+        Vector3 dir = right * std::cos(angle) + up * std::sin(angle);
+        DrawLine3D(pos + dir * 0.35f, pos + dir * 1.0f, viewProj, vpMin, vpMax, drawList, kColor, kRayThickness);
+    }
+
+    drawList->PopClipRect();
+}
 
 // ── Update ────────────────────────────────────────────────────────
 
@@ -210,6 +286,12 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         TransformCommandDesc{&scene, selected->id, m_gizmoStartPos, m_gizmoStartRot, m_gizmoStartScale,
                                              selected->position, selected->rotation, selected->scale}));
                 }
+            }
+
+            // Draw directional light gizmo
+            if (selected->HasLight() && selected->lightComp->type == LightType::Directional) {
+                Matrix vp = camera.GetViewProjectionMatrix();
+                DrawDirectionalLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
             }
         }
     }
