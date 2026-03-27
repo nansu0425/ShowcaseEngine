@@ -105,7 +105,7 @@ The project is split into two CMake targets with a strict dependency direction:
 | `Material` | `Model.h` | Base color factor + optional `shared_ptr<Texture>` for base color texture |
 | `AssetManager` | `AssetManager.h` | Central ownership of all `Model` instances (builtin + file-loaded); deduplicates by source key |
 | `ModelComponent` | `Scene.h` | Optional component: `modelSource` string, resolved `Model*` pointer, and optional `baseColor` material override |
-| `LightComponent` | `Scene.h` | Optional component: Directional or Ambient light with color and intensity; directional adds specular power, direction derived from object rotation |
+| `LightComponent` | `Scene.h` | Optional component: Directional, Ambient, Point, or Spot light with color and intensity; Directional/Spot use direction from object rotation; Point/Spot use range and position from transform; Spot adds inner/outer cone angles |
 | `Scene` | `Scene.h` | Flat collection of `SceneObject` with auto-incrementing IDs |
 | `SceneRenderer` | `SceneRenderer.h` | Root signatures, PSOs (mesh + selection outline), constant buffers, draw loop, GPU object-ID picking |
 
@@ -280,11 +280,15 @@ struct ModelComponent {
 };
 
 struct LightComponent {
-    LightType type;            // Directional, Ambient
+    LightType type;            // Directional, Ambient, Point, Spot
     Vector3 color;             // light color
     float intensity;           // multiplied into color for shader
-    float specularPower;       // Blinn-Phong exponent (Directional only)
-    // Directional: direction derived from SceneObject::rotation (forward vector of worldTransform)
+    float specularPower;       // Blinn-Phong exponent (Directional/Point/Spot)
+    float range;               // Point/Spot — radius of influence (meters)
+    float innerAngle;          // Spot only — full intensity cone half-angle (degrees)
+    float outerAngle;          // Spot only — falloff-to-zero cone half-angle (degrees)
+    // Directional/Spot: direction derived from SceneObject::rotation (forward vector of worldTransform)
+    // Point/Spot: position from SceneObject::position
 };
 
 struct SceneObject {

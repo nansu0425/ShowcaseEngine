@@ -168,6 +168,76 @@ static void DrawPointLightGizmo(const SceneObject& obj, const Matrix& viewProj, 
     drawList->PopClipRect();
 }
 
+static void DrawSpotLightGizmo(const SceneObject& obj, const Matrix& viewProj, const ImVec2& vpMin, const ImVec2& vpMax,
+                               ImDrawList* drawList) {
+    const Vector3 pos = obj.position;
+
+    Vector4 clip = Vector4::Transform(Vector4(pos.x, pos.y, pos.z, 1.0f), viewProj);
+    if (clip.w <= 0.0f)
+        return;
+    constexpr float kGizmoClipSize = 0.1f;
+    float s = clip.w * kGizmoClipSize;
+
+    constexpr ImU32 kColor = IM_COL32(50, 255, 100, 255);
+    constexpr ImU32 kConeColor = IM_COL32(50, 255, 100, 120);
+    constexpr float kLineThickness = 2.5f;
+    constexpr float kArrowHeadWidth = 5.0f;
+    constexpr int kConeSegments = 24;
+
+    // Forward vector from world transform Z-axis row
+    Vector3 forward(obj.worldTransform._31, obj.worldTransform._32, obj.worldTransform._33);
+    forward.Normalize();
+
+    // Build perpendicular basis
+    Vector3 worldUp(0.0f, 1.0f, 0.0f);
+    if (std::abs(forward.Dot(worldUp)) > 0.99f)
+        worldUp = Vector3(1.0f, 0.0f, 0.0f);
+    Vector3 right = worldUp.Cross(forward);
+    right.Normalize();
+    Vector3 up = forward.Cross(right);
+    up.Normalize();
+
+    float range = obj.lightComp->range;
+    float outerRad = std::tan(ToRadians(obj.lightComp->outerAngle));
+    float coneRadius = range * outerRad;
+
+    drawList->PushClipRect(vpMin, vpMax, true);
+
+    // Center filled circle
+    ImVec2 sCenter;
+    if (WorldToScreen(pos, viewProj, vpMin, vpMax, sCenter))
+        drawList->AddCircleFilled(sCenter, 5.0f, kColor);
+
+    // Direction arrow shaft + filled arrowhead
+    float arrowLen = 1.5f * s;
+    float headFrac = 0.2f;
+    Vector3 tip = pos + forward * arrowLen;
+    Vector3 headBase = pos + forward * (arrowLen * (1.0f - headFrac));
+    DrawLine3D(pos, headBase, viewProj, vpMin, vpMax, drawList, kColor, kLineThickness);
+    DrawArrowHead3D(tip, headBase, viewProj, vpMin, vpMax, drawList, kColor, kArrowHeadWidth);
+
+    // Cone tip at range distance
+    Vector3 coneTip = pos + forward * range;
+
+    // Cone edge circle at range distance
+    for (int i = 0; i < kConeSegments; ++i) {
+        float a0 = kTwoPi * static_cast<float>(i) / kConeSegments;
+        float a1 = kTwoPi * static_cast<float>(i + 1) / kConeSegments;
+        Vector3 p0 = coneTip + right * std::cos(a0) * coneRadius + up * std::sin(a0) * coneRadius;
+        Vector3 p1 = coneTip + right * std::cos(a1) * coneRadius + up * std::sin(a1) * coneRadius;
+        DrawLine3D(p0, p1, viewProj, vpMin, vpMax, drawList, kConeColor, kLineThickness);
+    }
+
+    // Four cone edge lines from position to circle perimeter
+    for (int i = 0; i < 4; ++i) {
+        float angle = kTwoPi * static_cast<float>(i) / 4.0f;
+        Vector3 edgePoint = coneTip + right * std::cos(angle) * coneRadius + up * std::sin(angle) * coneRadius;
+        DrawLine3D(pos, edgePoint, viewProj, vpMin, vpMax, drawList, kConeColor, kLineThickness);
+    }
+
+    drawList->PopClipRect();
+}
+
 // ── Update ────────────────────────────────────────────────────────
 
 void EditorController::Update(const EditorUpdateDesc& desc) {
@@ -378,6 +448,8 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                     DrawDirectionalLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
                 } else if (selected->lightComp->type == LightType::Point) {
                     DrawPointLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
+                } else if (selected->lightComp->type == LightType::Spot) {
+                    DrawSpotLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
                 }
             }
         }
@@ -663,7 +735,7 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                     auto& light = *selected->lightComp;
 
                     // Light type combo
-                    const char* typeNames[] = {"Directional", "Ambient", "Point"};
+                    const char* typeNames[] = {"Directional", "Ambient", "Point", "Spot"};
                     int currentType = static_cast<int>(light.type);
                     if (ImGui::BeginCombo("Type", typeNames[currentType])) {
                         for (int i = 0; i < IM_ARRAYSIZE(typeNames); ++i) {
@@ -716,6 +788,19 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                             {"Specular Power", &light.specularPower, 1.0f, 1.0f, 256.0f, &light, &scene, selected->id});
                         DragLightProperty({"Range", &light.range, 0.1f, 0.1f, 100.0f, &light, &scene, selected->id});
                         ImGui::TextDisabled("Position controlled by object transform");
+                    }
+
+                    if (light.type == LightType::Spot) {
+                        DragLightProperty(
+                            {"Specular Power", &light.specularPower, 1.0f, 1.0f, 256.0f, &light, &scene, selected->id});
+                        DragLightProperty({"Range", &light.range, 0.1f, 0.1f, 100.0f, &light, &scene, selected->id});
+                        DragLightProperty(
+                            {"Inner Angle", &light.innerAngle, 0.5f, 0.0f, 89.0f, &light, &scene, selected->id});
+                        DragLightProperty(
+                            {"Outer Angle", &light.outerAngle, 0.5f, 1.0f, 90.0f, &light, &scene, selected->id});
+                        if (light.innerAngle >= light.outerAngle)
+                            light.outerAngle = light.innerAngle + 1.0f;
+                        ImGui::TextDisabled("Position + direction controlled by object transform");
                     }
                 }
 

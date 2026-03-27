@@ -144,6 +144,8 @@ void Scene::Serialize(JsonDocument& doc) const {
             light["intensity"].Set(obj.lightComp->intensity);
             light["specularPower"].Set(obj.lightComp->specularPower);
             light["range"].Set(obj.lightComp->range);
+            light["innerAngle"].Set(obj.lightComp->innerAngle);
+            light["outerAngle"].Set(obj.lightComp->outerAngle);
         }
     }
 }
@@ -223,6 +225,10 @@ bool Scene::Deserialize(JsonDocument& doc) {
                 lc.specularPower = lightNode["specularPower"].GetFloat();
             if (lightNode.Contains("range"))
                 lc.range = lightNode["range"].GetFloat();
+            if (lightNode.Contains("innerAngle"))
+                lc.innerAngle = lightNode["innerAngle"].GetFloat();
+            if (lightNode.Contains("outerAngle"))
+                lc.outerAngle = lightNode["outerAngle"].GetFloat();
 
             obj.lightComp = lc;
         }
@@ -324,6 +330,29 @@ std::vector<PointLightData> Scene::GetPointLights() const {
         PointLightData data;
         data.position = obj.position;
         data.range = obj.lightComp->range;
+        data.color = obj.lightComp->color * obj.lightComp->intensity;
+        data.specularPower = obj.lightComp->specularPower;
+        result.push_back(data);
+    }
+    return result;
+}
+
+std::vector<SpotLightData> Scene::GetSpotLights() const {
+    std::vector<SpotLightData> result;
+    for (const auto& obj : m_objects) {
+        if (!obj.lightComp.has_value() || obj.lightComp->type != LightType::Spot)
+            continue;
+
+        SpotLightData data;
+        data.position = obj.position;
+        data.range = obj.lightComp->range;
+
+        Vector3 forward(obj.worldTransform._31, obj.worldTransform._32, obj.worldTransform._33);
+        forward.Normalize();
+        data.direction = forward;
+
+        data.innerCos = std::cos(ToRadians(obj.lightComp->innerAngle));
+        data.outerCos = std::cos(ToRadians(obj.lightComp->outerAngle));
         data.color = obj.lightComp->color * obj.lightComp->intensity;
         data.specularPower = obj.lightComp->specularPower;
         result.push_back(data);

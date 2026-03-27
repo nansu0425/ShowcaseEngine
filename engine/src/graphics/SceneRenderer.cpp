@@ -10,6 +10,7 @@
 namespace showcase {
 
 static constexpr int kMaxPointLights = 8;
+static constexpr int kMaxSpotLights = 8;
 
 struct GpuPointLight {
     Vector3 position;
@@ -17,6 +18,17 @@ struct GpuPointLight {
     Vector3 color;
     float specularPower;
 };
+
+struct GpuSpotLight {
+    Vector3 position;
+    float range; // 16 bytes
+    Vector3 direction;
+    float innerCos; // 16 bytes
+    Vector3 color;
+    float outerCos; // 16 bytes
+    float specularPower;
+    float _pad0[3]; // 16 bytes
+}; // Total: 64 bytes
 
 struct alignas(256) PerFrameData {
     Matrix viewProjection;
@@ -31,9 +43,11 @@ struct alignas(256) PerFrameData {
     float _pad2;
     int lightingEnabled;
     int numPointLights;
-    float _pad3[2];
+    int numSpotLights;
+    float _pad3;
 
     GpuPointLight pointLights[kMaxPointLights];
+    GpuSpotLight spotLights[kMaxSpotLights];
 };
 
 struct alignas(256) PerObjectData {
@@ -49,7 +63,8 @@ struct alignas(256) PerMaterialData {
     float primitiveHighlight;
 };
 
-static_assert(sizeof(PerFrameData) <= 512);
+static_assert(sizeof(GpuSpotLight) == 64);
+static_assert(sizeof(PerFrameData) <= 1024);
 static_assert(sizeof(PerObjectData) <= 256);
 static_assert(sizeof(PerMaterialData) <= 256);
 
@@ -479,6 +494,21 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
         frameData.pointLights[i].specularPower = pointLights[i].specularPower;
     }
     if (numPL > 0)
+        frameData.lightingEnabled = 1;
+
+    std::vector<SpotLightData> spotLights = scene.GetSpotLights();
+    int numSL = std::min(static_cast<int>(spotLights.size()), kMaxSpotLights);
+    frameData.numSpotLights = numSL;
+    for (int i = 0; i < numSL; ++i) {
+        frameData.spotLights[i].position = spotLights[i].position;
+        frameData.spotLights[i].range = spotLights[i].range;
+        frameData.spotLights[i].direction = spotLights[i].direction;
+        frameData.spotLights[i].innerCos = spotLights[i].innerCos;
+        frameData.spotLights[i].color = spotLights[i].color;
+        frameData.spotLights[i].outerCos = spotLights[i].outerCos;
+        frameData.spotLights[i].specularPower = spotLights[i].specularPower;
+    }
+    if (numSL > 0)
         frameData.lightingEnabled = 1;
 
     m_perFrameCB[fi].UpdateData(&frameData, sizeof(frameData));

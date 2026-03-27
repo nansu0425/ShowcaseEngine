@@ -15,6 +15,7 @@ enum class LightType : int {
     Directional = 0,
     Ambient = 1,
     Point = 2,
+    Spot = 3,
 };
 
 struct LightComponent {
@@ -22,7 +23,9 @@ struct LightComponent {
     Vector3 color = {1.0f, 1.0f, 1.0f};
     float intensity = 1.0f;
     float specularPower = 32.0f;
-    float range = 10.0f; // Point only — radius of influence (meters)
+    float range = 10.0f;      // Point/Spot — radius of influence (meters)
+    float innerAngle = 15.0f; // Spot only — full intensity cone half-angle (degrees)
+    float outerAngle = 30.0f; // Spot only — falloff-to-zero cone half-angle (degrees)
 };
 
 struct DirectionalLightData {
@@ -39,6 +42,16 @@ struct PointLightData {
     Vector3 position;
     float range;
     Vector3 color; // color * intensity
+    float specularPower;
+};
+
+struct SpotLightData {
+    Vector3 position;
+    float range;
+    Vector3 direction;
+    float innerCos; // cos(innerAngle)
+    Vector3 color;  // color * intensity
+    float outerCos; // cos(outerAngle)
     float specularPower;
 };
 
@@ -104,6 +117,7 @@ public:
     std::optional<DirectionalLightData> GetDirectionalLight() const;
     std::optional<AmbientLightData> GetAmbientLight() const;
     std::vector<PointLightData> GetPointLights() const;
+    std::vector<SpotLightData> GetSpotLights() const;
 
 private:
     std::vector<SceneObject> m_objects;

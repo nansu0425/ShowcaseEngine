@@ -2,6 +2,7 @@ Texture2D baseColorTex : register(t0);
 SamplerState linearSampler : register(s0);
 
 #define MAX_POINT_LIGHTS 8
+#define MAX_SPOT_LIGHTS 8
 
 struct PointLight
 {
@@ -9,6 +10,18 @@ struct PointLight
     float range;
     float3 color;
     float specularPower;
+};
+
+struct SpotLight
+{
+    float3 position;
+    float range;
+    float3 direction;
+    float innerCos;
+    float3 color;
+    float outerCos;
+    float specularPower;
+    float3 _pad0;
 };
 
 cbuffer PerFrame : register(b0)
@@ -25,9 +38,11 @@ cbuffer PerFrame : register(b0)
     float _pad2;
     int lightingEnabled;
     int numPointLights;
-    float2 _pad3;
+    int numSpotLights;
+    float _pad3;
 
     PointLight pointLights[MAX_POINT_LIGHTS];
+    SpotLight spotLights[MAX_SPOT_LIGHTS];
 };
 
 cbuffer PerMaterial : register(b2)
@@ -104,6 +119,32 @@ float4 main(PSInput input) : SV_TARGET
             float nDotH = max(dot(normal, halfVec), 0.0);
             float spec = pow(nDotH, pointLights[i].specularPower);
             specular += spec * pointLights[i].color * attenuation;
+        }
+
+        // Spot lights
+        for (int j = 0; j < numSpotLights; j++)
+        {
+            float3 toLight = spotLights[j].position - input.worldPos;
+            float dist = length(toLight);
+            float3 slDir = toLight / max(dist, 0.0001);
+
+            float distAtten = saturate(1.0 - dist / spotLights[j].range);
+            distAtten *= distAtten;
+
+            float cosAngle = dot(spotLights[j].direction, -slDir);
+            float denom = spotLights[j].innerCos - spotLights[j].outerCos;
+            float spotAtten = saturate((cosAngle - spotLights[j].outerCos) / (abs(denom) < 0.0001 ? 0.0001 : denom));
+
+            float atten = distAtten * spotAtten;
+
+            float3 halfVec = normalize(slDir + viewDir);
+
+            float nDotL = max(dot(normal, slDir), 0.0);
+            diffuse += nDotL * spotLights[j].color * color * atten;
+
+            float nDotH = max(dot(normal, halfVec), 0.0);
+            float spec = pow(nDotH, spotLights[j].specularPower);
+            specular += spec * spotLights[j].color * atten;
         }
 
         color = ambient + diffuse + specular;
