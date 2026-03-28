@@ -4,7 +4,6 @@
 #include <showcase/core/Log.h>
 #include <showcase/core/Profiler.h>
 #include <showcase/graphics/RenderContext.h>
-#include <showcase/graphics/SceneRenderer.h>
 
 #include <imgui.h>
 
@@ -46,7 +45,7 @@ void ViewportPanel::EndRender(CommandList& cmdList) {
 
 // ── ImGui ─────────────────────────────────────────────────────────
 
-void ViewportPanel::OnImGui(float fps, float deltaTime, const ShadowDebugStats& shadowStats) {
+void ViewportPanel::OnImGui(float fps, float deltaTime) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
     if (ImGui::Begin("Viewport")) {
@@ -88,35 +87,6 @@ void ViewportPanel::OnImGui(float fps, float deltaTime, const ShadowDebugStats& 
                                     ImVec2(textPos.x + textSize.x + padding.x, textPos.y + textSize.y + padding.y),
                                     IM_COL32(0, 0, 0, 128), 4.0f);
             drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), fpsText);
-        }
-
-        // Shadow debug info overlay (bottom-left of viewport)
-        if (m_showShadowInfo) {
-            ImDrawList* drawList = ImGui::GetWindowDrawList();
-            char shadowText[256];
-            if (shadowStats.active) {
-                snprintf(shadowText, sizeof(shadowText),
-                         "Shadow Map (%u x %u)\n"
-                         "Dir: (%.2f, %.2f, %.2f)\n"
-                         "Dist: %.1f m\n"
-                         "Frustum: %.1f x %.1f m\n"
-                         "Depth: [%.1f, %.1f]\n"
-                         "Texels/m: %.1f\n"
-                         "Bias: %.4f",
-                         shadowStats.resolution, shadowStats.resolution, shadowStats.lightDirection.x,
-                         shadowStats.lightDirection.y, shadowStats.lightDirection.z, shadowStats.shadowDistance,
-                         shadowStats.frustumWidth, shadowStats.frustumHeight, shadowStats.frustumNear,
-                         shadowStats.frustumFar, shadowStats.texelsPerMeter, shadowStats.shadowBias);
-            } else {
-                snprintf(shadowText, sizeof(shadowText), "Shadow: Inactive");
-            }
-            ImVec2 textSize = ImGui::CalcTextSize(shadowText);
-            ImVec2 padding(6, 4);
-            ImVec2 textPos(m_imageMin.x + 10, m_imageMax.y - textSize.y - 10);
-            drawList->AddRectFilled(ImVec2(textPos.x - padding.x, textPos.y - padding.y),
-                                    ImVec2(textPos.x + textSize.x + padding.x, textPos.y + textSize.y + padding.y),
-                                    IM_COL32(0, 0, 0, 128), 4.0f);
-            drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), shadowText);
         }
     }
 

@@ -60,11 +60,6 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
         return enabled ? "V-Sync enabled" : "V-Sync disabled";
     });
 
-    m_console.RegisterCommand("shadow_info", [this](const std::string&) -> std::string {
-        m_viewport.ToggleShowShadowInfo();
-        return m_viewport.GetShowShadowInfo() ? "Shadow info overlay enabled" : "Shadow info overlay disabled";
-    });
-
     m_console.RegisterCommand("shadow_frustum", [this](const std::string&) -> std::string {
         m_viewport.ToggleShowShadowFrustum();
         return m_viewport.GetShowShadowFrustum() ? "Shadow frustum wireframe enabled"
@@ -181,7 +176,6 @@ void EditorApp::SaveEditorConfig() {
     // Viewport settings
     auto vp = doc["viewport"];
     vp["showFPS"].Set(m_viewport.GetShowFPS());
-    vp["showShadowInfo"].Set(m_viewport.GetShowShadowInfo());
     vp["showShadowFrustum"].Set(m_viewport.GetShowShadowFrustum());
     vp["showShadowOverlay"].Set(m_viewport.GetShowShadowOverlay());
     vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
@@ -219,9 +213,6 @@ void EditorApp::LoadEditorConfig() {
     auto vp = doc["viewport"];
     if (vp.Contains("showFPS")) {
         m_viewport.SetShowFPS(vp["showFPS"].GetBool());
-    }
-    if (vp.Contains("showShadowInfo")) {
-        m_viewport.SetShowShadowInfo(vp["showShadowInfo"].GetBool());
     }
     if (vp.Contains("showShadowFrustum")) {
         m_viewport.SetShowShadowFrustum(vp["showShadowFrustum"].GetBool());
@@ -813,7 +804,7 @@ int EditorApp::Run() {
             // Create full-screen DockSpace
             ImGui::DockSpaceOverViewport(dockspaceId, ImGui::GetMainViewport());
 
-            m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime(), m_sceneRenderer.GetShadowDebugStats());
+            m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime());
             m_editorController.RenderUI(m_scene, m_viewport);
             m_console.Render();
 

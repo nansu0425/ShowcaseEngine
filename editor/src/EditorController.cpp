@@ -838,6 +838,36 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                     ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(sz, sz));
                                 }
                             }
+
+                            ImGui::Spacing();
+                            ImGui::Text("Debug Visualization");
+                            if (m_renderer) {
+                                if (ImGui::CollapsingHeader("Shadow Info")) {
+                                    const ShadowDebugStats& stats = m_renderer->GetShadowDebugStats();
+                                    if (stats.active) {
+                                        ImGui::Text("Resolution: %u x %u", stats.resolution, stats.resolution);
+                                        ImGui::Text("Direction: (%.2f, %.2f, %.2f)", stats.lightDirection.x,
+                                                    stats.lightDirection.y, stats.lightDirection.z);
+                                        ImGui::Text("Distance: %.1f m", stats.shadowDistance);
+                                        ImGui::Text("Frustum: %.1f x %.1f m", stats.frustumWidth, stats.frustumHeight);
+                                        ImGui::Text("Depth: [%.1f, %.1f]", stats.frustumNear, stats.frustumFar);
+                                        ImGui::Text("Texels/m: %.1f", stats.texelsPerMeter);
+                                        ImGui::Text("Bias: %.4f", stats.shadowBias);
+                                    } else {
+                                        ImGui::TextDisabled("Shadow inactive");
+                                    }
+                                }
+                            }
+                            {
+                                bool showFrustum = viewport.GetShowShadowFrustum();
+                                if (ImGui::Checkbox("Shadow Frustum", &showFrustum)) {
+                                    viewport.SetShowShadowFrustum(showFrustum);
+                                }
+                                bool showOverlay = viewport.GetShowShadowOverlay();
+                                if (ImGui::Checkbox("Shadow Coverage", &showOverlay)) {
+                                    viewport.SetShowShadowOverlay(showOverlay);
+                                }
+                            }
                         }
 
                         ImGui::TextDisabled("Direction controlled by object rotation");
@@ -1038,42 +1068,6 @@ void EditorController::RenderToolbar(ViewportPanel& viewport) {
                     camera.GetPosition().z);
         ImGui::SliderFloat("Move Speed", &viewport.cameraMoveSpeed, 1.0f, 50.0f);
         ImGui::SliderFloat("Look Sensitivity", &viewport.cameraLookSpeed, 0.001f, 0.01f);
-        ImGui::EndPopup();
-    }
-
-    // ── View options (right-aligned) ─────────────────────────────
-    ImGui::SameLine();
-    float viewBtnWidth = ImGui::CalcTextSize("View").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - viewBtnWidth - 6.0f);
-
-    if (ImGui::Button("View")) {
-        ImGui::OpenPopup("ViewOptions");
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Viewport display options");
-    }
-
-    if (ImGui::BeginPopup("ViewOptions")) {
-        bool showFPS = viewport.GetShowFPS();
-        if (ImGui::MenuItem("FPS Overlay", nullptr, showFPS)) {
-            viewport.SetShowFPS(!showFPS);
-        }
-
-        bool showShadowInfo = viewport.GetShowShadowInfo();
-        if (ImGui::MenuItem("Shadow Info", nullptr, showShadowInfo)) {
-            viewport.SetShowShadowInfo(!showShadowInfo);
-        }
-
-        bool showShadowFrustum = viewport.GetShowShadowFrustum();
-        if (ImGui::MenuItem("Shadow Frustum", nullptr, showShadowFrustum)) {
-            viewport.SetShowShadowFrustum(!showShadowFrustum);
-        }
-
-        bool showShadowOverlay = viewport.GetShowShadowOverlay();
-        if (ImGui::MenuItem("Shadow Coverage", nullptr, showShadowOverlay)) {
-            viewport.SetShowShadowOverlay(!showShadowOverlay);
-        }
-
         ImGui::EndPopup();
     }
 }
