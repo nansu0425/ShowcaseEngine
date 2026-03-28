@@ -762,6 +762,33 @@ void SceneRenderer::Init(RenderContext& ctx) {
         m_cubemapFaceOverlayPSO = PipelineState::CreateGraphicsPSO(device, faceOverlayDesc);
     }
 
+    // Depth precision heatmap overlay (shares root signature with cubemap face overlay)
+    {
+        D3D12_SHADER_BYTECODE heatmapPs =
+            ctx.GetShaderManager().LoadShader("shaders/point_shadow_depth_heatmap_ps_ps.cso");
+
+        GraphicsPipelineDesc heatmapDesc;
+        heatmapDesc.rootSignature = m_cubemapFaceOverlayRootSig.Get();
+        heatmapDesc.vertexShader = ctx.GetShaderManager().LoadShader("shaders/outline_vs_vs.cso");
+        heatmapDesc.pixelShader = heatmapPs;
+        heatmapDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        heatmapDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+
+        heatmapDesc.blendState.RenderTarget[0].BlendEnable = TRUE;
+        heatmapDesc.blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        heatmapDesc.blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        heatmapDesc.blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        heatmapDesc.blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+        heatmapDesc.blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        heatmapDesc.blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+        heatmapDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        heatmapDesc.depthStencilState.DepthEnable = FALSE;
+        heatmapDesc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+        m_depthHeatmapOverlayPSO = PipelineState::CreateGraphicsPSO(device, heatmapDesc);
+    }
+
     // Cubemap face preview (point shadow depth-to-grayscale for inspector cross layout)
     {
         D3D12_SHADER_BYTECODE cubemapPreviewPs = ctx.GetShaderManager().LoadShader("shaders/cubemap_preview_ps_ps.cso");
@@ -821,6 +848,7 @@ void SceneRenderer::Shutdown() {
     m_shadowOverlayRootSig.Reset();
     m_pointShadowOverlayPSO.Reset();
     m_pointShadowOverlayRootSig.Reset();
+    m_depthHeatmapOverlayPSO.Reset();
     m_shadowPreviewPSO.Reset();
     m_shadowPreviewRootSig.Reset();
     m_shadowPSO.Reset();
@@ -1654,6 +1682,72 @@ void SceneRenderer::RenderCubemapFaceOverlay(RenderContext& ctx, Camera& camera,
     Matrix invVP = vp.Invert();
 
     struct FaceOverlayParams {
+        Matrix invViewProjection;
+        float lightPosition[3];
+        float lightRange;
+        float overlayAlpha;
+        float _pad0[3];
+    } params;
+    params.invViewProjection = invVP;
+    params.lightPosition[0] = m_pointShadowPositions[shadowIndex].x;
+    params.lightPosition[1] = m_pointShadowPositions[shadowIndex].y;
+    params.lightPosition[2] = m_pointShadowPositions[shadowIndex].z;
+    params.lightRange = m_pointShadowRanges[shadowIndex];
+    params.overlayAlpha = 0.35f;
+    params._pad0[0] = 0.0f;
+    params._pad0[1] = 0.0f;
+    params._pad0[2] = 0.0f;
+
+    cmdList->SetGraphicsRoot32BitConstants(0, 24, &params, 0);
+
+    ID3D12DescriptorHeap* heaps[] = {ctx.GetSrvHeap().GetHeap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+    cmdList->SetGraphicsRootDescriptorTable(1, sceneDepthBuffer.GetSRV().gpu);
+
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    // Transition scene depth buffer back: PIXEL_SHADER_RESOURCE -> DEPTH_WRITE
+    barrier.Transition.StateBefore =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    cmdList->ResourceBarrier(1, &barrier);
+}
+
+void SceneRenderer::RenderDepthHeatmapOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                              DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height,
+                                              int shadowIndex) {
+    if (shadowIndex < 0 || shadowIndex >= m_numPointShadowLights)
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Transition scene depth buffer: DEPTH_WRITE -> PIXEL_SHADER_RESOURCE
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = sceneDepthBuffer.GetResource();
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    barrier.Transition.StateAfter =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    // Bind RTV only (no depth test needed)
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_cubemapFaceOverlayRootSig.Get());
+    cmdList->SetPipelineState(m_depthHeatmapOverlayPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Root constants: invViewProjection + point light params
+    Matrix vp = camera.GetViewMatrix() * camera.GetProjectionMatrix();
+    Matrix invVP = vp.Invert();
+
+    struct DepthHeatmapParams {
         Matrix invViewProjection;
         float lightPosition[3];
         float lightRange;

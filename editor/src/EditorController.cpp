@@ -911,6 +911,12 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                     viewport.SetShowCubemapFaceOverlay(showFaceOverlay);
                                 }
                             }
+                            {
+                                bool showHeatmap = viewport.GetShowDepthHeatmapOverlay();
+                                if (ImGui::Checkbox("Depth Precision Heatmap", &showHeatmap)) {
+                                    viewport.SetShowDepthHeatmapOverlay(showHeatmap);
+                                }
+                            }
                             int shadowIdx = m_renderer ? m_renderer->GetPointShadowIndex(selected->id) : -1;
                             if (m_renderer && ImGui::CollapsingHeader("Point Shadow Info")) {
                                 Vector3 pos = selected->position;

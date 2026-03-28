@@ -57,6 +57,10 @@ public:
     bool GetShowCubemapFaceOverlay() const { return m_showCubemapFaceOverlay; }
     void SetShowCubemapFaceOverlay(bool show) { m_showCubemapFaceOverlay = show; }
 
+    void ToggleShowDepthHeatmapOverlay() { m_showDepthHeatmapOverlay = !m_showDepthHeatmapOverlay; }
+    bool GetShowDepthHeatmapOverlay() const { return m_showDepthHeatmapOverlay; }
+    void SetShowDepthHeatmapOverlay(bool show) { m_showDepthHeatmapOverlay = show; }
+
     ViewMode GetViewMode() const { return m_viewMode; }
     void SetViewMode(ViewMode mode) { m_viewMode = mode; }
 
@@ -85,6 +89,7 @@ private:
     bool m_showShadowOverlay = false;
     bool m_showPointShadowOverlay = false;
     bool m_showCubemapFaceOverlay = false;
+    bool m_showDepthHeatmapOverlay = false;
     ViewMode m_viewMode = static_cast<ViewMode>(0); // ViewMode::Lit
     ToolbarCallback m_toolbarCallback;
 

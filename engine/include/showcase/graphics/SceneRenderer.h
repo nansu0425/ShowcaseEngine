@@ -116,6 +116,11 @@ public:
     void RenderCubemapFaceOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                                   DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
 
+    /// Renders depth precision heatmap overlay (green=close/good, red=far/poor, magenta=danger zone).
+    /// Call between Render() and viewport EndRender() while scene depth is populated.
+    void RenderDepthHeatmapOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                   DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
+
     void RenderCubemapPreview(RenderContext& ctx, int shadowIndex);
     D3D12_GPU_DESCRIPTOR_HANDLE GetCubemapPreviewFaceSRV(uint32_t face) const;
     bool IsCubemapPreviewReady() const { return m_cubemapPreviewRendered; }
@@ -187,6 +192,9 @@ private:
     // Cubemap face ID overlay
     ComPtr<ID3D12RootSignature> m_cubemapFaceOverlayRootSig;
     ComPtr<ID3D12PipelineState> m_cubemapFaceOverlayPSO;
+
+    // Depth precision heatmap overlay (shares root sig with cubemap face overlay)
+    ComPtr<ID3D12PipelineState> m_depthHeatmapOverlayPSO;
 
     // Cubemap face preview (point shadow depth-to-grayscale)
     RenderTarget m_cubemapPreviewRT[6];
