@@ -128,8 +128,8 @@ static void DrawDirectionalLightGizmo(const SceneObject& obj, const Matrix& view
     drawList->PopClipRect();
 }
 
-static void DrawPointLightGizmo(const SceneObject& obj, const Matrix& viewProj, const ImVec2& vpMin,
-                                const ImVec2& vpMax, ImDrawList* drawList) {
+static void DrawPointLightCenterDot(const SceneObject& obj, const Matrix& viewProj, const ImVec2& vpMin,
+                                    const ImVec2& vpMax, ImDrawList* drawList) {
     const Vector3 pos = obj.position;
 
     Vector4 clip = Vector4::Transform(Vector4(pos.x, pos.y, pos.z, 1.0f), viewProj);
@@ -137,33 +137,12 @@ static void DrawPointLightGizmo(const SceneObject& obj, const Matrix& viewProj, 
         return;
 
     constexpr ImU32 kColor = IM_COL32(100, 200, 255, 255);
-    constexpr ImU32 kRingColor = IM_COL32(100, 200, 255, 120);
-    constexpr float kLineThickness = 2.0f;
-    constexpr int kCircleSegments = 24;
 
     drawList->PushClipRect(vpMin, vpMax, true);
 
-    // Center filled circle
     ImVec2 sCenter;
     if (WorldToScreen(pos, viewProj, vpMin, vpMax, sCenter))
         drawList->AddCircleFilled(sCenter, 6.0f, kColor);
-
-    // Range sphere wireframe: 3 orthogonal rings
-    float range = obj.lightComp->range;
-    Vector3 axes[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-    Vector3 perps[3] = {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}};
-
-    for (int ring = 0; ring < 3; ++ring) {
-        Vector3 u = axes[ring];
-        Vector3 v = perps[ring];
-        for (int i = 0; i < kCircleSegments; ++i) {
-            float a0 = kTwoPi * static_cast<float>(i) / kCircleSegments;
-            float a1 = kTwoPi * static_cast<float>(i + 1) / kCircleSegments;
-            Vector3 p0 = pos + u * std::cos(a0) * range + v * std::sin(a0) * range;
-            Vector3 p1 = pos + u * std::cos(a1) * range + v * std::sin(a1) * range;
-            DrawLine3D(p0, p1, viewProj, vpMin, vpMax, drawList, kRingColor, kLineThickness);
-        }
-    }
 
     drawList->PopClipRect();
 }
@@ -262,6 +241,8 @@ static void DrawSpotLightGizmo(const SceneObject& obj, const Matrix& viewProj, c
 
 void EditorController::Update(const EditorUpdateDesc& desc) {
     SE_ZONE_SCOPED_C(profile::kColorUpdate);
+    desc.renderer->ClearPointLightGizmo();
+
     const Input& input = *desc.input;
     Scene& scene = *desc.scene;
     SceneRenderer& renderer = *desc.renderer;
@@ -319,6 +300,14 @@ void EditorController::Update(const EditorUpdateDesc& desc) {
         }
         if (input.IsKeyDown(Key::kControl) && input.IsKeyPressed('D') && m_selectedObjectId > 0) {
             DuplicateSelectedObject(scene);
+        }
+    }
+
+    // Set point light gizmo data for GPU rendering (must happen before render phase)
+    if (m_selectedObjectId >= 0) {
+        SceneObject* selected = scene.FindById(static_cast<uint32_t>(m_selectedObjectId));
+        if (selected && selected->HasLight() && selected->lightComp->type == LightType::Point) {
+            renderer.SetPointLightGizmo(selected->position, selected->lightComp->range);
         }
     }
 }
@@ -469,7 +458,7 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                 if (selected->lightComp->type == LightType::Directional) {
                     DrawDirectionalLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
                 } else if (selected->lightComp->type == LightType::Point) {
-                    DrawPointLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
+                    DrawPointLightCenterDot(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
                 } else if (selected->lightComp->type == LightType::Spot) {
                     DrawSpotLightGizmo(*selected, vp, m_viewportMin, m_viewportMax, vpWindow->DrawList);
                 }

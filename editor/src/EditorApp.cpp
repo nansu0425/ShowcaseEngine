@@ -752,6 +752,12 @@ int EditorApp::Run() {
                                                     ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer().GetDSV(),
                                                     ot.GetWidth(), ot.GetHeight());
             }
+            {
+                auto& ot = m_viewport.GetOffscreenTarget();
+                m_sceneRenderer.RenderPointLightGizmo(m_renderContext, m_viewport.GetCamera(),
+                                                      ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer().GetDSV(),
+                                                      ot.GetWidth(), ot.GetHeight());
+            }
             if (m_viewport.GetShowShadowOverlay()) {
                 auto& ot = m_viewport.GetOffscreenTarget();
                 m_sceneRenderer.RenderShadowOverlay(m_renderContext, m_viewport.GetCamera(),

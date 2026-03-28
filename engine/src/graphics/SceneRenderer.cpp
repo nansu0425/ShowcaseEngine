@@ -572,6 +572,41 @@ void SceneRenderer::Init(RenderContext& ctx) {
             PipelineState::CreateGraphicsPSO(device, makeFrustumDesc(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE));
     }
 
+    // Point light gizmo (depth-tested wireframe rings)
+    {
+        D3D12_SHADER_BYTECODE gizmoVs = ctx.GetShaderManager().LoadShader("shaders/light_gizmo_vs_vs.cso");
+        D3D12_SHADER_BYTECODE gizmoPs = ctx.GetShaderManager().LoadShader("shaders/frustum_debug_ps_ps.cso");
+
+        m_lightGizmoRootSig = RootSignatureBuilder()
+                                  .AddConstants({28, 0}) // 28 DWORDs at b0
+                                  .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                                  .Build(device);
+
+        GraphicsPipelineDesc desc;
+        desc.rootSignature = m_lightGizmoRootSig.Get();
+        desc.vertexShader = gizmoVs;
+        desc.pixelShader = gizmoPs;
+        desc.primitiveTopology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+
+        desc.blendState.RenderTarget[0].BlendEnable = TRUE;
+        desc.blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        desc.blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        desc.blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        desc.blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+        desc.blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        desc.blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+        desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+
+        desc.depthStencilState.DepthEnable = TRUE;
+        desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+        desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+
+        m_lightGizmoLinePSO = PipelineState::CreateGraphicsPSO(device, desc);
+    }
+
     // Shadow map preview (depth-to-grayscale conversion for ImGui display)
     {
         D3D12_SHADER_BYTECODE previewPs = ctx.GetShaderManager().LoadShader("shaders/shadow_debug_ps_ps.cso");
@@ -685,6 +720,8 @@ void SceneRenderer::Shutdown() {
     m_frustumDebugTriPSO.Reset();
     m_frustumDebugLinePSO.Reset();
     m_frustumDebugRootSig.Reset();
+    m_lightGizmoLinePSO.Reset();
+    m_lightGizmoRootSig.Reset();
     m_pipelineState.Reset();
     m_pipelineStateDoubleSided.Reset();
     m_rootSignature.Reset();
@@ -1135,6 +1172,63 @@ void SceneRenderer::RenderShadowFrustum(RenderContext& ctx, Camera& camera, D3D1
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
     cmdList->SetGraphicsRoot32BitConstants(0, 53, &constants, 0);
     cmdList->DrawInstanced(24, 1, 0, 0);
+}
+
+void SceneRenderer::SetPointLightGizmo(const Vector3& center, float range) {
+    m_pointLightGizmo = {center, range, true};
+}
+
+void SceneRenderer::ClearPointLightGizmo() {
+    m_pointLightGizmo.valid = false;
+}
+
+void SceneRenderer::RenderPointLightGizmo(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                          D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height) {
+    if (!m_pointLightGizmo.valid)
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+    D3D12_VIEWPORT vp = {0, 0, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    cmdList->RSSetViewports(1, &vp);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_lightGizmoRootSig.Get());
+
+    // Root constants: VP(16) + color(4) + centerAndRange(4) + viewport(2) + lineWidth(1) + pad(1) = 28 DWORDs
+    struct {
+        float viewProjection[16];
+        float color[4];
+        float centerAndRange[4];
+        float viewportSize[2];
+        float lineWidthPixels;
+        float _pad;
+    } constants = {};
+
+    Matrix vpMat = camera.GetViewProjectionMatrix();
+    memcpy(constants.viewProjection, &vpMat, sizeof(float) * 16);
+
+    constants.color[0] = 0.39f; // R (100/255)
+    constants.color[1] = 0.78f; // G (200/255)
+    constants.color[2] = 1.0f;  // B (255/255)
+    constants.color[3] = 0.47f; // A (120/255)
+
+    constants.centerAndRange[0] = m_pointLightGizmo.center.x;
+    constants.centerAndRange[1] = m_pointLightGizmo.center.y;
+    constants.centerAndRange[2] = m_pointLightGizmo.center.z;
+    constants.centerAndRange[3] = m_pointLightGizmo.range;
+
+    constants.viewportSize[0] = static_cast<float>(width);
+    constants.viewportSize[1] = static_cast<float>(height);
+    constants.lineWidthPixels = 2.0f;
+
+    cmdList->SetPipelineState(m_lightGizmoLinePSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->SetGraphicsRoot32BitConstants(0, 28, &constants, 0);
+    cmdList->DrawInstanced(432, 1, 0, 0); // 3 rings x 24 segments x 6 verts/quad
 }
 
 void SceneRenderer::RenderShadowPreview(RenderContext& ctx) {

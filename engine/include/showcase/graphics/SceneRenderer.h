@@ -95,6 +95,15 @@ public:
     void RenderShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                              DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height);
 
+    /// Sets the point light gizmo data for GPU-based depth-tested wireframe rendering.
+    void SetPointLightGizmo(const Vector3& center, float range);
+    void ClearPointLightGizmo();
+
+    /// Renders point light range wireframe (3 orthogonal rings) with depth testing.
+    /// Call between Render() and viewport EndRender() while scene depth is populated.
+    void RenderPointLightGizmo(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                               D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height);
+
 private:
     static constexpr uint32_t kMaxObjects = 256;
     static constexpr int kMaxPointLights = 6;
@@ -142,6 +151,16 @@ private:
     // Shadow coverage overlay
     ComPtr<ID3D12RootSignature> m_shadowOverlayRootSig;
     ComPtr<ID3D12PipelineState> m_shadowOverlayPSO;
+
+    // Point light gizmo (depth-tested wireframe rings)
+    struct PointLightGizmoData {
+        Vector3 center;
+        float range = 0.0f;
+        bool valid = false;
+    };
+    PointLightGizmoData m_pointLightGizmo;
+    ComPtr<ID3D12RootSignature> m_lightGizmoRootSig;
+    ComPtr<ID3D12PipelineState> m_lightGizmoLinePSO;
     static constexpr uint32_t kShadowPreviewSize = 512;
     bool m_shadowPreviewRendered = false;
 
