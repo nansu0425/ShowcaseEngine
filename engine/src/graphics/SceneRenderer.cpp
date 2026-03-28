@@ -516,6 +516,41 @@ void SceneRenderer::Init(RenderContext& ctx) {
             PipelineState::CreateGraphicsPSO(device, makeFrustumDesc(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE));
     }
 
+    // Shadow map preview (depth-to-grayscale conversion for ImGui display)
+    {
+        D3D12_SHADER_BYTECODE previewPs = ctx.GetShaderManager().LoadShader("shaders/shadow_debug_ps_ps.cso");
+
+        m_shadowPreviewRootSig =
+            RootSignatureBuilder()
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .AddStaticSampler({0, 0, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                                   D3D12_TEXTURE_ADDRESS_MODE_CLAMP})
+                .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                .Build(device);
+
+        GraphicsPipelineDesc previewDesc;
+        previewDesc.rootSignature = m_shadowPreviewRootSig.Get();
+        previewDesc.vertexShader =
+            ctx.GetShaderManager().LoadShader("shaders/outline_vs_vs.cso"); // fullscreen triangle
+        previewDesc.pixelShader = previewPs;
+        previewDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        previewDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+        previewDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        previewDesc.depthStencilState.DepthEnable = FALSE;
+        previewDesc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+        m_shadowPreviewPSO = PipelineState::CreateGraphicsPSO(device, previewDesc);
+
+        float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+        if (!m_shadowPreviewRT.Init({device, allocator, &ctx.GetSrvHeap(), kShadowPreviewSize, kShadowPreviewSize,
+                                     DXGI_FORMAT_R8G8B8A8_UNORM, clearColor})) {
+            SE_LOG_ERROR("Failed to create shadow preview render target");
+            return;
+        }
+        // RenderTarget::Init() creates resource in PIXEL_SHADER_RESOURCE state,
+        // which matches the first RenderShadowPreview() barrier (SRV -> RT). No transition needed.
+    }
+
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
@@ -525,7 +560,10 @@ void SceneRenderer::Shutdown() {
         m_objectIdRT.Shutdown(*m_srvHeap);
         m_objectIdDepth.Shutdown(*m_srvHeap);
         m_shadowMap.Shutdown(*m_srvHeap);
+        m_shadowPreviewRT.Shutdown(*m_srvHeap);
     }
+    m_shadowPreviewPSO.Reset();
+    m_shadowPreviewRootSig.Reset();
     m_shadowPSO.Reset();
     m_shadowPSODoubleSided.Reset();
     for (uint32_t i = 0; i < FrameResource::kNumFrames; ++i) {
@@ -914,6 +952,54 @@ void SceneRenderer::RenderShadowFrustum(RenderContext& ctx, Camera& camera, D3D1
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
     cmdList->SetGraphicsRoot32BitConstants(0, 53, &constants, 0);
     cmdList->DrawInstanced(24, 1, 0, 0);
+}
+
+void SceneRenderer::RenderShadowPreview(RenderContext& ctx) {
+    if (!m_hasShadow || !m_shadowPreviewRT.GetResource())
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Transition preview RT: SRV -> RENDER_TARGET
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = m_shadowPreviewRT.GetResource();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    // Clear and set render target
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_shadowPreviewRT.GetRTV();
+    float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_VIEWPORT vp = {0,    0,   static_cast<float>(kShadowPreviewSize), static_cast<float>(kShadowPreviewSize),
+                         0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(kShadowPreviewSize), static_cast<LONG>(kShadowPreviewSize)};
+    cmdList->RSSetViewports(1, &vp);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    // Draw fullscreen triangle sampling shadow map depth
+    cmdList->SetGraphicsRootSignature(m_shadowPreviewRootSig.Get());
+    cmdList->SetPipelineState(m_shadowPreviewPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    ID3D12DescriptorHeap* heaps[] = {ctx.GetSrvHeap().GetHeap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+    cmdList->SetGraphicsRootDescriptorTable(0, m_shadowMap.GetSRV().gpu);
+
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    // Transition preview RT: RENDER_TARGET -> SRV (for ImGui to read)
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    cmdList->ResourceBarrier(1, &barrier);
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE SceneRenderer::GetShadowPreviewSRV() const {
+    return m_shadowPreviewRT.GetSRVHandle().gpu;
 }
 
 void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,

@@ -71,6 +71,11 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
                                                  : "Shadow frustum wireframe disabled";
     });
 
+    m_console.RegisterCommand("shadow_map", [this](const std::string&) -> std::string {
+        m_viewport.ToggleShowShadowMap();
+        return m_viewport.GetShowShadowMap() ? "Shadow map preview enabled" : "Shadow map preview disabled";
+    });
+
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext))
         return false;
 
@@ -177,6 +182,7 @@ void EditorApp::SaveEditorConfig() {
     vp["showFPS"].Set(m_viewport.GetShowFPS());
     vp["showShadowInfo"].Set(m_viewport.GetShowShadowInfo());
     vp["showShadowFrustum"].Set(m_viewport.GetShowShadowFrustum());
+    vp["showShadowMap"].Set(m_viewport.GetShowShadowMap());
     vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
     vp["cameraLookSpeed"].Set(m_viewport.cameraLookSpeed);
 
@@ -218,6 +224,9 @@ void EditorApp::LoadEditorConfig() {
     }
     if (vp.Contains("showShadowFrustum")) {
         m_viewport.SetShowShadowFrustum(vp["showShadowFrustum"].GetBool());
+    }
+    if (vp.Contains("showShadowMap")) {
+        m_viewport.SetShowShadowMap(vp["showShadowMap"].GetBool());
     }
     if (vp.Contains("cameraMoveSpeed")) {
         m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].GetFloat();
@@ -548,6 +557,10 @@ void EditorApp::RenderMainMenuBar() {
 #else
             ImGui::MenuItem("Tracy Profiler (disabled)", nullptr, false, false);
 #endif
+            ImGui::Separator();
+            if (ImGui::MenuItem("Shadow Map Preview", nullptr, m_viewport.GetShowShadowMap())) {
+                m_viewport.ToggleShowShadowMap();
+            }
             ImGui::EndMenu();
         }
 
@@ -746,6 +759,11 @@ int EditorApp::Run() {
             // Render object IDs for GPU picking
             m_sceneRenderer.RenderObjectIds(m_renderContext, m_viewport.GetCamera(), m_scene);
 
+            // Render shadow map preview (depth-to-grayscale for ImGui panel)
+            if (m_viewport.GetShowShadowMap()) {
+                m_sceneRenderer.RenderShadowPreview(m_renderContext);
+            }
+
             // Phase 2: Render ImGui to back buffer
             float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
             m_renderContext.BeginBackBufferPass(clearColor);
@@ -788,6 +806,24 @@ int EditorApp::Run() {
             m_viewport.OnImGui(m_timer.FPS(), m_timer.DeltaTime(), m_sceneRenderer.GetShadowDebugStats());
             m_editorController.RenderUI(m_scene, m_viewport);
             m_console.Render();
+
+            if (m_viewport.GetShowShadowMap()) {
+                ImGui::SetNextWindowSize(ImVec2(530, 560), ImGuiCond_FirstUseEver);
+                if (ImGui::Begin("Shadow Map")) {
+                    auto gpuHandle = m_sceneRenderer.GetShadowPreviewSRV();
+                    if (gpuHandle.ptr != 0) {
+                        ImVec2 avail = ImGui::GetContentRegionAvail();
+                        float sz = (std::min)(avail.x, avail.y);
+                        if (sz < 64.0f)
+                            sz = 512.0f;
+                        ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(sz, sz));
+                    } else {
+                        ImGui::TextDisabled("No shadow map available");
+                    }
+                }
+                ImGui::End();
+            }
+
             m_imguiLayer.EndFrame(m_renderContext.GetCommandList());
 
             m_renderContext.EndBackBufferPass();

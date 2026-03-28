@@ -95,4 +95,5 @@ target_compile_shaders(ShowcaseEngine
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/frustum_debug_ps.hlsl
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/object_id_ps.hlsl
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/outline_ps.hlsl
+    PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shadow_debug_ps.hlsl
 )

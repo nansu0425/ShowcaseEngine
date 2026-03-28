@@ -82,6 +82,9 @@ public:
     void RenderShadowFrustum(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                              D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height);
 
+    void RenderShadowPreview(RenderContext& ctx);
+    D3D12_GPU_DESCRIPTOR_HANDLE GetShadowPreviewSRV() const;
+
 private:
     static constexpr uint32_t kMaxObjects = 256;
 
@@ -119,6 +122,12 @@ private:
     float m_cachedShadowBias = 0.001f;
     ShadowDebugStats m_shadowDebugStats;
     ShadowFrustumDebugData m_shadowFrustumDebug;
+
+    // Shadow map preview (depth-to-grayscale conversion)
+    RenderTarget m_shadowPreviewRT;
+    ComPtr<ID3D12RootSignature> m_shadowPreviewRootSig;
+    ComPtr<ID3D12PipelineState> m_shadowPreviewPSO;
+    static constexpr uint32_t kShadowPreviewSize = 512;
 
     void RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj);
 
