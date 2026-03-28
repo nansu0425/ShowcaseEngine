@@ -806,6 +806,12 @@ int EditorApp::Run() {
                 m_sceneRenderer.RenderShadowPreview(m_renderContext);
             }
 
+            // Render cubemap face preview (point shadow depth-to-grayscale for inspector)
+            if (m_editorController.NeedsCubemapPreview()) {
+                m_sceneRenderer.RenderCubemapPreview(m_renderContext,
+                                                     m_editorController.GetCubemapPreviewShadowIndex());
+            }
+
             // Phase 2: Render ImGui to back buffer
             float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
             m_renderContext.BeginBackBufferPass(clearColor);

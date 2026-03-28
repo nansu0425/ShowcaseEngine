@@ -116,6 +116,10 @@ public:
     void RenderCubemapFaceOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                                   DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
 
+    void RenderCubemapPreview(RenderContext& ctx, int shadowIndex);
+    D3D12_GPU_DESCRIPTOR_HANDLE GetCubemapPreviewFaceSRV(uint32_t face) const;
+    bool IsCubemapPreviewReady() const { return m_cubemapPreviewRendered; }
+
     void SetViewMode(ViewMode mode) { m_viewMode = mode; }
     ViewMode GetViewMode() const { return m_viewMode; }
 
@@ -183,6 +187,13 @@ private:
     // Cubemap face ID overlay
     ComPtr<ID3D12RootSignature> m_cubemapFaceOverlayRootSig;
     ComPtr<ID3D12PipelineState> m_cubemapFaceOverlayPSO;
+
+    // Cubemap face preview (point shadow depth-to-grayscale)
+    RenderTarget m_cubemapPreviewRT[6];
+    ComPtr<ID3D12RootSignature> m_cubemapPreviewRootSig;
+    ComPtr<ID3D12PipelineState> m_cubemapPreviewPSO;
+    static constexpr uint32_t kCubemapPreviewFaceSize = 128;
+    bool m_cubemapPreviewRendered = false;
 
     // Point light gizmo (depth-tested wireframe rings)
     struct PointLightGizmoData {

@@ -36,6 +36,8 @@ public:
     void SetSelection(uint32_t id) { m_selectedObjectId = static_cast<int>(id); }
 
     bool NeedsShadowPreview() const { return m_needsShadowPreview; }
+    bool NeedsCubemapPreview() const { return m_needsCubemapPreview; }
+    int GetCubemapPreviewShadowIndex() const { return m_cubemapPreviewShadowIndex; }
 
     PrimitiveHighlight GetPrimitiveHighlight() const {
         return {m_selectedObjectId, m_hoveredMeshIdx, m_hoveredPrimIdx};
@@ -98,6 +100,8 @@ private:
     CommandHistory* m_commandHistory = nullptr;
     SceneRenderer* m_renderer = nullptr;
     bool m_needsShadowPreview = false;
+    bool m_needsCubemapPreview = false;
+    int m_cubemapPreviewShadowIndex = -1;
 
     // Gizmo drag coalescing
     bool m_gizmoDragging = false;

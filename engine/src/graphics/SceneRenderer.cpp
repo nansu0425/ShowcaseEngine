@@ -762,6 +762,44 @@ void SceneRenderer::Init(RenderContext& ctx) {
         m_cubemapFaceOverlayPSO = PipelineState::CreateGraphicsPSO(device, faceOverlayDesc);
     }
 
+    // Cubemap face preview (point shadow depth-to-grayscale for inspector cross layout)
+    {
+        D3D12_SHADER_BYTECODE cubemapPreviewPs = ctx.GetShaderManager().LoadShader("shaders/cubemap_preview_ps_ps.cso");
+
+        m_cubemapPreviewRootSig =
+            RootSignatureBuilder()
+                .AddConstants({4, 0})                                    // slot 0: 4 DWORDs at b0
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, // slot 1: cubemap SRV t0
+                                     0, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .AddStaticSampler({0, 0, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                                   D3D12_TEXTURE_ADDRESS_MODE_CLAMP})
+                .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                .Build(device);
+
+        GraphicsPipelineDesc previewDesc;
+        previewDesc.rootSignature = m_cubemapPreviewRootSig.Get();
+        previewDesc.vertexShader = ctx.GetShaderManager().LoadShader("shaders/outline_vs_vs.cso");
+        previewDesc.pixelShader = cubemapPreviewPs;
+        previewDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        previewDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+        previewDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        previewDesc.depthStencilState.DepthEnable = FALSE;
+        previewDesc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+        m_cubemapPreviewPSO = PipelineState::CreateGraphicsPSO(device, previewDesc);
+
+        float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+        for (uint32_t i = 0; i < 6; ++i) {
+            if (!m_cubemapPreviewRT[i].Init({device, allocator, &ctx.GetSrvHeap(), kCubemapPreviewFaceSize,
+                                             kCubemapPreviewFaceSize, DXGI_FORMAT_R8G8B8A8_UNORM, clearColor})) {
+                SE_LOG_ERROR("Failed to create cubemap preview RT face {}", i);
+                return;
+            }
+            std::wstring name = L"CubemapPreview RT Face " + std::to_wstring(i);
+            m_cubemapPreviewRT[i].GetResource()->SetName(name.c_str());
+        }
+    }
+
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
@@ -774,7 +812,11 @@ void SceneRenderer::Shutdown() {
         for (int i = 0; i < kMaxPointLights; ++i)
             m_pointShadowMaps[i].Shutdown(*m_srvHeap);
         m_shadowPreviewRT.Shutdown(*m_srvHeap);
+        for (int i = 0; i < 6; ++i)
+            m_cubemapPreviewRT[i].Shutdown(*m_srvHeap);
     }
+    m_cubemapPreviewPSO.Reset();
+    m_cubemapPreviewRootSig.Reset();
     m_shadowOverlayPSO.Reset();
     m_shadowOverlayRootSig.Reset();
     m_pointShadowOverlayPSO.Reset();
@@ -1367,6 +1409,81 @@ void SceneRenderer::RenderShadowPreview(RenderContext& ctx) {
 
 D3D12_GPU_DESCRIPTOR_HANDLE SceneRenderer::GetShadowPreviewSRV() const {
     return m_shadowPreviewRT.GetSRVHandle().gpu;
+}
+
+void SceneRenderer::RenderCubemapPreview(RenderContext& ctx, int shadowIndex) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+    m_cubemapPreviewRendered = false;
+
+    if (shadowIndex < 0 || shadowIndex >= m_numPointShadowLights)
+        return;
+    if (!m_cubemapPreviewRT[0].GetResource())
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Batch-transition all 6 preview RTs: SRV -> RENDER_TARGET
+    D3D12_RESOURCE_BARRIER barriers[6] = {};
+    for (uint32_t i = 0; i < 6; ++i) {
+        barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[i].Transition.pResource = m_cubemapPreviewRT[i].GetResource();
+        barriers[i].Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[i].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barriers[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    }
+    cmdList->ResourceBarrier(6, barriers);
+
+    // Set shared state once
+    cmdList->SetGraphicsRootSignature(m_cubemapPreviewRootSig.Get());
+    cmdList->SetPipelineState(m_cubemapPreviewPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    ID3D12DescriptorHeap* heaps[] = {ctx.GetSrvHeap().GetHeap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+    cmdList->SetGraphicsRootDescriptorTable(1, m_pointShadowMaps[shadowIndex].GetSRV().gpu);
+
+    D3D12_VIEWPORT vp = {
+        0, 0, static_cast<float>(kCubemapPreviewFaceSize), static_cast<float>(kCubemapPreviewFaceSize), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(kCubemapPreviewFaceSize), static_cast<LONG>(kCubemapPreviewFaceSize)};
+    cmdList->RSSetViewports(1, &vp);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    // Render each face
+    struct CubemapPreviewConstants {
+        uint32_t faceIndex;
+        float nearZ;
+        float farZ;
+        uint32_t _pad;
+    };
+
+    for (uint32_t face = 0; face < 6; ++face) {
+        D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_cubemapPreviewRT[face].GetRTV();
+        float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+        cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+        cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+        CubemapPreviewConstants constants;
+        constants.faceIndex = face;
+        constants.nearZ = kPointShadowNearZ;
+        constants.farZ = m_pointShadowRanges[shadowIndex];
+        constants._pad = 0;
+        cmdList->SetGraphicsRoot32BitConstants(0, 4, &constants, 0);
+
+        cmdList->DrawInstanced(3, 1, 0, 0);
+    }
+
+    // Batch-transition all 6 RTs back: RENDER_TARGET -> SRV
+    for (uint32_t i = 0; i < 6; ++i) {
+        barriers[i].Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barriers[i].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+    cmdList->ResourceBarrier(6, barriers);
+
+    m_cubemapPreviewRendered = true;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE SceneRenderer::GetCubemapPreviewFaceSRV(uint32_t face) const {
+    return m_cubemapPreviewRT[face].GetSRVHandle().gpu;
 }
 
 void SceneRenderer::RenderShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,

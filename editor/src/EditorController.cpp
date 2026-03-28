@@ -368,6 +368,8 @@ static void RenderPrimitiveDetails(const MeshPrimitive& prim) {
 void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
     SE_ZONE_SCOPED_C(profile::kColorImGui);
     m_needsShadowPreview = false;
+    m_needsCubemapPreview = false;
+    m_cubemapPreviewShadowIndex = -1;
     Camera& camera = viewport.GetCamera();
 
     ImGuizmo::BeginFrame();
@@ -909,12 +911,12 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                     viewport.SetShowCubemapFaceOverlay(showFaceOverlay);
                                 }
                             }
+                            int shadowIdx = m_renderer ? m_renderer->GetPointShadowIndex(selected->id) : -1;
                             if (m_renderer && ImGui::CollapsingHeader("Point Shadow Info")) {
                                 Vector3 pos = selected->position;
                                 float range = light.range;
                                 uint32_t res = SceneRenderer::GetPointShadowResolution();
                                 float nearZ = SceneRenderer::GetPointShadowNearZ();
-                                int shadowIdx = m_renderer->GetPointShadowIndex(selected->id);
                                 float texelDensity = (range > 0.0f) ? static_cast<float>(res) / range : 0.0f;
 
                                 ImGui::Text("Position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
@@ -928,6 +930,56 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                 else
                                     ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1),
                                                        "Shadow index: -1 (slot limit reached)");
+                            }
+
+                            if (m_renderer && shadowIdx >= 0) {
+                                m_needsCubemapPreview = true;
+                                m_cubemapPreviewShadowIndex = shadowIdx;
+
+                                if (m_renderer->IsCubemapPreviewReady()) {
+                                    ImGui::Spacing();
+                                    if (ImGui::CollapsingHeader("Cubemap Depth Preview")) {
+                                        float availWidth = ImGui::GetContentRegionAvail().x;
+                                        float cellSize = (availWidth > 64.0f) ? (availWidth / 4.0f) : 32.0f;
+                                        ImVec2 faceSize(cellSize, cellSize);
+
+                                        static const char* faceLabels[] = {"+X", "-X", "+Y", "-Y", "+Z", "-Z"};
+
+                                        // Cross layout: face index, column, row
+                                        struct FaceLayout {
+                                            int face;
+                                            int col;
+                                            int row;
+                                        };
+                                        static const FaceLayout layout[] = {
+                                            {2, 1, 0}, // +Y top
+                                            {1, 0, 1}, // -X left
+                                            {4, 1, 1}, // +Z center
+                                            {0, 2, 1}, // +X right
+                                            {3, 1, 2}, // -Y bottom
+                                            {5, 1, 3}, // -Z very bottom
+                                        };
+
+                                        ImVec2 origin = ImGui::GetCursorScreenPos();
+
+                                        for (const auto& fl : layout) {
+                                            ImVec2 pos(origin.x + fl.col * cellSize, origin.y + fl.row * cellSize);
+                                            ImGui::SetCursorScreenPos(pos);
+
+                                            D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle =
+                                                m_renderer->GetCubemapPreviewFaceSRV(fl.face);
+                                            ImGui::Image((ImTextureID)gpuHandle.ptr, faceSize);
+
+                                            ImVec2 textPos(pos.x + 2.0f, pos.y + 2.0f);
+                                            ImGui::GetWindowDrawList()->AddText(textPos, IM_COL32(255, 255, 0, 200),
+                                                                                faceLabels[fl.face]);
+                                        }
+
+                                        // Advance cursor past the cross layout (4 rows)
+                                        ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + cellSize * 4.0f));
+                                        ImGui::Dummy(ImVec2(0, 0));
+                                    }
+                                }
                             }
                         }
 
