@@ -897,6 +897,12 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                 {"Shadow Bias", &light.shadowBias, 0.0001f, 0.0f, 0.01f, &light, &scene, selected->id});
 
                             ImGui::Spacing();
+                            {
+                                bool showPointOverlay = viewport.GetShowPointShadowOverlay();
+                                if (ImGui::Checkbox("Point Shadow Coverage", &showPointOverlay)) {
+                                    viewport.SetShowPointShadowOverlay(showPointOverlay);
+                                }
+                            }
                             if (m_renderer && ImGui::CollapsingHeader("Point Shadow Info")) {
                                 Vector3 pos = selected->position;
                                 float range = light.range;

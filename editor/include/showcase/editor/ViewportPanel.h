@@ -49,6 +49,10 @@ public:
     bool GetShowShadowOverlay() const { return m_showShadowOverlay; }
     void SetShowShadowOverlay(bool show) { m_showShadowOverlay = show; }
 
+    void ToggleShowPointShadowOverlay() { m_showPointShadowOverlay = !m_showPointShadowOverlay; }
+    bool GetShowPointShadowOverlay() const { return m_showPointShadowOverlay; }
+    void SetShowPointShadowOverlay(bool show) { m_showPointShadowOverlay = show; }
+
     ViewMode GetViewMode() const { return m_viewMode; }
     void SetViewMode(ViewMode mode) { m_viewMode = mode; }
 
@@ -75,6 +79,7 @@ private:
     bool m_showFPS = true;
     bool m_showShadowFrustum = false;
     bool m_showShadowOverlay = false;
+    bool m_showPointShadowOverlay = false;
     ViewMode m_viewMode = static_cast<ViewMode>(0); // ViewMode::Lit
     ToolbarCallback m_toolbarCallback;
 

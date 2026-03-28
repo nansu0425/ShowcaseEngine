@@ -72,6 +72,12 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
                                                  : "Shadow coverage overlay disabled";
     });
 
+    m_console.RegisterCommand("point_shadow_overlay", [this](const std::string&) -> std::string {
+        m_viewport.ToggleShowPointShadowOverlay();
+        return m_viewport.GetShowPointShadowOverlay() ? "Point shadow coverage overlay enabled"
+                                                      : "Point shadow coverage overlay disabled";
+    });
+
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext))
         return false;
 
@@ -178,6 +184,7 @@ void EditorApp::SaveEditorConfig() {
     vp["showFPS"].Set(m_viewport.GetShowFPS());
     vp["showShadowFrustum"].Set(m_viewport.GetShowShadowFrustum());
     vp["showShadowOverlay"].Set(m_viewport.GetShowShadowOverlay());
+    vp["showPointShadowOverlay"].Set(m_viewport.GetShowPointShadowOverlay());
     vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
     vp["cameraLookSpeed"].Set(m_viewport.cameraLookSpeed);
 
@@ -219,6 +226,9 @@ void EditorApp::LoadEditorConfig() {
     }
     if (vp.Contains("showShadowOverlay")) {
         m_viewport.SetShowShadowOverlay(vp["showShadowOverlay"].GetBool());
+    }
+    if (vp.Contains("showPointShadowOverlay")) {
+        m_viewport.SetShowPointShadowOverlay(vp["showPointShadowOverlay"].GetBool());
     }
     if (vp.Contains("cameraMoveSpeed")) {
         m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].GetFloat();
@@ -757,6 +767,15 @@ int EditorApp::Run() {
                 m_sceneRenderer.RenderShadowOverlay(m_renderContext, m_viewport.GetCamera(),
                                                     ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer(), ot.GetWidth(),
                                                     ot.GetHeight());
+            }
+            if (m_viewport.GetViewMode() == ViewMode::Lit && m_viewport.GetShowPointShadowOverlay()) {
+                int shadowIdx = m_sceneRenderer.GetPointShadowIndex(m_editorController.GetSelectedObjectId());
+                if (shadowIdx >= 0) {
+                    auto& ot = m_viewport.GetOffscreenTarget();
+                    m_sceneRenderer.RenderPointShadowOverlay(m_renderContext, m_viewport.GetCamera(),
+                                                             ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer(),
+                                                             ot.GetWidth(), ot.GetHeight(), shadowIdx);
+                }
             }
             m_viewport.EndRender(m_renderContext.GetCommandList());
 

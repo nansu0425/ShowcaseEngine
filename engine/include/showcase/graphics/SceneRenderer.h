@@ -106,6 +106,11 @@ public:
     void RenderShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                              DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height);
 
+    /// Renders a semi-transparent point shadow coverage overlay (red=shadowed, green=lit, blue=outside range).
+    /// Call between Render() and viewport EndRender() while scene depth is populated.
+    void RenderPointShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                  DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
+
     void SetViewMode(ViewMode mode) { m_viewMode = mode; }
     ViewMode GetViewMode() const { return m_viewMode; }
 
@@ -165,6 +170,10 @@ private:
     // Shadow coverage overlay
     ComPtr<ID3D12RootSignature> m_shadowOverlayRootSig;
     ComPtr<ID3D12PipelineState> m_shadowOverlayPSO;
+
+    // Point shadow coverage overlay
+    ComPtr<ID3D12RootSignature> m_pointShadowOverlayRootSig;
+    ComPtr<ID3D12PipelineState> m_pointShadowOverlayPSO;
 
     // Point light gizmo (depth-tested wireframe rings)
     struct PointLightGizmoData {
