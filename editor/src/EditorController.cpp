@@ -1062,6 +1062,11 @@ void EditorController::RenderToolbar(ViewportPanel& viewport) {
             viewport.SetShowShadowFrustum(!showShadowFrustum);
         }
 
+        bool showShadowOverlay = viewport.GetShowShadowOverlay();
+        if (ImGui::MenuItem("Shadow Coverage", nullptr, showShadowOverlay)) {
+            viewport.SetShowShadowOverlay(!showShadowOverlay);
+        }
+
         ImGui::EndPopup();
     }
 }

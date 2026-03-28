@@ -86,6 +86,11 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GetShadowPreviewSRV() const;
     bool IsShadowPreviewReady() const { return m_shadowPreviewRendered; }
 
+    /// Renders a semi-transparent shadow coverage overlay (red=shadowed, green=lit).
+    /// Call between Render() and viewport EndRender() while scene depth is populated.
+    void RenderShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                             DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height);
+
 private:
     static constexpr uint32_t kMaxObjects = 256;
 
@@ -128,6 +133,10 @@ private:
     RenderTarget m_shadowPreviewRT;
     ComPtr<ID3D12RootSignature> m_shadowPreviewRootSig;
     ComPtr<ID3D12PipelineState> m_shadowPreviewPSO;
+
+    // Shadow coverage overlay
+    ComPtr<ID3D12RootSignature> m_shadowOverlayRootSig;
+    ComPtr<ID3D12PipelineState> m_shadowOverlayPSO;
     static constexpr uint32_t kShadowPreviewSize = 512;
     bool m_shadowPreviewRendered = false;
 

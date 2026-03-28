@@ -553,6 +553,48 @@ void SceneRenderer::Init(RenderContext& ctx) {
         // which matches the first RenderShadowPreview() barrier (SRV -> RT). No transition needed.
     }
 
+    // Shadow coverage overlay (fullscreen pass: reconstruct world pos from depth, recompute shadow)
+    {
+        D3D12_SHADER_BYTECODE overlayPs = ctx.GetShaderManager().LoadShader("shaders/shadow_overlay_ps_ps.cso");
+
+        m_shadowOverlayRootSig =
+            RootSignatureBuilder()
+                .AddConstants({36, 0})                                   // slot 0: 36 DWORDs at b0
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, // slot 1: scene depth t0
+                                     0, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, // slot 2: shadow map t1
+                                     1, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .AddStaticSampler({0, 0, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                                   D3D12_TEXTURE_ADDRESS_MODE_CLAMP}) // s0: point clamp
+                .AddStaticSampler({1, 0,                              // s1: comparison sampler
+                                   D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                                   D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE})
+                .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                .Build(device);
+
+        GraphicsPipelineDesc overlayDesc;
+        overlayDesc.rootSignature = m_shadowOverlayRootSig.Get();
+        overlayDesc.vertexShader = ctx.GetShaderManager().LoadShader("shaders/outline_vs_vs.cso");
+        overlayDesc.pixelShader = overlayPs;
+        overlayDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        overlayDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+
+        // Alpha blending (same as outline pass)
+        overlayDesc.blendState.RenderTarget[0].BlendEnable = TRUE;
+        overlayDesc.blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        overlayDesc.blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        overlayDesc.blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        overlayDesc.blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+        overlayDesc.blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        overlayDesc.blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+        overlayDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        overlayDesc.depthStencilState.DepthEnable = FALSE;
+        overlayDesc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+        m_shadowOverlayPSO = PipelineState::CreateGraphicsPSO(device, overlayDesc);
+    }
+
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
@@ -564,6 +606,8 @@ void SceneRenderer::Shutdown() {
         m_shadowMap.Shutdown(*m_srvHeap);
         m_shadowPreviewRT.Shutdown(*m_srvHeap);
     }
+    m_shadowOverlayPSO.Reset();
+    m_shadowOverlayRootSig.Reset();
     m_shadowPreviewPSO.Reset();
     m_shadowPreviewRootSig.Reset();
     m_shadowPSO.Reset();
@@ -1009,6 +1053,70 @@ void SceneRenderer::RenderShadowPreview(RenderContext& ctx) {
 
 D3D12_GPU_DESCRIPTOR_HANDLE SceneRenderer::GetShadowPreviewSRV() const {
     return m_shadowPreviewRT.GetSRVHandle().gpu;
+}
+
+void SceneRenderer::RenderShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                        DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height) {
+    if (!m_hasShadow)
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Transition scene depth buffer: DEPTH_WRITE -> PIXEL_SHADER_RESOURCE
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = sceneDepthBuffer.GetResource();
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    barrier.Transition.StateAfter =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    // Bind RTV only (no depth test needed)
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_shadowOverlayRootSig.Get());
+    cmdList->SetPipelineState(m_shadowOverlayPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Root constants: invViewProjection, lightViewProjection, shadow params
+    Matrix vp = camera.GetViewMatrix() * camera.GetProjectionMatrix();
+    Matrix invVP = vp.Invert();
+
+    struct ShadowOverlayParams {
+        Matrix invViewProjection;
+        Matrix lightViewProjection;
+        float shadowBias;
+        float shadowMapTexelSize;
+        float overlayAlpha;
+        float _pad0;
+    } params;
+    params.invViewProjection = invVP;
+    params.lightViewProjection = m_cachedLightVP;
+    params.shadowBias = m_cachedShadowBias;
+    params.shadowMapTexelSize = 1.0f / static_cast<float>(kShadowMapResolution);
+    params.overlayAlpha = 0.35f;
+    params._pad0 = 0.0f;
+
+    cmdList->SetGraphicsRoot32BitConstants(0, 36, &params, 0);
+
+    ID3D12DescriptorHeap* heaps[] = {ctx.GetSrvHeap().GetHeap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+    cmdList->SetGraphicsRootDescriptorTable(1, sceneDepthBuffer.GetSRV().gpu);
+    cmdList->SetGraphicsRootDescriptorTable(2, m_shadowMap.GetSRV().gpu);
+
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    // Transition scene depth buffer back: PIXEL_SHADER_RESOURCE -> DEPTH_WRITE
+    barrier.Transition.StateBefore =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    cmdList->ResourceBarrier(1, &barrier);
 }
 
 void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,

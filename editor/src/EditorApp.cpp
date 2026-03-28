@@ -71,6 +71,12 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
                                                  : "Shadow frustum wireframe disabled";
     });
 
+    m_console.RegisterCommand("shadow_overlay", [this](const std::string&) -> std::string {
+        m_viewport.ToggleShowShadowOverlay();
+        return m_viewport.GetShowShadowOverlay() ? "Shadow coverage overlay enabled"
+                                                 : "Shadow coverage overlay disabled";
+    });
+
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext))
         return false;
 
@@ -177,6 +183,7 @@ void EditorApp::SaveEditorConfig() {
     vp["showFPS"].Set(m_viewport.GetShowFPS());
     vp["showShadowInfo"].Set(m_viewport.GetShowShadowInfo());
     vp["showShadowFrustum"].Set(m_viewport.GetShowShadowFrustum());
+    vp["showShadowOverlay"].Set(m_viewport.GetShowShadowOverlay());
     vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
     vp["cameraLookSpeed"].Set(m_viewport.cameraLookSpeed);
 
@@ -218,6 +225,9 @@ void EditorApp::LoadEditorConfig() {
     }
     if (vp.Contains("showShadowFrustum")) {
         m_viewport.SetShowShadowFrustum(vp["showShadowFrustum"].GetBool());
+    }
+    if (vp.Contains("showShadowOverlay")) {
+        m_viewport.SetShowShadowOverlay(vp["showShadowOverlay"].GetBool());
     }
     if (vp.Contains("cameraMoveSpeed")) {
         m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].GetFloat();
@@ -740,6 +750,12 @@ int EditorApp::Run() {
                 m_sceneRenderer.RenderShadowFrustum(m_renderContext, m_viewport.GetCamera(),
                                                     ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer().GetDSV(),
                                                     ot.GetWidth(), ot.GetHeight());
+            }
+            if (m_viewport.GetShowShadowOverlay()) {
+                auto& ot = m_viewport.GetOffscreenTarget();
+                m_sceneRenderer.RenderShadowOverlay(m_renderContext, m_viewport.GetCamera(),
+                                                    ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer(), ot.GetWidth(),
+                                                    ot.GetHeight());
             }
             m_viewport.EndRender(m_renderContext.GetCommandList());
 
