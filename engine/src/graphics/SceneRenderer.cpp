@@ -602,7 +602,8 @@ struct ShadowFrustumResult {
 };
 
 static ShadowFrustumResult ComputeDirectionalLightVP(const Vector3& lightDir, const Camera& camera,
-                                                     float shadowDistance) {
+                                                     float shadowDistance,
+                                                     const std::optional<BoundingBox>& sceneAABB = std::nullopt) {
     // Build a shadow-specific frustum with limited far plane (not the full camera far=1000m).
     // Using the full camera frustum makes the ortho projection too large, destroying depth precision.
     float shadowFar = std::min(camera.GetFarZ(), shadowDistance);
@@ -655,9 +656,44 @@ static ShadowFrustumResult ComputeDirectionalLightVP(const Vector3& lightDir, co
         maxZ = std::max(maxZ, lsCorner.z);
     }
 
-    // Extend near plane to capture shadow casters behind the camera frustum
-    float zRange = maxZ - minZ;
-    minZ -= zRange;
+    // Tighten X/Y bounds by intersecting with scene AABB in light space
+    if (sceneAABB.has_value()) {
+        Vector3 sceneCorners[8];
+        sceneAABB->GetCorners(sceneCorners);
+
+        float sMinX = FLT_MAX, sMaxX = -FLT_MAX;
+        float sMinY = FLT_MAX, sMaxY = -FLT_MAX;
+        float sMinZ = FLT_MAX, sMaxZ = -FLT_MAX;
+        for (int i = 0; i < 8; ++i) {
+            Vector3 ls = Vector3::Transform(sceneCorners[i], lightView);
+            sMinX = std::min(sMinX, ls.x);
+            sMaxX = std::max(sMaxX, ls.x);
+            sMinY = std::min(sMinY, ls.y);
+            sMaxY = std::max(sMaxY, ls.y);
+            sMinZ = std::min(sMinZ, ls.z);
+            sMaxZ = std::max(sMaxZ, ls.z);
+        }
+
+        // Intersect X/Y (tighten)
+        float iMinX = std::max(minX, sMinX);
+        float iMaxX = std::min(maxX, sMaxX);
+        float iMinY = std::max(minY, sMinY);
+        float iMaxY = std::min(maxY, sMaxY);
+
+        if (iMinX < iMaxX && iMinY < iMaxY) {
+            minX = iMinX;
+            maxX = iMaxX;
+            minY = iMinY;
+            maxY = iMaxY;
+        }
+        // Z: use scene AABB range directly — all casters/receivers are within scene AABB
+        minZ = sMinZ;
+        maxZ = sMaxZ;
+    } else {
+        // No scene AABB: conservatively extend near plane to capture shadow casters behind camera
+        float zRange = maxZ - minZ;
+        minZ -= zRange;
+    }
 
     Matrix lightProj = OrthographicOffCenterLH(minX, maxX, minY, maxY, minZ, maxZ);
 
@@ -787,7 +823,7 @@ void SceneRenderer::RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& 
         shadowDistance = ComputeAdaptiveShadowDistance(camera, *sceneAABB);
     }
 
-    auto frustum = ComputeDirectionalLightVP(dirLight->direction, camera, shadowDistance);
+    auto frustum = ComputeDirectionalLightVP(dirLight->direction, camera, shadowDistance, sceneAABB);
     m_cachedLightVP = frustum.lightViewProj;
     m_cachedShadowBias = dirLight->shadowBias;
     RenderShadowMap(ctx, scene, m_cachedLightVP);
