@@ -426,6 +426,7 @@ void SceneRenderer::Init(RenderContext& ctx) {
             SE_LOG_ERROR("Failed to create shadow map depth buffer");
             return;
         }
+        m_shadowMap.GetResource()->SetName(L"ShadowMap DepthBuffer");
         m_shadowMap.CreateSRV(device, ctx.GetSrvHeap());
 
         // Transition shadow map from initial DEPTH_WRITE to shader resource
@@ -547,6 +548,7 @@ void SceneRenderer::Init(RenderContext& ctx) {
             SE_LOG_ERROR("Failed to create shadow preview render target");
             return;
         }
+        m_shadowPreviewRT.GetResource()->SetName(L"ShadowPreview RT");
         // RenderTarget::Init() creates resource in PIXEL_SHADER_RESOURCE state,
         // which matches the first RenderShadowPreview() barrier (SRV -> RT). No transition needed.
     }
@@ -601,6 +603,7 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
             SE_LOG_ERROR("Failed to init object ID render target");
         }
     }
+    m_objectIdRT.GetResource()->SetName(L"ObjectId RT");
 
     if (m_objectIdDepth.GetResource()) {
         m_objectIdDepth.Resize(m_device, m_allocator, width, height);
@@ -609,6 +612,9 @@ void SceneRenderer::OnResize(uint32_t width, uint32_t height) {
             SE_LOG_ERROR("Failed to init object ID depth buffer");
         }
     }
+    m_objectIdDepth.GetResource()->SetName(L"ObjectId DepthBuffer");
+
+    m_objectIdNeedsInit = true;
 }
 
 // ── Shadow Mapping ──────────────────────────────────────────────────
@@ -955,6 +961,7 @@ void SceneRenderer::RenderShadowFrustum(RenderContext& ctx, Camera& camera, D3D1
 }
 
 void SceneRenderer::RenderShadowPreview(RenderContext& ctx) {
+    m_shadowPreviewRendered = false;
     if (!m_hasShadow || !m_shadowPreviewRT.GetResource())
         return;
 
@@ -996,6 +1003,8 @@ void SceneRenderer::RenderShadowPreview(RenderContext& ctx) {
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     cmdList->ResourceBarrier(1, &barrier);
+
+    m_shadowPreviewRendered = true;
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE SceneRenderer::GetShadowPreviewSRV() const {
@@ -1007,6 +1016,28 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     SE_ZONE_SCOPED_C(profile::kColorRendering);
     SE_PLOT("Scene Objects", static_cast<int64_t>(scene.GetObjects().size()));
     auto* cmdList = ctx.GetCommandList().Get();
+
+    // Initialize ObjectId resources after resize so they are valid before any
+    // descriptor table binding in this pass.
+    if (m_objectIdNeedsInit && m_objectIdRT.GetResource()) {
+        m_objectIdNeedsInit = false;
+
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_objectIdRT.GetResource();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+
+        float clearValues[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        cmdList->ClearRenderTargetView(m_objectIdRT.GetRTV(), clearValues, 0, nullptr);
+        cmdList->ClearDepthStencilView(m_objectIdDepth.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        cmdList->ResourceBarrier(1, &barrier);
+    }
 
     cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
     cmdList->SetPipelineState(m_pipelineState.Get());

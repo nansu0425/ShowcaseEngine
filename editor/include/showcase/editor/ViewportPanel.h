@@ -48,10 +48,6 @@ public:
     bool GetShowShadowFrustum() const { return m_showShadowFrustum; }
     void SetShowShadowFrustum(bool show) { m_showShadowFrustum = show; }
 
-    void ToggleShowShadowMap() { m_showShadowMap = !m_showShadowMap; }
-    bool GetShowShadowMap() const { return m_showShadowMap; }
-    void SetShowShadowMap(bool show) { m_showShadowMap = show; }
-
     float GetYaw() const { return m_yaw; }
     float GetPitch() const { return m_pitch; }
     void SetYaw(float yaw) { m_yaw = yaw; }
@@ -75,7 +71,6 @@ private:
     bool m_showFPS = true;
     bool m_showShadowInfo = false;
     bool m_showShadowFrustum = false;
-    bool m_showShadowMap = false;
     ToolbarCallback m_toolbarCallback;
 
     ImVec2 m_imageMin = {};

@@ -30,6 +30,7 @@ bool RenderContext::Init(HWND hwnd, uint32_t width, uint32_t height) {
 
     if (!m_depthBuffer.Init({device, m_device.GetAllocator(), width, height}))
         return false;
+    m_depthBuffer.GetResource()->SetName(L"BackBuffer DepthBuffer");
 
     if (!m_frameResource.Init(device))
         return false;
@@ -101,6 +102,7 @@ void RenderContext::Resize(uint32_t width, uint32_t height) {
     m_directQueue.Flush();
     m_swapChain.Resize(m_device.GetDevice(), width, height);
     m_depthBuffer.Resize(m_device.GetDevice(), m_device.GetAllocator(), width, height);
+    m_depthBuffer.GetResource()->SetName(L"BackBuffer DepthBuffer");
 }
 
 // ── Back buffer pass ─────────────────────────────────────────────────

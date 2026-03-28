@@ -267,6 +267,7 @@ void EditorController::Update(const EditorUpdateDesc& desc) {
     SceneRenderer& renderer = *desc.renderer;
     ViewportPanel& viewport = *desc.viewport;
     RenderContext& renderContext = *desc.renderContext;
+    m_renderer = desc.renderer;
 
     // Check for completed GPU pick result from previous frame
     if (m_pickPending && renderer.IsPickComplete(renderContext)) {
@@ -377,6 +378,7 @@ static void RenderPrimitiveDetails(const MeshPrimitive& prim) {
 
 void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
     SE_ZONE_SCOPED_C(profile::kColorImGui);
+    m_needsShadowPreview = false;
     Camera& camera = viewport.GetCamera();
 
     ImGuizmo::BeginFrame();
@@ -818,6 +820,17 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         if (light.castShadow) {
                             DragLightProperty(
                                 {"Shadow Bias", &light.shadowBias, 0.0001f, 0.0f, 0.01f, &light, &scene, selected->id});
+
+                            m_needsShadowPreview = true;
+                            if (m_renderer && m_renderer->IsShadowPreviewReady()) {
+                                ImGui::Spacing();
+                                if (ImGui::CollapsingHeader("Shadow Map Preview")) {
+                                    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_renderer->GetShadowPreviewSRV();
+                                    float availWidth = ImGui::GetContentRegionAvail().x;
+                                    float sz = availWidth > 64.0f ? availWidth : 128.0f;
+                                    ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(sz, sz));
+                                }
+                            }
                         }
 
                         ImGui::TextDisabled("Direction controlled by object rotation");

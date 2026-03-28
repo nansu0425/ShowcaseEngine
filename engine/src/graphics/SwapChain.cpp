@@ -91,6 +91,10 @@ void SwapChain::CreateRenderTargetViews(ID3D12Device* device) {
     for (uint32_t i = 0; i < kBufferCount; i++) {
         m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]));
 
+        wchar_t name[32];
+        swprintf_s(name, L"SwapChain BackBuffer %u", i);
+        m_backBuffers[i]->SetName(name);
+
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
         rtvDesc.Format = m_format;
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;

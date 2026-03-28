@@ -35,6 +35,8 @@ public:
     void ClearSelection() { m_selectedObjectId = -1; }
     void SetSelection(uint32_t id) { m_selectedObjectId = static_cast<int>(id); }
 
+    bool NeedsShadowPreview() const { return m_needsShadowPreview; }
+
     PrimitiveHighlight GetPrimitiveHighlight() const {
         return {m_selectedObjectId, m_hoveredMeshIdx, m_hoveredPrimIdx};
     }
@@ -94,6 +96,8 @@ private:
     ResolveModelCallback m_resolveModelCallback;
 
     CommandHistory* m_commandHistory = nullptr;
+    SceneRenderer* m_renderer = nullptr;
+    bool m_needsShadowPreview = false;
 
     // Gizmo drag coalescing
     bool m_gizmoDragging = false;

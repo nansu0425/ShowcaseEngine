@@ -84,6 +84,7 @@ public:
 
     void RenderShadowPreview(RenderContext& ctx);
     D3D12_GPU_DESCRIPTOR_HANDLE GetShadowPreviewSRV() const;
+    bool IsShadowPreviewReady() const { return m_shadowPreviewRendered; }
 
 private:
     static constexpr uint32_t kMaxObjects = 256;
@@ -128,6 +129,7 @@ private:
     ComPtr<ID3D12RootSignature> m_shadowPreviewRootSig;
     ComPtr<ID3D12PipelineState> m_shadowPreviewPSO;
     static constexpr uint32_t kShadowPreviewSize = 512;
+    bool m_shadowPreviewRendered = false;
 
     void RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj);
 
@@ -143,6 +145,7 @@ private:
     bool m_pickReady = false;
     uint64_t m_pickFenceValue = 0;
     int m_lastPickResult = -1;
+    bool m_objectIdNeedsInit = false;
 
     // Cached device pointers (non-owning)
     ID3D12Device* m_device = nullptr;
