@@ -474,6 +474,48 @@ void SceneRenderer::Init(RenderContext& ctx) {
         m_shadowPSODoubleSided = PipelineState::CreateGraphicsPSO(device, shadowPsoDescDS);
     }
 
+    // Shadow frustum debug visualization
+    {
+        D3D12_SHADER_BYTECODE frustumVs = ctx.GetShaderManager().LoadShader("shaders/frustum_debug_vs_vs.cso");
+        D3D12_SHADER_BYTECODE frustumPs = ctx.GetShaderManager().LoadShader("shaders/frustum_debug_ps_ps.cso");
+
+        m_frustumDebugRootSig = RootSignatureBuilder()
+                                    .AddConstants({53, 0}) // 53 DWORDs at b0
+                                    .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                                    .Build(device);
+
+        auto makeFrustumDesc = [&](D3D12_PRIMITIVE_TOPOLOGY_TYPE topo) {
+            GraphicsPipelineDesc desc;
+            desc.rootSignature = m_frustumDebugRootSig.Get();
+            desc.vertexShader = frustumVs;
+            desc.pixelShader = frustumPs;
+            desc.primitiveTopology = topo;
+            desc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+            desc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+
+            desc.blendState.RenderTarget[0].BlendEnable = TRUE;
+            desc.blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+            desc.blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+            desc.blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+            desc.blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+            desc.blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+            desc.blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+            desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+
+            desc.depthStencilState.DepthEnable = TRUE;
+            desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+            desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+
+            return desc;
+        };
+
+        m_frustumDebugTriPSO =
+            PipelineState::CreateGraphicsPSO(device, makeFrustumDesc(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE));
+        m_frustumDebugLinePSO =
+            PipelineState::CreateGraphicsPSO(device, makeFrustumDesc(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE));
+    }
+
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
@@ -499,6 +541,9 @@ void SceneRenderer::Shutdown() {
     }
     m_outlinePSO.Reset();
     m_outlineRootSignature.Reset();
+    m_frustumDebugTriPSO.Reset();
+    m_frustumDebugLinePSO.Reset();
+    m_frustumDebugRootSig.Reset();
     m_pipelineState.Reset();
     m_pipelineStateDoubleSided.Reset();
     m_rootSignature.Reset();
@@ -726,6 +771,7 @@ void SceneRenderer::RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& 
     SE_ZONE_SCOPED_C(profile::kColorRendering);
     m_hasShadow = false;
     m_shadowDebugStats = {};
+    m_shadowFrustumDebug = {};
 
     if (!m_shadowMapReady)
         return;
@@ -759,6 +805,79 @@ void SceneRenderer::RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& 
     m_shadowDebugStats.shadowBias = dirLight->shadowBias;
     m_shadowDebugStats.texelsPerMeter =
         frustum.width > 0.0f ? static_cast<float>(kShadowMapResolution) / frustum.width : 0.0f;
+
+    // Compute world-space frustum corners for debug visualization
+    // DX12 LH clip space: z in [0,1]
+    const Vector4 ndcCorners[8] = {
+        {-1, -1, 0, 1}, {1, -1, 0, 1}, {1, 1, 0, 1}, {-1, 1, 0, 1}, // near
+        {-1, -1, 1, 1}, {1, -1, 1, 1}, {1, 1, 1, 1}, {-1, 1, 1, 1}, // far
+    };
+    Matrix invVP = m_cachedLightVP.Invert();
+    for (int i = 0; i < 8; ++i) {
+        Vector4 world = Vector4::Transform(ndcCorners[i], invVP);
+        m_shadowFrustumDebug.corners[i] = Vector3(world.x, world.y, world.z) / world.w;
+    }
+    m_shadowFrustumDebug.valid = true;
+}
+
+void SceneRenderer::RenderShadowFrustum(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                        D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height) {
+    if (!m_shadowFrustumDebug.valid)
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Re-bind render targets (outline pass may have changed pipeline state)
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+    D3D12_VIEWPORT vp = {0, 0, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    cmdList->RSSetViewports(1, &vp);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_frustumDebugRootSig.Get());
+
+    // Root constants: VP(16) + color(4) + corners(32) + mode(1) = 53 DWORDs
+    struct {
+        float viewProjection[16];
+        float color[4];
+        float corners[32]; // 8 x float4 (xyz + pad)
+        uint32_t mode;
+    } constants = {};
+
+    Matrix vpMat = camera.GetViewProjectionMatrix();
+    memcpy(constants.viewProjection, &vpMat, sizeof(float) * 16);
+
+    for (int i = 0; i < 8; ++i) {
+        constants.corners[i * 4 + 0] = m_shadowFrustumDebug.corners[i].x;
+        constants.corners[i * 4 + 1] = m_shadowFrustumDebug.corners[i].y;
+        constants.corners[i * 4 + 2] = m_shadowFrustumDebug.corners[i].z;
+        constants.corners[i * 4 + 3] = 0.0f;
+    }
+
+    // Pass 1: Semi-transparent filled faces
+    constants.color[0] = 1.0f;
+    constants.color[1] = 0.7f;
+    constants.color[2] = 0.0f;
+    constants.color[3] = 0.12f;
+    constants.mode = 0;
+
+    cmdList->SetPipelineState(m_frustumDebugTriPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->SetGraphicsRoot32BitConstants(0, 53, &constants, 0);
+    cmdList->DrawInstanced(36, 1, 0, 0);
+
+    // Pass 2: Opaque wireframe edges
+    constants.color[0] = 1.0f;
+    constants.color[1] = 0.7f;
+    constants.color[2] = 0.0f;
+    constants.color[3] = 1.0f;
+    constants.mode = 1;
+
+    cmdList->SetPipelineState(m_frustumDebugLinePSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+    cmdList->SetGraphicsRoot32BitConstants(0, 53, &constants, 0);
+    cmdList->DrawInstanced(24, 1, 0, 0);
 }
 
 void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,

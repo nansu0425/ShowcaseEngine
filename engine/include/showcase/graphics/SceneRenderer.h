@@ -38,6 +38,11 @@ struct ShadowDebugStats {
     bool active = false;
 };
 
+struct ShadowFrustumDebugData {
+    Vector3 corners[8]; // world-space frustum corners (near 0-3, far 4-7)
+    bool valid = false;
+};
+
 class SceneRenderer {
 public:
     void Init(RenderContext& ctx);
@@ -70,6 +75,12 @@ public:
     Texture& GetDefaultWhiteTexture() { return m_defaultWhiteTex; }
 
     const ShadowDebugStats& GetShadowDebugStats() const { return m_shadowDebugStats; }
+    const ShadowFrustumDebugData& GetShadowFrustumDebug() const { return m_shadowFrustumDebug; }
+
+    /// Renders the shadow frustum as a depth-tested semi-transparent box.
+    /// Call between Render() and viewport EndRender() while scene depth is populated.
+    void RenderShadowFrustum(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                             D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height);
 
 private:
     static constexpr uint32_t kMaxObjects = 256;
@@ -82,6 +93,11 @@ private:
     // Selection outline
     ComPtr<ID3D12RootSignature> m_outlineRootSignature;
     ComPtr<ID3D12PipelineState> m_outlinePSO;
+
+    // Shadow frustum debug visualization
+    ComPtr<ID3D12RootSignature> m_frustumDebugRootSig;
+    ComPtr<ID3D12PipelineState> m_frustumDebugTriPSO;
+    ComPtr<ID3D12PipelineState> m_frustumDebugLinePSO;
 
     // Constant buffers (per-frame to avoid CPU/GPU race on upload heap)
     Buffer m_perFrameCB[FrameResource::kNumFrames];
@@ -102,6 +118,7 @@ private:
     bool m_hasShadow = false;      // set by RenderShadowPass for current frame
     float m_cachedShadowBias = 0.001f;
     ShadowDebugStats m_shadowDebugStats;
+    ShadowFrustumDebugData m_shadowFrustumDebug;
 
     void RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj);
 

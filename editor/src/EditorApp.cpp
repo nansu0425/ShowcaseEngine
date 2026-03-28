@@ -65,6 +65,12 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
         return m_viewport.GetShowShadowInfo() ? "Shadow info overlay enabled" : "Shadow info overlay disabled";
     });
 
+    m_console.RegisterCommand("shadow_frustum", [this](const std::string&) -> std::string {
+        m_viewport.ToggleShowShadowFrustum();
+        return m_viewport.GetShowShadowFrustum() ? "Shadow frustum wireframe enabled"
+                                                 : "Shadow frustum wireframe disabled";
+    });
+
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext))
         return false;
 
@@ -170,6 +176,7 @@ void EditorApp::SaveEditorConfig() {
     auto vp = doc["viewport"];
     vp["showFPS"].Set(m_viewport.GetShowFPS());
     vp["showShadowInfo"].Set(m_viewport.GetShowShadowInfo());
+    vp["showShadowFrustum"].Set(m_viewport.GetShowShadowFrustum());
     vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
     vp["cameraLookSpeed"].Set(m_viewport.cameraLookSpeed);
 
@@ -208,6 +215,9 @@ void EditorApp::LoadEditorConfig() {
     }
     if (vp.Contains("showShadowInfo")) {
         m_viewport.SetShowShadowInfo(vp["showShadowInfo"].GetBool());
+    }
+    if (vp.Contains("showShadowFrustum")) {
+        m_viewport.SetShowShadowFrustum(vp["showShadowFrustum"].GetBool());
     }
     if (vp.Contains("cameraMoveSpeed")) {
         m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].GetFloat();
@@ -543,6 +553,10 @@ void EditorApp::RenderMainMenuBar() {
             if (ImGui::MenuItem("Shadow Info", nullptr, &showShadowInfo)) {
                 m_viewport.SetShowShadowInfo(showShadowInfo);
             }
+            bool showShadowFrustum = m_viewport.GetShowShadowFrustum();
+            if (ImGui::MenuItem("Shadow Frustum", nullptr, &showShadowFrustum)) {
+                m_viewport.SetShowShadowFrustum(showShadowFrustum);
+            }
             ImGui::EndMenu();
         }
 
@@ -730,6 +744,12 @@ int EditorApp::Run() {
             m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
                                    m_editorController.GetSelectedObjectId(),
                                    m_editorController.GetPrimitiveHighlight());
+            if (m_viewport.GetShowShadowFrustum()) {
+                auto& ot = m_viewport.GetOffscreenTarget();
+                m_sceneRenderer.RenderShadowFrustum(m_renderContext, m_viewport.GetCamera(),
+                                                    ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer().GetDSV(),
+                                                    ot.GetWidth(), ot.GetHeight());
+            }
             m_viewport.EndRender(m_renderContext.GetCommandList());
 
             // Render object IDs for GPU picking

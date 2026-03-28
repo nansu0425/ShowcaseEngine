@@ -44,6 +44,10 @@ public:
     bool GetShowShadowInfo() const { return m_showShadowInfo; }
     void SetShowShadowInfo(bool show) { m_showShadowInfo = show; }
 
+    void ToggleShowShadowFrustum() { m_showShadowFrustum = !m_showShadowFrustum; }
+    bool GetShowShadowFrustum() const { return m_showShadowFrustum; }
+    void SetShowShadowFrustum(bool show) { m_showShadowFrustum = show; }
+
     float GetYaw() const { return m_yaw; }
     float GetPitch() const { return m_pitch; }
     void SetYaw(float yaw) { m_yaw = yaw; }
@@ -66,6 +70,7 @@ private:
 
     bool m_showFPS = true;
     bool m_showShadowInfo = false;
+    bool m_showShadowFrustum = false;
     ToolbarCallback m_toolbarCallback;
 
     ImVec2 m_imageMin = {};
