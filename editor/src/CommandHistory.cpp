@@ -252,4 +252,21 @@ void RemoveObjectCommand::Undo() {
     m_selectedObjectId = m_previousSelection;
 }
 
+// ── ToggleEnabledCommand ────────────────────────────────────────────
+
+ToggleEnabledCommand::ToggleEnabledCommand(Scene& scene, uint32_t objectId, bool oldEnabled, bool newEnabled)
+    : m_scene(scene), m_objectId(objectId), m_oldEnabled(oldEnabled), m_newEnabled(newEnabled) {}
+
+void ToggleEnabledCommand::Execute() {
+    SceneObject* obj = m_scene.FindById(m_objectId);
+    if (obj)
+        obj->enabled = m_newEnabled;
+}
+
+void ToggleEnabledCommand::Undo() {
+    SceneObject* obj = m_scene.FindById(m_objectId);
+    if (obj)
+        obj->enabled = m_oldEnabled;
+}
+
 } // namespace showcase

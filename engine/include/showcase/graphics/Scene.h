@@ -72,6 +72,7 @@ struct ModelComponent {
 struct SceneObject {
     uint32_t id = 0;
     std::string name;
+    bool enabled = true;
     Vector3 position = {};
     Vector3 rotation = {}; // Euler degrees (Y→X→Z)
     Vector3 scale = {1, 1, 1};

@@ -209,6 +209,19 @@ private:
     int m_previousSelection;
 };
 
+class ToggleEnabledCommand : public Command {
+public:
+    ToggleEnabledCommand(Scene& scene, uint32_t objectId, bool oldEnabled, bool newEnabled);
+    void Execute() override;
+    void Undo() override;
+    std::string GetName() const override { return "Toggle Enabled"; }
+
+private:
+    Scene& m_scene;
+    uint32_t m_objectId;
+    bool m_oldEnabled, m_newEnabled;
+};
+
 class RemoveObjectCommand : public Command {
 public:
     RemoveObjectCommand(Scene& scene, int& selectedObjectId, uint32_t objectId);

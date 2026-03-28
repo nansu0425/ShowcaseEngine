@@ -511,9 +511,15 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
 
         for (auto& obj : scene.GetObjects()) {
             ImGui::PushID(static_cast<int>(obj.id));
+            if (!obj.enabled) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            }
             bool isSelected = (static_cast<int>(obj.id) == m_selectedObjectId);
             if (ImGui::Selectable(obj.name.c_str(), isSelected)) {
                 m_selectedObjectId = static_cast<int>(obj.id);
+            }
+            if (!obj.enabled) {
+                ImGui::PopStyleColor();
             }
             if (ImGui::BeginPopupContextItem()) {
                 if (ImGui::MenuItem("Duplicate")) {
@@ -564,6 +570,18 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
             }
             ImGui::SameLine();
             ImGui::TextDisabled("ID: %u", selected->id);
+
+            bool prevEnabled = selected->enabled;
+            if (ImGui::Checkbox("Enabled", &selected->enabled)) {
+                if (m_commandHistory) {
+                    m_commandHistory->RecordCommand(
+                        std::make_unique<ToggleEnabledCommand>(scene, selected->id, prevEnabled, selected->enabled));
+                }
+                if (m_dirtyCallback) {
+                    m_dirtyCallback();
+                }
+            }
+
             ImGui::Separator();
 
             // ── Transform (always shown) ──

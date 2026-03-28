@@ -898,6 +898,8 @@ void SceneRenderer::RenderDepthOnlyObjects(RenderContext& ctx, Scene& scene, con
     for (const auto& sceneObj : scene.GetObjects()) {
         if (!sceneObj.HasModel())
             continue;
+        if (!sceneObj.enabled)
+            continue;
 
         for (const auto& mesh : sceneObj.modelComp->model->meshes) {
             for (const auto& prim : mesh.primitives) {
@@ -1376,6 +1378,8 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     for (const auto& sceneObj : scene.GetObjects()) {
         if (!sceneObj.HasModel())
             continue;
+        if (!sceneObj.enabled)
+            continue;
 
         bool isSelected = (static_cast<int>(sceneObj.id) == selectedObjectId);
 
@@ -1555,6 +1559,8 @@ void SceneRenderer::RenderObjectIds(RenderContext& ctx, Camera& camera, Scene& s
 
     for (const auto& sceneObj : scene.GetObjects()) {
         if (!sceneObj.HasModel())
+            continue;
+        if (!sceneObj.enabled)
             continue;
 
         for (const auto& mesh : sceneObj.modelComp->model->meshes) {

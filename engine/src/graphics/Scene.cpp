@@ -9,7 +9,7 @@ namespace showcase {
 
 // ── SceneObject ──────────────────────────────────────────────────────
 bool SceneObject::IsVisible() const {
-    return !frustumCulled && !occlusionCulled;
+    return enabled && !frustumCulled && !occlusionCulled;
 }
 
 void SceneObject::RecomputeWorldTransform() {
@@ -125,6 +125,10 @@ void Scene::Serialize(JsonDocument& doc) const {
         node["position"].SetFloatArray({obj.position.x, obj.position.y, obj.position.z});
         node["rotation"].SetFloatArray({obj.rotation.x, obj.rotation.y, obj.rotation.z});
         node["scale"].SetFloatArray({obj.scale.x, obj.scale.y, obj.scale.z});
+
+        if (!obj.enabled) {
+            node["enabled"].Set(false);
+        }
 
         if (obj.modelComp.has_value()) {
             auto model = node["components"]["model"];
@@ -263,6 +267,10 @@ bool Scene::Deserialize(JsonDocument& doc) {
             obj.scale = Vector3(scl[0].GetFloat(), scl[1].GetFloat(), scl[2].GetFloat());
         }
 
+        if (node.Contains("enabled")) {
+            obj.enabled = node["enabled"].GetBool();
+        }
+
         m_objects.push_back(std::move(obj));
     }
 
@@ -300,6 +308,8 @@ bool Scene::LoadFromFile(const std::string& filePath) {
 
 std::optional<DirectionalLightData> Scene::GetDirectionalLight() const {
     for (const auto& obj : m_objects) {
+        if (!obj.enabled)
+            continue;
         if (!obj.lightComp.has_value() || obj.lightComp->type != LightType::Directional)
             continue;
 
@@ -319,6 +329,8 @@ std::optional<DirectionalLightData> Scene::GetDirectionalLight() const {
 
 std::optional<AmbientLightData> Scene::GetAmbientLight() const {
     for (const auto& obj : m_objects) {
+        if (!obj.enabled)
+            continue;
         if (!obj.lightComp.has_value() || obj.lightComp->type != LightType::Ambient)
             continue;
 
@@ -332,6 +344,8 @@ std::optional<AmbientLightData> Scene::GetAmbientLight() const {
 std::vector<PointLightData> Scene::GetPointLights() const {
     std::vector<PointLightData> result;
     for (const auto& obj : m_objects) {
+        if (!obj.enabled)
+            continue;
         if (!obj.lightComp.has_value() || obj.lightComp->type != LightType::Point)
             continue;
 
@@ -350,6 +364,8 @@ std::vector<PointLightData> Scene::GetPointLights() const {
 std::vector<SpotLightData> Scene::GetSpotLights() const {
     std::vector<SpotLightData> result;
     for (const auto& obj : m_objects) {
+        if (!obj.enabled)
+            continue;
         if (!obj.lightComp.has_value() || obj.lightComp->type != LightType::Spot)
             continue;
 
@@ -404,6 +420,8 @@ std::optional<BoundingBox> Scene::GetSceneAABB() const {
     BoundingBox merged;
     for (const auto& obj : m_objects) {
         if (!obj.HasModel())
+            continue;
+        if (!obj.enabled)
             continue;
         if (first) {
             merged = obj.worldAABB;
