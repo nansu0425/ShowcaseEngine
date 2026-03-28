@@ -1020,6 +1020,37 @@ void EditorController::RenderToolbar(ViewportPanel& viewport) {
         ImGui::SliderFloat("Look Sensitivity", &viewport.cameraLookSpeed, 0.001f, 0.01f);
         ImGui::EndPopup();
     }
+
+    // ── View options (right-aligned) ─────────────────────────────
+    ImGui::SameLine();
+    float viewBtnWidth = ImGui::CalcTextSize("View").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - viewBtnWidth - 6.0f);
+
+    if (ImGui::Button("View")) {
+        ImGui::OpenPopup("ViewOptions");
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Viewport display options");
+    }
+
+    if (ImGui::BeginPopup("ViewOptions")) {
+        bool showFPS = viewport.GetShowFPS();
+        if (ImGui::MenuItem("FPS Overlay", nullptr, showFPS)) {
+            viewport.SetShowFPS(!showFPS);
+        }
+
+        bool showShadowInfo = viewport.GetShowShadowInfo();
+        if (ImGui::MenuItem("Shadow Info", nullptr, showShadowInfo)) {
+            viewport.SetShowShadowInfo(!showShadowInfo);
+        }
+
+        bool showShadowFrustum = viewport.GetShowShadowFrustum();
+        if (ImGui::MenuItem("Shadow Frustum", nullptr, showShadowFrustum)) {
+            viewport.SetShowShadowFrustum(!showShadowFrustum);
+        }
+
+        ImGui::EndPopup();
+    }
 }
 
 } // namespace showcase

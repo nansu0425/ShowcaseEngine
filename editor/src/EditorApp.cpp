@@ -548,15 +548,6 @@ void EditorApp::RenderMainMenuBar() {
 #else
             ImGui::MenuItem("Tracy Profiler (disabled)", nullptr, false, false);
 #endif
-            ImGui::Separator();
-            bool showShadowInfo = m_viewport.GetShowShadowInfo();
-            if (ImGui::MenuItem("Shadow Info", nullptr, &showShadowInfo)) {
-                m_viewport.SetShowShadowInfo(showShadowInfo);
-            }
-            bool showShadowFrustum = m_viewport.GetShowShadowFrustum();
-            if (ImGui::MenuItem("Shadow Frustum", nullptr, &showShadowFrustum)) {
-                m_viewport.SetShowShadowFrustum(showShadowFrustum);
-            }
             ImGui::EndMenu();
         }
 
