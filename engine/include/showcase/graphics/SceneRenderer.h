@@ -18,6 +18,11 @@ using Microsoft::WRL::ComPtr;
 
 namespace showcase {
 
+enum class ViewMode : int {
+    Lit = 0,
+    Unlit = 1,
+};
+
 class RenderContext;
 
 struct PrimitiveHighlight {
@@ -94,6 +99,9 @@ public:
     /// Call between Render() and viewport EndRender() while scene depth is populated.
     void RenderShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                              DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height);
+
+    void SetViewMode(ViewMode mode) { m_viewMode = mode; }
+    ViewMode GetViewMode() const { return m_viewMode; }
 
     /// Sets the point light gizmo data for GPU-based depth-tested wireframe rendering.
     void SetPointLightGizmo(const Vector3& center, float range);
@@ -199,6 +207,7 @@ private:
     DescriptorHeap* m_srvHeap = nullptr;
 
     float m_aspectRatio = 16.0f / 9.0f;
+    ViewMode m_viewMode = ViewMode::Lit;
 };
 
 } // namespace showcase

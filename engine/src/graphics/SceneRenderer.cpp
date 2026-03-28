@@ -1450,6 +1450,11 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     if (numSL > 0)
         frameData.lightingEnabled = 1;
 
+    // ViewMode override: force lighting off in Unlit mode
+    if (m_viewMode == ViewMode::Unlit) {
+        frameData.lightingEnabled = 0;
+    }
+
     // Shadow mapping data (directional)
     if (m_hasShadow) {
         frameData.lightViewProjection = m_cachedLightVP;

@@ -10,6 +10,8 @@
 
 namespace showcase {
 
+enum class ViewMode : int;
+
 class Input;
 class RenderContext;
 
@@ -47,6 +49,9 @@ public:
     bool GetShowShadowOverlay() const { return m_showShadowOverlay; }
     void SetShowShadowOverlay(bool show) { m_showShadowOverlay = show; }
 
+    ViewMode GetViewMode() const { return m_viewMode; }
+    void SetViewMode(ViewMode mode) { m_viewMode = mode; }
+
     float GetYaw() const { return m_yaw; }
     float GetPitch() const { return m_pitch; }
     void SetYaw(float yaw) { m_yaw = yaw; }
@@ -70,6 +75,7 @@ private:
     bool m_showFPS = true;
     bool m_showShadowFrustum = false;
     bool m_showShadowOverlay = false;
+    ViewMode m_viewMode = static_cast<ViewMode>(0); // ViewMode::Lit
     ToolbarCallback m_toolbarCallback;
 
     ImVec2 m_imageMin = {};

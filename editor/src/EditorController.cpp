@@ -1070,6 +1070,30 @@ void EditorController::RenderToolbar(ViewportPanel& viewport) {
         ImGui::SliderFloat("Look Sensitivity", &viewport.cameraLookSpeed, 0.001f, 0.01f);
         ImGui::EndPopup();
     }
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    const char* viewModeNames[] = {"Lit", "Unlit"};
+    int modeIndex = static_cast<int>(viewport.GetViewMode());
+
+    ImGui::SetNextItemWidth(80);
+    if (ImGui::BeginCombo("##ViewMode", viewModeNames[modeIndex])) {
+        for (int i = 0; i < IM_ARRAYSIZE(viewModeNames); ++i) {
+            bool isSelected = (modeIndex == i);
+            if (ImGui::Selectable(viewModeNames[i], isSelected)) {
+                viewport.SetViewMode(static_cast<ViewMode>(i));
+            }
+            if (isSelected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("View Mode: Lit shows full lighting, Unlit shows base colors only");
+    }
 }
 
 } // namespace showcase

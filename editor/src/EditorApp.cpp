@@ -731,13 +731,16 @@ int EditorApp::Run() {
             m_renderContext.BeginFrame();
 
             // Phase 1: Render scene to off-screen viewport render target
-            m_sceneRenderer.RenderShadowPass(m_renderContext, m_viewport.GetCamera(), m_scene);
-            m_sceneRenderer.RenderPointShadowPass(m_renderContext, m_scene);
+            m_sceneRenderer.SetViewMode(m_viewport.GetViewMode());
+            if (m_viewport.GetViewMode() == ViewMode::Lit) {
+                m_sceneRenderer.RenderShadowPass(m_renderContext, m_viewport.GetCamera(), m_scene);
+                m_sceneRenderer.RenderPointShadowPass(m_renderContext, m_scene);
+            }
             m_viewport.BeginRender(m_renderContext.GetCommandList());
             m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
                                    m_editorController.GetSelectedObjectId(),
                                    m_editorController.GetPrimitiveHighlight());
-            if (m_viewport.GetShowShadowFrustum()) {
+            if (m_viewport.GetViewMode() == ViewMode::Lit && m_viewport.GetShowShadowFrustum()) {
                 auto& ot = m_viewport.GetOffscreenTarget();
                 m_sceneRenderer.RenderShadowFrustum(m_renderContext, m_viewport.GetCamera(),
                                                     ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer().GetDSV(),
@@ -749,7 +752,7 @@ int EditorApp::Run() {
                                                       ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer().GetDSV(),
                                                       ot.GetWidth(), ot.GetHeight());
             }
-            if (m_viewport.GetShowShadowOverlay()) {
+            if (m_viewport.GetViewMode() == ViewMode::Lit && m_viewport.GetShowShadowOverlay()) {
                 auto& ot = m_viewport.GetOffscreenTarget();
                 m_sceneRenderer.RenderShadowOverlay(m_renderContext, m_viewport.GetCamera(),
                                                     ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer(), ot.GetWidth(),
