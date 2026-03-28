@@ -877,6 +877,48 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         DragLightProperty(
                             {"Specular Power", &light.specularPower, 1.0f, 1.0f, 256.0f, &light, &scene, selected->id});
                         DragLightProperty({"Range", &light.range, 0.1f, 0.1f, 100.0f, &light, &scene, selected->id});
+
+                        ImGui::Separator();
+                        ImGui::Text("Shadows");
+                        {
+                            LightComponent oldProps = light;
+                            if (ImGui::Checkbox("Cast Shadow", &light.castShadow)) {
+                                if (m_commandHistory) {
+                                    m_commandHistory->RecordCommand(std::make_unique<ChangeLightPropertiesCommand>(
+                                        ChangeLightPropertiesCommandDesc{&scene, selected->id, oldProps, light}));
+                                }
+                                if (m_dirtyCallback) {
+                                    m_dirtyCallback();
+                                }
+                            }
+                        }
+                        if (light.castShadow) {
+                            DragLightProperty(
+                                {"Shadow Bias", &light.shadowBias, 0.0001f, 0.0f, 0.01f, &light, &scene, selected->id});
+
+                            ImGui::Spacing();
+                            if (m_renderer && ImGui::CollapsingHeader("Point Shadow Info")) {
+                                Vector3 pos = selected->position;
+                                float range = light.range;
+                                uint32_t res = SceneRenderer::GetPointShadowResolution();
+                                float nearZ = SceneRenderer::GetPointShadowNearZ();
+                                int shadowIdx = m_renderer->GetPointShadowIndex(selected->id);
+                                float texelDensity = (range > 0.0f) ? static_cast<float>(res) / range : 0.0f;
+
+                                ImGui::Text("Position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
+                                ImGui::Text("Range (far plane): %.2f m", range);
+                                ImGui::Text("Near plane: %.2f", nearZ);
+                                ImGui::Text("Resolution: %u x %u (per face)", res, res);
+                                ImGui::Text("Shadow Bias: %.4f", light.shadowBias);
+                                ImGui::Text("Texels/m at mid-range: %.1f", texelDensity);
+                                if (shadowIdx >= 0)
+                                    ImGui::Text("Shadow index: %d", shadowIdx);
+                                else
+                                    ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1),
+                                                       "Shadow index: -1 (slot limit reached)");
+                            }
+                        }
+
                         ImGui::TextDisabled("Position controlled by object transform");
                     }
 

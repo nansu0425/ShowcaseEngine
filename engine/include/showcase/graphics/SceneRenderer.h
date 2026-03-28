@@ -86,6 +86,12 @@ public:
     const ShadowDebugStats& GetShadowDebugStats() const { return m_shadowDebugStats; }
     const ShadowFrustumDebugData& GetShadowFrustumDebug() const { return m_shadowFrustumDebug; }
 
+    /// Returns the shadow slot index (0..5) for a point light with the given object ID,
+    /// or -1 if the light has no shadow slot assigned this frame.
+    int GetPointShadowIndex(int objectId) const;
+    static constexpr uint32_t GetPointShadowResolution() { return kPointShadowMapResolution; }
+    static constexpr float GetPointShadowNearZ() { return kPointShadowNearZ; }
+
     /// Renders the shadow frustum as a depth-tested semi-transparent box.
     /// Call between Render() and viewport EndRender() while scene depth is populated.
     void RenderShadowFrustum(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
@@ -186,6 +192,14 @@ private:
     Vector3 m_pointShadowPositions[kMaxPointLights];
     float m_pointShadowRanges[kMaxPointLights];
     float m_pointShadowBiases[kMaxPointLights];
+
+    // Cached shadow index per point light (populated in Render(), queried by editor)
+    struct CachedPointShadowEntry {
+        int objectId = -1;
+        int shadowIndex = -1;
+    };
+    CachedPointShadowEntry m_cachedPointShadowEntries[kMaxPointLights];
+    int m_numCachedPointShadowEntries = 0;
 
     // Object ID picking
     ComPtr<ID3D12PipelineState> m_objectIdPSO;

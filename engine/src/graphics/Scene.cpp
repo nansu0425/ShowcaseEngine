@@ -356,6 +356,7 @@ std::vector<PointLightData> Scene::GetPointLights() const {
         data.specularPower = obj.lightComp->specularPower;
         data.castShadow = obj.lightComp->castShadow;
         data.shadowBias = obj.lightComp->shadowBias;
+        data.objectId = obj.id;
         result.push_back(data);
     }
     return result;

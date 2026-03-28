@@ -1059,6 +1059,14 @@ void SceneRenderer::RenderPointShadowPass(RenderContext& ctx, Scene& scene) {
     }
 }
 
+int SceneRenderer::GetPointShadowIndex(int objectId) const {
+    for (int i = 0; i < m_numCachedPointShadowEntries; ++i) {
+        if (m_cachedPointShadowEntries[i].objectId == objectId)
+            return m_cachedPointShadowEntries[i].shadowIndex;
+    }
+    return -1;
+}
+
 // ── Render ───────────────────────────────────────────────────────────
 
 void SceneRenderer::RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& scene) {
@@ -1431,7 +1439,10 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
                 }
             }
         }
+
+        m_cachedPointShadowEntries[i] = {pointLights[i].objectId, frameData.pointLights[i].shadowIndex};
     }
+    m_numCachedPointShadowEntries = numPL;
     if (numPL > 0)
         frameData.lightingEnabled = 1;
 

@@ -49,6 +49,7 @@ struct PointLightData {
     float specularPower;
     bool castShadow;
     float shadowBias;
+    int objectId = -1;
 };
 
 struct SpotLightData {
