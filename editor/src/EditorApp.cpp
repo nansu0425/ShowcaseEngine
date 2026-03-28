@@ -78,6 +78,12 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
                                                       : "Point shadow coverage overlay disabled";
     });
 
+    m_console.RegisterCommand("cubemap_face_overlay", [this](const std::string&) -> std::string {
+        m_viewport.ToggleShowCubemapFaceOverlay();
+        return m_viewport.GetShowCubemapFaceOverlay() ? "Cubemap face ID overlay enabled"
+                                                      : "Cubemap face ID overlay disabled";
+    });
+
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext))
         return false;
 
@@ -185,6 +191,7 @@ void EditorApp::SaveEditorConfig() {
     vp["showShadowFrustum"].Set(m_viewport.GetShowShadowFrustum());
     vp["showShadowOverlay"].Set(m_viewport.GetShowShadowOverlay());
     vp["showPointShadowOverlay"].Set(m_viewport.GetShowPointShadowOverlay());
+    vp["showCubemapFaceOverlay"].Set(m_viewport.GetShowCubemapFaceOverlay());
     vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
     vp["cameraLookSpeed"].Set(m_viewport.cameraLookSpeed);
 
@@ -229,6 +236,9 @@ void EditorApp::LoadEditorConfig() {
     }
     if (vp.Contains("showPointShadowOverlay")) {
         m_viewport.SetShowPointShadowOverlay(vp["showPointShadowOverlay"].GetBool());
+    }
+    if (vp.Contains("showCubemapFaceOverlay")) {
+        m_viewport.SetShowCubemapFaceOverlay(vp["showCubemapFaceOverlay"].GetBool());
     }
     if (vp.Contains("cameraMoveSpeed")) {
         m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].GetFloat();
@@ -773,6 +783,15 @@ int EditorApp::Run() {
                 if (shadowIdx >= 0) {
                     auto& ot = m_viewport.GetOffscreenTarget();
                     m_sceneRenderer.RenderPointShadowOverlay(m_renderContext, m_viewport.GetCamera(),
+                                                             ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer(),
+                                                             ot.GetWidth(), ot.GetHeight(), shadowIdx);
+                }
+            }
+            if (m_viewport.GetViewMode() == ViewMode::Lit && m_viewport.GetShowCubemapFaceOverlay()) {
+                int shadowIdx = m_sceneRenderer.GetPointShadowIndex(m_editorController.GetSelectedObjectId());
+                if (shadowIdx >= 0) {
+                    auto& ot = m_viewport.GetOffscreenTarget();
+                    m_sceneRenderer.RenderCubemapFaceOverlay(m_renderContext, m_viewport.GetCamera(),
                                                              ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer(),
                                                              ot.GetWidth(), ot.GetHeight(), shadowIdx);
                 }

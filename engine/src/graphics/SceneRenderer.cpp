@@ -725,6 +725,43 @@ void SceneRenderer::Init(RenderContext& ctx) {
         m_pointShadowOverlayPSO = PipelineState::CreateGraphicsPSO(device, pointOverlayDesc);
     }
 
+    // Cubemap face ID overlay (fullscreen pass: reconstruct world pos, dominant axis → face color)
+    {
+        D3D12_SHADER_BYTECODE faceOverlayPs =
+            ctx.GetShaderManager().LoadShader("shaders/point_shadow_face_overlay_ps_ps.cso");
+
+        m_cubemapFaceOverlayRootSig =
+            RootSignatureBuilder()
+                .AddConstants({24, 0})                                   // slot 0: 24 DWORDs at b0
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, // slot 1: scene depth t0
+                                     0, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .AddStaticSampler({0, 0, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                                   D3D12_TEXTURE_ADDRESS_MODE_CLAMP}) // s0: point clamp (depth)
+                .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                .Build(device);
+
+        GraphicsPipelineDesc faceOverlayDesc;
+        faceOverlayDesc.rootSignature = m_cubemapFaceOverlayRootSig.Get();
+        faceOverlayDesc.vertexShader = ctx.GetShaderManager().LoadShader("shaders/outline_vs_vs.cso");
+        faceOverlayDesc.pixelShader = faceOverlayPs;
+        faceOverlayDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        faceOverlayDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+
+        faceOverlayDesc.blendState.RenderTarget[0].BlendEnable = TRUE;
+        faceOverlayDesc.blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        faceOverlayDesc.blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        faceOverlayDesc.blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        faceOverlayDesc.blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+        faceOverlayDesc.blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        faceOverlayDesc.blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+        faceOverlayDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        faceOverlayDesc.depthStencilState.DepthEnable = FALSE;
+        faceOverlayDesc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+        m_cubemapFaceOverlayPSO = PipelineState::CreateGraphicsPSO(device, faceOverlayDesc);
+    }
+
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
@@ -1455,6 +1492,72 @@ void SceneRenderer::RenderPointShadowOverlay(RenderContext& ctx, Camera& camera,
     cmdList->SetDescriptorHeaps(1, heaps);
     cmdList->SetGraphicsRootDescriptorTable(1, sceneDepthBuffer.GetSRV().gpu);
     cmdList->SetGraphicsRootDescriptorTable(2, m_pointShadowMaps[shadowIndex].GetSRV().gpu);
+
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    // Transition scene depth buffer back: PIXEL_SHADER_RESOURCE -> DEPTH_WRITE
+    barrier.Transition.StateBefore =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    cmdList->ResourceBarrier(1, &barrier);
+}
+
+void SceneRenderer::RenderCubemapFaceOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                             DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height,
+                                             int shadowIndex) {
+    if (shadowIndex < 0 || shadowIndex >= m_numPointShadowLights)
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Transition scene depth buffer: DEPTH_WRITE -> PIXEL_SHADER_RESOURCE
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = sceneDepthBuffer.GetResource();
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    barrier.Transition.StateAfter =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    // Bind RTV only (no depth test needed)
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_cubemapFaceOverlayRootSig.Get());
+    cmdList->SetPipelineState(m_cubemapFaceOverlayPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Root constants: invViewProjection + point light params
+    Matrix vp = camera.GetViewMatrix() * camera.GetProjectionMatrix();
+    Matrix invVP = vp.Invert();
+
+    struct FaceOverlayParams {
+        Matrix invViewProjection;
+        float lightPosition[3];
+        float lightRange;
+        float overlayAlpha;
+        float _pad0[3];
+    } params;
+    params.invViewProjection = invVP;
+    params.lightPosition[0] = m_pointShadowPositions[shadowIndex].x;
+    params.lightPosition[1] = m_pointShadowPositions[shadowIndex].y;
+    params.lightPosition[2] = m_pointShadowPositions[shadowIndex].z;
+    params.lightRange = m_pointShadowRanges[shadowIndex];
+    params.overlayAlpha = 0.35f;
+    params._pad0[0] = 0.0f;
+    params._pad0[1] = 0.0f;
+    params._pad0[2] = 0.0f;
+
+    cmdList->SetGraphicsRoot32BitConstants(0, 24, &params, 0);
+
+    ID3D12DescriptorHeap* heaps[] = {ctx.GetSrvHeap().GetHeap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+    cmdList->SetGraphicsRootDescriptorTable(1, sceneDepthBuffer.GetSRV().gpu);
 
     cmdList->DrawInstanced(3, 1, 0, 0);
 

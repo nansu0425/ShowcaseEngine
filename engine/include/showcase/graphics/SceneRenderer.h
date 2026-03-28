@@ -111,6 +111,11 @@ public:
     void RenderPointShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                                   DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
 
+    /// Renders cubemap face ID overlay (6 colors per face direction).
+    /// Call between Render() and viewport EndRender() while scene depth is populated.
+    void RenderCubemapFaceOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                  DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
+
     void SetViewMode(ViewMode mode) { m_viewMode = mode; }
     ViewMode GetViewMode() const { return m_viewMode; }
 
@@ -174,6 +179,10 @@ private:
     // Point shadow coverage overlay
     ComPtr<ID3D12RootSignature> m_pointShadowOverlayRootSig;
     ComPtr<ID3D12PipelineState> m_pointShadowOverlayPSO;
+
+    // Cubemap face ID overlay
+    ComPtr<ID3D12RootSignature> m_cubemapFaceOverlayRootSig;
+    ComPtr<ID3D12PipelineState> m_cubemapFaceOverlayPSO;
 
     // Point light gizmo (depth-tested wireframe rings)
     struct PointLightGizmoData {

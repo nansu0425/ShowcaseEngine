@@ -903,6 +903,12 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                     viewport.SetShowPointShadowOverlay(showPointOverlay);
                                 }
                             }
+                            {
+                                bool showFaceOverlay = viewport.GetShowCubemapFaceOverlay();
+                                if (ImGui::Checkbox("Cubemap Face ID", &showFaceOverlay)) {
+                                    viewport.SetShowCubemapFaceOverlay(showFaceOverlay);
+                                }
+                            }
                             if (m_renderer && ImGui::CollapsingHeader("Point Shadow Info")) {
                                 Vector3 pos = selected->position;
                                 float range = light.range;
