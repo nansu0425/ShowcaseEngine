@@ -340,6 +340,8 @@ std::vector<PointLightData> Scene::GetPointLights() const {
         data.range = obj.lightComp->range;
         data.color = obj.lightComp->color * obj.lightComp->intensity;
         data.specularPower = obj.lightComp->specularPower;
+        data.castShadow = obj.lightComp->castShadow;
+        data.shadowBias = obj.lightComp->shadowBias;
         result.push_back(data);
     }
     return result;

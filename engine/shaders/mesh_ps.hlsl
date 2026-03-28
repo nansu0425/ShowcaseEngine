@@ -1,9 +1,15 @@
 Texture2D baseColorTex : register(t0);
 Texture2D shadowMap : register(t1);
+TextureCube pointShadowMap0 : register(t2);
+TextureCube pointShadowMap1 : register(t3);
+TextureCube pointShadowMap2 : register(t4);
+TextureCube pointShadowMap3 : register(t5);
+TextureCube pointShadowMap4 : register(t6);
+TextureCube pointShadowMap5 : register(t7);
 SamplerState linearSampler : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
 
-#define MAX_POINT_LIGHTS 8
+#define MAX_POINT_LIGHTS 6
 #define MAX_SPOT_LIGHTS 8
 
 struct PointLight
@@ -12,6 +18,9 @@ struct PointLight
     float range;
     float3 color;
     float specularPower;
+    int shadowIndex;
+    float shadowBias;
+    float2 _pad;
 };
 
 struct SpotLight
@@ -46,12 +55,17 @@ cbuffer PerFrame : register(b0)
     PointLight pointLights[MAX_POINT_LIGHTS];
     SpotLight spotLights[MAX_SPOT_LIGHTS];
 
-    // Shadow mapping
+    // Shadow mapping (directional)
     row_major float4x4 lightViewProjection;
     int shadowEnabled;
     float shadowBias;
     float shadowMapTexelSize;
     float _pad4;
+
+    // Point light shadow mapping
+    int numPointShadowLights;
+    float pointShadowNearZ;
+    float2 _pad5;
 };
 
 cbuffer PerMaterial : register(b2)
@@ -100,6 +114,40 @@ float CalculateShadow(float3 worldPos)
         }
     }
     return shadow / 9.0;
+}
+
+float SamplePointShadowCubemap(float3 dir, int idx)
+{
+    if (idx == 0)
+        return pointShadowMap0.SampleLevel(linearSampler, dir, 0).r;
+    if (idx == 1)
+        return pointShadowMap1.SampleLevel(linearSampler, dir, 0).r;
+    if (idx == 2)
+        return pointShadowMap2.SampleLevel(linearSampler, dir, 0).r;
+    if (idx == 3)
+        return pointShadowMap3.SampleLevel(linearSampler, dir, 0).r;
+    if (idx == 4)
+        return pointShadowMap4.SampleLevel(linearSampler, dir, 0).r;
+    return pointShadowMap5.SampleLevel(linearSampler, dir, 0).r;
+}
+
+float CalculatePointShadow(float3 worldPos, float3 lightPos, float lightRange, float bias, int shadowIdx)
+{
+    float3 lightToFrag = worldPos - lightPos;
+    // Use dominant axis distance (matches what the perspective depth buffer stores per cubemap face)
+    float3 absDir = abs(lightToFrag);
+    float currentDist = max(absDir.x, max(absDir.y, absDir.z));
+
+    float storedDepth = SamplePointShadowCubemap(lightToFrag, shadowIdx);
+
+    // Reconstruct linear depth from perspective NDC z
+    // Perspective LH: z_ndc = far*(d - near) / (d*(far-near))
+    // Invert: d = near*far / (far - z_ndc*(far-near))
+    float nearZ = pointShadowNearZ;
+    float farZ = lightRange;
+    float linearDepth = nearZ * farZ / (farZ - storedDepth * (farZ - nearZ));
+
+    return (currentDist - bias > linearDepth) ? 0.0 : 1.0;
 }
 
 float4 main(PSInput input) : SV_TARGET
@@ -154,14 +202,21 @@ float4 main(PSInput input) : SV_TARGET
             float attenuation = saturate(1.0 - dist / pointLights[i].range);
             attenuation *= attenuation;
 
+            float shadow = 1.0;
+            if (pointLights[i].shadowIndex >= 0)
+            {
+                shadow = CalculatePointShadow(input.worldPos, pointLights[i].position, pointLights[i].range,
+                                              pointLights[i].shadowBias, pointLights[i].shadowIndex);
+            }
+
             float3 halfVec = normalize(plDir + viewDir);
 
             float nDotL = max(dot(normal, plDir), 0.0);
-            diffuse += nDotL * pointLights[i].color * color * attenuation;
+            diffuse += nDotL * pointLights[i].color * color * attenuation * shadow;
 
             float nDotH = max(dot(normal, halfVec), 0.0);
             float spec = pow(nDotH, pointLights[i].specularPower);
-            specular += spec * pointLights[i].color * attenuation;
+            specular += spec * pointLights[i].color * attenuation * shadow;
         }
 
         // Spot lights

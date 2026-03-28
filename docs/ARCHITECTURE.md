@@ -184,12 +184,20 @@ EditorApp::Run()
 │
 │   ┌── Shadow Pass ───────────────────────────────────────┐
 │   │                                                       │
-│   ├── SceneRenderer::RenderShadowPass()      // before BeginRender
+│   ├── SceneRenderer::RenderShadowPass()      // directional light
 │   │   ├── Compute light view-projection (camera frustum fit)
 │   │   ├── Transition shadow map: SRV → DEPTH_WRITE
 │   │   ├── Clear shadow depth, set depth-only PSO
 │   │   ├── For each SceneObject: draw depth only
 │   │   └── Transition shadow map: DEPTH_WRITE → SRV
+│   │                                                       │
+│   ├── SceneRenderer::RenderPointShadowPass() // point lights
+│   │   ├── For each shadow-casting point light (up to 6):
+│   │   │   ├── Transition cubemap: SRV → DEPTH_WRITE
+│   │   │   ├── For each of 6 faces (+X/-X/+Y/-Y/+Z/-Z):
+│   │   │   │   ├── Build 90° perspective view-projection
+│   │   │   │   └── Draw all objects depth-only to face DSV
+│   │   │   └── Transition cubemap: DEPTH_WRITE → SRV
 │   │                                                       │
 │   └───────────────────────────────────────────────────────┘
 │
@@ -197,8 +205,8 @@ EditorApp::Run()
 │   │                                                       │
 │   ├── ViewportPanel::BeginRender()           // transition offscreen → RT
 │   ├── SceneRenderer::Render()                // set root sig, PSO
-│   │   ├── Bind shadow map SRV (slot 5)
-│   │   ├── Update per-frame CB (VP, lighting, lightViewProjection)
+│   │   ├── Bind shadow map SRV (slot 5) + point shadow cubemaps (slots 6-11)
+│   │   ├── Update per-frame CB (VP, lighting, shadow data)
 │   │   ├── For each SceneObject:
 │   │   │   ├── Update per-object CB at offset (world matrix)
 │   │   │   ├── Update per-material CB at offset (color, texture flag)
@@ -271,7 +279,8 @@ Root[1]  CBV  b1   Per-object data (world matrix) — offset per object
 Root[2]  CBV  b2   Per-material data (base color, texture flag) — offset per object
 Root[3]  Table     SRV t0  Base color texture (or default white)
 Root[4]  Constants b3      Object ID (1 DWORD — GPU picking pass only)
-Root[5]  Table     SRV t1  Shadow map depth texture
+Root[5]  Table     SRV t1  Shadow map depth texture (directional)
+Root[6-11] Table   SRV t2-t7  Point light shadow cubemaps (up to 6)
          Static sampler s0  Linear wrap
          Static sampler s1  Comparison sampler (border, for shadow PCF)
 ```
@@ -301,7 +310,7 @@ struct LightComponent {
     float range;               // Point/Spot — radius of influence (meters)
     float innerAngle;          // Spot only — full intensity cone half-angle (degrees)
     float outerAngle;          // Spot only — falloff-to-zero cone half-angle (degrees)
-    bool castShadow;           // Directional only (for now) — enables shadow map pass
+    bool castShadow;           // Directional & Point — enables shadow map pass
     float shadowBias;          // Shader-side depth bias for shadow acne prevention
     // Directional/Spot: direction derived from SceneObject::rotation (forward vector of worldTransform)
     // Point/Spot: position from SceneObject::position

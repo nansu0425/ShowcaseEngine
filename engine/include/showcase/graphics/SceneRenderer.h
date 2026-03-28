@@ -2,6 +2,7 @@
 
 #include <showcase/graphics/Buffer.h>
 #include <showcase/graphics/Camera.h>
+#include <showcase/graphics/CubemapDepthBuffer.h>
 #include <showcase/graphics/DepthBuffer.h>
 #include <showcase/graphics/FrameResource.h>
 #include <showcase/graphics/Model.h>
@@ -52,6 +53,9 @@ public:
     /// Renders the shadow map from directional light. Call before BeginRender/Render.
     void RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& scene);
 
+    /// Renders cubemap shadow maps for point lights. Call after RenderShadowPass, before Render.
+    void RenderPointShadowPass(RenderContext& ctx, Scene& scene);
+
     void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
                 const PrimitiveHighlight& highlight = {});
 
@@ -93,6 +97,7 @@ public:
 
 private:
     static constexpr uint32_t kMaxObjects = 256;
+    static constexpr int kMaxPointLights = 6;
 
     // Pipeline
     ComPtr<ID3D12RootSignature> m_rootSignature;
@@ -141,6 +146,19 @@ private:
     bool m_shadowPreviewRendered = false;
 
     void RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj);
+    void RenderDepthOnlyObjects(RenderContext& ctx, Scene& scene, const Matrix& viewProj,
+                                D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t resolution, uint32_t shadowCBSlot);
+
+    // Point light shadow mapping
+    static constexpr uint32_t kPointShadowMapResolution = 512;
+    static constexpr float kPointShadowNearZ = 0.1f;
+    static constexpr uint32_t kMaxShadowCBSlots = 1 + kMaxPointLights * 6; // 1 directional + 6 faces per light
+    CubemapDepthBuffer m_pointShadowMaps[kMaxPointLights];
+    bool m_pointShadowMapsReady = false;
+    int m_numPointShadowLights = 0;
+    Vector3 m_pointShadowPositions[kMaxPointLights];
+    float m_pointShadowRanges[kMaxPointLights];
+    float m_pointShadowBiases[kMaxPointLights];
 
     // Object ID picking
     ComPtr<ID3D12PipelineState> m_objectIdPSO;

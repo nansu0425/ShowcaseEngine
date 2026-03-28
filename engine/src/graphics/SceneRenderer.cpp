@@ -9,15 +9,18 @@
 
 namespace showcase {
 
-static constexpr int kMaxPointLights = 8;
+static constexpr int kMaxPointLights = 6;
 static constexpr int kMaxSpotLights = 8;
 
 struct GpuPointLight {
     Vector3 position;
-    float range;
+    float range; // 16 bytes
     Vector3 color;
-    float specularPower;
-};
+    float specularPower; // 16 bytes
+    int shadowIndex;     // -1 = no shadow, 0..5 = cubemap index
+    float shadowBias;
+    float _pad[2]; // 16 bytes
+}; // Total: 48 bytes
 
 struct GpuSpotLight {
     Vector3 position;
@@ -49,12 +52,17 @@ struct alignas(256) PerFrameData {
     GpuPointLight pointLights[kMaxPointLights];
     GpuSpotLight spotLights[kMaxSpotLights];
 
-    // Shadow mapping
+    // Shadow mapping (directional)
     Matrix lightViewProjection;
     int shadowEnabled;
     float shadowBias;
     float shadowMapTexelSize; // 1.0 / shadowMapResolution
     float _pad4;
+
+    // Point light shadow mapping
+    int numPointShadowLights;
+    float pointShadowNearZ;
+    float _pad5[2];
 };
 
 struct alignas(256) ShadowPerFrameData {
@@ -74,8 +82,9 @@ struct alignas(256) PerMaterialData {
     float primitiveHighlight;
 };
 
+static_assert(sizeof(GpuPointLight) == 48);
 static_assert(sizeof(GpuSpotLight) == 64);
-static_assert(sizeof(PerFrameData) <= 1280);
+static_assert(sizeof(PerFrameData) <= 1536);
 static_assert(sizeof(ShadowPerFrameData) <= 256);
 static_assert(sizeof(PerObjectData) <= 256);
 static_assert(sizeof(PerMaterialData) <= 256);
@@ -263,7 +272,8 @@ void SceneRenderer::Init(RenderContext& ctx) {
 
     // Root signature: CBV b0 (PerFrame), CBV b1 (PerObject), CBV b2 (PerMaterial),
     //                 DescriptorTable(SRV t0), Constants b3 (objectId),
-    //                 DescriptorTable(SRV t1 shadowMap), StaticSampler s0, s1
+    //                 DescriptorTable(SRV t1 shadowMap),
+    //                 DescriptorTable(SRV t2..t7 pointShadowMaps), StaticSampler s0, s1
     m_rootSignature =
         RootSignatureBuilder()
             .AddCBV({0})                                                 // slot 0: PerFrame
@@ -272,6 +282,12 @@ void SceneRenderer::Init(RenderContext& ctx) {
             .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0}) // slot 3: baseColorTex t0
             .AddConstants({1, 3})                                        // slot 4: objectId (b3, 1 DWORD)
             .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1}) // slot 5: shadowMap t1
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2}) // slot 6: pointShadowMap0 t2
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3}) // slot 7: pointShadowMap1 t3
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 4}) // slot 8: pointShadowMap2 t4
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 5}) // slot 9: pointShadowMap3 t5
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 6}) // slot 10: pointShadowMap4 t6
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 7}) // slot 11: pointShadowMap5 t7
             .AddStaticSampler({0})                                       // s0: linear wrap
             .AddStaticSampler({1, 0,                                     // s1: comparison sampler
                                D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
@@ -446,7 +462,8 @@ void SceneRenderer::Init(RenderContext& ctx) {
 
         // Shadow per-frame constant buffers
         for (uint32_t i = 0; i < FrameResource::kNumFrames; ++i) {
-            if (!m_shadowPerFrameCB[i].InitAsUploadBuffer(device, allocator, sizeof(ShadowPerFrameData))) {
+            uint32_t shadowCBSize = kMaxShadowCBSlots * sizeof(ShadowPerFrameData);
+            if (!m_shadowPerFrameCB[i].InitAsUploadBuffer(device, allocator, shadowCBSize)) {
                 SE_LOG_ERROR("Failed to create shadow per-frame CB");
                 return;
             }
@@ -473,6 +490,44 @@ void SceneRenderer::Init(RenderContext& ctx) {
         GraphicsPipelineDesc shadowPsoDescDS = shadowPsoDesc;
         shadowPsoDescDS.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
         m_shadowPSODoubleSided = PipelineState::CreateGraphicsPSO(device, shadowPsoDescDS);
+    }
+
+    // Point light shadow cubemaps
+    {
+        CommandList initCmdList;
+        bool cmdListReady = initCmdList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+        if (cmdListReady)
+            initCmdList.Reset();
+
+        for (int i = 0; i < kMaxPointLights; ++i) {
+            if (!m_pointShadowMaps[i].Init(device, allocator, kPointShadowMapResolution)) {
+                SE_LOG_ERROR("Failed to create point shadow cubemap {}", i);
+                return;
+            }
+            std::wstring name = L"PointShadowMap" + std::to_wstring(i);
+            m_pointShadowMaps[i].GetResource()->SetName(name.c_str());
+            m_pointShadowMaps[i].CreateSRV(device, ctx.GetSrvHeap());
+
+            if (cmdListReady) {
+                // Clear all 6 faces to initialize the depth/stencil resource
+                // (D3D12 requires Clear/Discard before first use of DS resources)
+                for (uint32_t face = 0; face < CubemapDepthBuffer::kNumFaces; ++face) {
+                    initCmdList.Get()->ClearDepthStencilView(m_pointShadowMaps[i].GetFaceDSV(face),
+                                                             D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+                }
+                initCmdList.TransitionBarrier(m_pointShadowMaps[i].GetResource(), D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                                              D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
+                                                  D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            }
+        }
+
+        if (cmdListReady) {
+            initCmdList.Close();
+            ctx.GetDirectQueue().ExecuteCommandList(initCmdList.Get());
+            ctx.GetDirectQueue().Flush();
+            initCmdList.Shutdown();
+        }
+        m_pointShadowMapsReady = true;
     }
 
     // Shadow frustum debug visualization
@@ -604,6 +659,8 @@ void SceneRenderer::Shutdown() {
         m_objectIdRT.Shutdown(*m_srvHeap);
         m_objectIdDepth.Shutdown(*m_srvHeap);
         m_shadowMap.Shutdown(*m_srvHeap);
+        for (int i = 0; i < kMaxPointLights; ++i)
+            m_pointShadowMaps[i].Shutdown(*m_srvHeap);
         m_shadowPreviewRT.Shutdown(*m_srvHeap);
     }
     m_shadowOverlayPSO.Reset();
@@ -794,36 +851,24 @@ static ShadowFrustumResult ComputeDirectionalLightVP(const Vector3& lightDir, co
     return result;
 }
 
-void SceneRenderer::RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj) {
-    SE_ZONE_SCOPED_C(profile::kColorRendering);
+void SceneRenderer::RenderDepthOnlyObjects(RenderContext& ctx, Scene& scene, const Matrix& viewProj,
+                                           D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t resolution,
+                                           uint32_t shadowCBSlot) {
     auto* cmdList = ctx.GetCommandList().Get();
     uint32_t fi = ctx.GetCurrentFrameIndex();
 
-    // Transition shadow map: SRV -> DEPTH_WRITE
-    D3D12_RESOURCE_BARRIER barrier = {};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = m_shadowMap.GetResource();
-    barrier.Transition.StateBefore =
-        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    cmdList->ResourceBarrier(1, &barrier);
-
-    // Clear shadow depth buffer
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_shadowMap.GetDSV();
+    // Clear and bind DSV
     cmdList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-    // Set render target: depth-only (no color RT)
     cmdList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
 
     // Viewport and scissor
     D3D12_VIEWPORT viewport = {};
-    viewport.Width = static_cast<float>(kShadowMapResolution);
-    viewport.Height = static_cast<float>(kShadowMapResolution);
+    viewport.Width = static_cast<float>(resolution);
+    viewport.Height = static_cast<float>(resolution);
     viewport.MaxDepth = 1.0f;
     cmdList->RSSetViewports(1, &viewport);
 
-    D3D12_RECT scissor = {0, 0, static_cast<LONG>(kShadowMapResolution), static_cast<LONG>(kShadowMapResolution)};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(resolution), static_cast<LONG>(resolution)};
     cmdList->RSSetScissorRects(1, &scissor);
 
     // Set pipeline
@@ -832,15 +877,19 @@ void SceneRenderer::RenderShadowMap(RenderContext& ctx, Scene& scene, const Matr
     ID3D12PipelineState* currentPSO = m_shadowPSO.Get();
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // Upload shadow per-frame CB (light VP as the viewProjection field)
+    // Upload shadow per-frame CB (view-projection matrix) at unique offset per face
     ShadowPerFrameData shadowFrameData = {};
-    shadowFrameData.viewProjection = lightViewProj;
-    m_shadowPerFrameCB[fi].UpdateData(&shadowFrameData, sizeof(shadowFrameData));
-    cmdList->SetGraphicsRootConstantBufferView(0, m_shadowPerFrameCB[fi].GetResource()->GetGPUVirtualAddress());
+    shadowFrameData.viewProjection = viewProj;
+    uint32_t cbOffset = shadowCBSlot * sizeof(ShadowPerFrameData);
+    m_shadowPerFrameCB[fi].UpdateDataAtOffset(&shadowFrameData, sizeof(shadowFrameData), cbOffset);
+    cmdList->SetGraphicsRootConstantBufferView(0,
+                                               m_shadowPerFrameCB[fi].GetResource()->GetGPUVirtualAddress() + cbOffset);
 
-    // Bind dummy SRV for slots 3 and 5 (textures not needed for depth-only)
+    // Bind dummy SRV for unused texture slots (depth-only pass)
     cmdList->SetGraphicsRootDescriptorTable(3, m_defaultWhiteTex.GetSRVHandle().gpu);
     cmdList->SetGraphicsRootDescriptorTable(5, m_defaultWhiteTex.GetSRVHandle().gpu);
+    for (int i = 0; i < kMaxPointLights; ++i)
+        cmdList->SetGraphicsRootDescriptorTable(6 + i, m_defaultWhiteTex.GetSRVHandle().gpu);
 
     // Render all objects (depth only)
     uint32_t objectIndex = 0;
@@ -855,13 +904,11 @@ void SceneRenderer::RenderShadowMap(RenderContext& ctx, Scene& scene, const Matr
                 if (prim.indexCount == 0 || objectIndex >= kMaxObjects)
                     continue;
 
-                // Per-object transform
                 PerObjectData objData;
                 objData.world = sceneObj.worldTransform;
                 m_perObjectCB[fi].UpdateDataAtOffset(&objData, sizeof(objData), objectIndex * sizeof(PerObjectData));
                 cmdList->SetGraphicsRootConstantBufferView(1, objCbBase + objectIndex * sizeof(PerObjectData));
 
-                // Switch PSO for double-sided materials
                 if (prim.material && prim.material->doubleSided) {
                     if (currentPSO != m_shadowPSODoubleSided.Get()) {
                         cmdList->SetPipelineState(m_shadowPSODoubleSided.Get());
@@ -881,12 +928,96 @@ void SceneRenderer::RenderShadowMap(RenderContext& ctx, Scene& scene, const Matr
             }
         }
     }
+}
+
+void SceneRenderer::RenderShadowMap(RenderContext& ctx, Scene& scene, const Matrix& lightViewProj) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Transition shadow map: SRV -> DEPTH_WRITE
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = m_shadowMap.GetResource();
+    barrier.Transition.StateBefore =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    RenderDepthOnlyObjects(ctx, scene, lightViewProj, m_shadowMap.GetDSV(), kShadowMapResolution, 0);
 
     // Transition shadow map: DEPTH_WRITE -> SRV
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     barrier.Transition.StateAfter =
         D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     cmdList->ResourceBarrier(1, &barrier);
+}
+
+void SceneRenderer::RenderPointShadowPass(RenderContext& ctx, Scene& scene) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+    m_numPointShadowLights = 0;
+
+    if (!m_pointShadowMapsReady)
+        return;
+
+    auto pointLights = scene.GetPointLights();
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Cubemap face directions (DX cubemap order: +X, -X, +Y, -Y, +Z, -Z)
+    struct FaceInfo {
+        Vector3 dir;
+        Vector3 up;
+    };
+    static const FaceInfo faces[6] = {
+        {{1, 0, 0}, {0, 1, 0}},  // +X
+        {{-1, 0, 0}, {0, 1, 0}}, // -X
+        {{0, 1, 0}, {0, 0, -1}}, // +Y
+        {{0, -1, 0}, {0, 0, 1}}, // -Y
+        {{0, 0, 1}, {0, 1, 0}},  // +Z
+        {{0, 0, -1}, {0, 1, 0}}, // -Z
+    };
+
+    for (const auto& pl : pointLights) {
+        if (!pl.castShadow || m_numPointShadowLights >= kMaxPointLights)
+            continue;
+
+        int idx = m_numPointShadowLights;
+        m_pointShadowPositions[idx] = pl.position;
+        m_pointShadowRanges[idx] = pl.range;
+        m_pointShadowBiases[idx] = pl.shadowBias;
+
+        // Transition cubemap: SRV -> DEPTH_WRITE
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_pointShadowMaps[idx].GetResource();
+        barrier.Transition.StateBefore =
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+
+        // 90-degree perspective projection (aspect=1, near=0.1, far=range)
+        Matrix proj = PerspectiveFovLH(kPiOver2, 1.0f, kPointShadowNearZ, pl.range);
+
+        for (int face = 0; face < 6; ++face) {
+            Vector3 target = pl.position + faces[face].dir;
+            Matrix view = LookAtLH(pl.position, target, faces[face].up);
+            Matrix viewProj = view * proj;
+
+            // Slot 0 is directional; point lights start at slot 1
+            uint32_t cbSlot = 1 + idx * 6 + face;
+            D3D12_CPU_DESCRIPTOR_HANDLE faceDSV = m_pointShadowMaps[idx].GetFaceDSV(face);
+            RenderDepthOnlyObjects(ctx, scene, viewProj, faceDSV, kPointShadowMapResolution, cbSlot);
+        }
+
+        // Transition cubemap: DEPTH_WRITE -> SRV
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrier.Transition.StateAfter =
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        cmdList->ResourceBarrier(1, &barrier);
+
+        m_numPointShadowLights++;
+    }
 }
 
 // ── Render ───────────────────────────────────────────────────────────
@@ -1159,6 +1290,10 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
         cmdList->SetGraphicsRootDescriptorTable(5, m_defaultWhiteTex.GetSRVHandle().gpu);
     }
 
+    // Bind point shadow cubemap SRVs (slots 6-11)
+    for (int i = 0; i < kMaxPointLights; ++i)
+        cmdList->SetGraphicsRootDescriptorTable(6 + i, m_pointShadowMaps[i].GetSRV().gpu);
+
     // Update PerFrame CB (use per-frame buffer to avoid CPU/GPU race)
     uint32_t fi = ctx.GetCurrentFrameIndex();
     PerFrameData frameData = {};
@@ -1188,6 +1323,18 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
         frameData.pointLights[i].range = pointLights[i].range;
         frameData.pointLights[i].color = pointLights[i].color;
         frameData.pointLights[i].specularPower = pointLights[i].specularPower;
+
+        // Match point light to its shadow cubemap
+        frameData.pointLights[i].shadowIndex = -1;
+        if (pointLights[i].castShadow) {
+            for (int s = 0; s < m_numPointShadowLights; ++s) {
+                if (Vector3::DistanceSquared(pointLights[i].position, m_pointShadowPositions[s]) < 0.0001f) {
+                    frameData.pointLights[i].shadowIndex = s;
+                    frameData.pointLights[i].shadowBias = m_pointShadowBiases[s];
+                    break;
+                }
+            }
+        }
     }
     if (numPL > 0)
         frameData.lightingEnabled = 1;
@@ -1207,13 +1354,17 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     if (numSL > 0)
         frameData.lightingEnabled = 1;
 
-    // Shadow mapping data
+    // Shadow mapping data (directional)
     if (m_hasShadow) {
         frameData.lightViewProjection = m_cachedLightVP;
         frameData.shadowEnabled = 1;
         frameData.shadowBias = m_cachedShadowBias;
         frameData.shadowMapTexelSize = 1.0f / static_cast<float>(kShadowMapResolution);
     }
+
+    // Point light shadow data
+    frameData.numPointShadowLights = m_numPointShadowLights;
+    frameData.pointShadowNearZ = kPointShadowNearZ;
 
     m_perFrameCB[fi].UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB[fi].GetResource()->GetGPUVirtualAddress());
@@ -1389,8 +1540,10 @@ void SceneRenderer::RenderObjectIds(RenderContext& ctx, Camera& camera, Scene& s
     ID3D12PipelineState* currentPSO = m_objectIdPSO.Get();
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // Bind dummy SRV for shadow map slot (slot 5, required by root signature)
+    // Bind dummy SRVs for shadow map slots (required by root signature)
     cmdList->SetGraphicsRootDescriptorTable(5, m_defaultWhiteTex.GetSRVHandle().gpu);
+    for (int i = 0; i < kMaxPointLights; ++i)
+        cmdList->SetGraphicsRootDescriptorTable(6 + i, m_defaultWhiteTex.GetSRVHandle().gpu);
 
     // Reuse PerFrame CB (already uploaded by Render())
     uint32_t fi = ctx.GetCurrentFrameIndex();
