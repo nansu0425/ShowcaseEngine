@@ -34,6 +34,13 @@ static const uint EDGE_LINES = 4;
 static const uint VERTS_PER_CONE = SEGMENTS * VERTS_PER_QUAD + EDGE_LINES * VERTS_PER_QUAD;
 static const uint CIRCLE_VERTS = SEGMENTS * VERTS_PER_QUAD;
 
+// Spherical cap (outer cone only):
+// Meridian arcs: 8 arcs x 5 segments = 240 vertices
+static const uint CONE_TOTAL_VERTS = 2 * VERTS_PER_CONE; // 336
+static const uint MERIDIAN_ARCS = 8;
+static const uint MERIDIAN_SEGMENTS = 5;
+static const uint MERIDIAN_VERTS = MERIDIAN_ARCS * MERIDIAN_SEGMENTS * VERTS_PER_QUAD; // 240
+
 // Quad winding: two triangles sharing an edge
 // 0--2    tri0: 0,1,2   tri1: 2,1,3
 // |\ |
@@ -45,39 +52,63 @@ VSOutput main(uint vertexId : SV_VertexID)
 {
     VSOutput output;
 
-    // Determine which cone (0 = outer, 1 = inner)
-    uint coneIndex = vertexId / VERTS_PER_CONE;
-    uint localId = vertexId % VERTS_PER_CONE;
-
-    float cosAngle = (coneIndex == 0) ? outerCosAngle : innerCosAngle;
-    float sinAngle = (coneIndex == 0) ? outerSinAngle : innerSinAngle;
-    float4 col = (coneIndex == 0) ? outerColor : innerColor;
-
-    // Sphere-cone intersection: circle at distance range*cos along forward, radius range*sin
-    float radius = range * sinAngle;
-    float3 coneCenter = position + forward * range * cosAngle;
-
     float3 w0, w1;
+    float4 col;
 
-    if (localId < CIRCLE_VERTS)
+    if (vertexId < CONE_TOTAL_VERTS)
     {
-        // Circle segment
-        uint segIndex = localId / VERTS_PER_QUAD;
-        float a0 = 2.0f * PI * float(segIndex) / float(SEGMENTS);
-        float a1 = 2.0f * PI * float(segIndex + 1) / float(SEGMENTS);
+        // --- Cone geometry (outer + inner) ---
+        uint coneIndex = vertexId / VERTS_PER_CONE;
+        uint localId = vertexId % VERTS_PER_CONE;
 
-        w0 = coneCenter + right * cos(a0) * radius + up * sin(a0) * radius;
-        w1 = coneCenter + right * cos(a1) * radius + up * sin(a1) * radius;
+        float cosAngle = (coneIndex == 0) ? outerCosAngle : innerCosAngle;
+        float sinAngle = (coneIndex == 0) ? outerSinAngle : innerSinAngle;
+        col = (coneIndex == 0) ? outerColor : innerColor;
+
+        // Sphere-cone intersection: circle at distance range*cos along forward, radius range*sin
+        float radius = range * sinAngle;
+        float3 coneCenter = position + forward * range * cosAngle;
+
+        if (localId < CIRCLE_VERTS)
+        {
+            // Circle segment
+            uint segIndex = localId / VERTS_PER_QUAD;
+            float a0 = 2.0f * PI * float(segIndex) / float(SEGMENTS);
+            float a1 = 2.0f * PI * float(segIndex + 1) / float(SEGMENTS);
+
+            w0 = coneCenter + right * cos(a0) * radius + up * sin(a0) * radius;
+            w1 = coneCenter + right * cos(a1) * radius + up * sin(a1) * radius;
+        }
+        else
+        {
+            // Edge line from apex to circle perimeter
+            uint edgeLocalId = localId - CIRCLE_VERTS;
+            uint edgeIndex = edgeLocalId / VERTS_PER_QUAD;
+            float angle = 2.0f * PI * float(edgeIndex) / float(EDGE_LINES);
+
+            w0 = position;
+            w1 = coneCenter + right * cos(angle) * radius + up * sin(angle) * radius;
+        }
     }
     else
     {
-        // Edge line from apex to circle perimeter
-        uint edgeLocalId = localId - CIRCLE_VERTS;
-        uint edgeIndex = edgeLocalId / VERTS_PER_QUAD;
-        float angle = 2.0f * PI * float(edgeIndex) / float(EDGE_LINES);
+        // --- Spherical cap (outer cone only) ---
+        uint capId = vertexId - CONE_TOTAL_VERTS;
+        col = outerColor;
+        float outerAngle = acos(outerCosAngle);
 
-        w0 = position;
-        w1 = coneCenter + right * cos(angle) * radius + up * sin(angle) * radius;
+        // Meridian arc: from pole (forward * range) to outer circle along sphere surface
+        uint arcIndex = capId / (MERIDIAN_SEGMENTS * VERTS_PER_QUAD);
+        uint segInArc = (capId % (MERIDIAN_SEGMENTS * VERTS_PER_QUAD)) / VERTS_PER_QUAD;
+
+        float phi = 2.0f * PI * float(arcIndex) / float(MERIDIAN_ARCS);
+        float3 radialDir = right * cos(phi) + up * sin(phi);
+
+        float theta0 = outerAngle * float(segInArc) / float(MERIDIAN_SEGMENTS);
+        float theta1 = outerAngle * float(segInArc + 1) / float(MERIDIAN_SEGMENTS);
+
+        w0 = position + (forward * cos(theta0) + radialDir * sin(theta0)) * range;
+        w1 = position + (forward * cos(theta1) + radialDir * sin(theta1)) * range;
     }
 
     // Transform to clip space
@@ -96,7 +127,7 @@ VSOutput main(uint vertexId : SV_VertexID)
     float2 ndcOffset = perp * lineWidthPixels / viewportSize;
 
     // Select endpoint and side from quad index
-    uint vertInQuad = localId % VERTS_PER_QUAD;
+    uint vertInQuad = vertexId % VERTS_PER_QUAD;
     uint qi = QUAD_INDICES[vertInQuad];
     float4 clipPos = (qi < 2) ? clip0 : clip1;
     float side = (qi % 2 == 0) ? -1.0f : 1.0f;

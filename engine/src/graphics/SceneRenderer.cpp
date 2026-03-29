@@ -1682,7 +1682,7 @@ void SceneRenderer::RenderSpotLightGizmo(RenderContext& ctx, Camera& camera, D3D
     cmdList->SetPipelineState(m_spotLightGizmoLinePSO.Get());
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     cmdList->SetGraphicsRoot32BitConstants(0, 44, &constants, 0);
-    cmdList->DrawInstanced(336, 1, 0, 0); // 2 cones x (24 seg circle + 4 edge lines) x 6 verts/quad
+    cmdList->DrawInstanced(576, 1, 0, 0); // 2 cones (336) + spherical cap: 8 meridian arcs x 5 segs (240)
 }
 
 void SceneRenderer::RenderShadowPreview(RenderContext& ctx) {
