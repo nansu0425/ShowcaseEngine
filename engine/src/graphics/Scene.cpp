@@ -382,6 +382,10 @@ std::vector<SpotLightData> Scene::GetSpotLights() const {
         data.outerCos = std::cos(ToRadians(obj.lightComp->outerAngle));
         data.color = obj.lightComp->color * obj.lightComp->intensity;
         data.specularPower = obj.lightComp->specularPower;
+        data.castShadow = obj.lightComp->castShadow;
+        data.shadowBias = obj.lightComp->shadowBias;
+        data.outerAngle = ToRadians(obj.lightComp->outerAngle);
+        data.objectId = static_cast<int>(obj.id);
         result.push_back(data);
     }
     return result;

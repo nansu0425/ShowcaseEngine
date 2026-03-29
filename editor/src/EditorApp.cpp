@@ -765,6 +765,7 @@ int EditorApp::Run() {
             if (m_viewport.GetViewMode() == ViewMode::Lit) {
                 m_sceneRenderer.RenderShadowPass(m_renderContext, m_viewport.GetCamera(), m_scene);
                 m_sceneRenderer.RenderPointShadowPass(m_renderContext, m_scene);
+                m_sceneRenderer.RenderSpotShadowPass(m_renderContext, m_scene);
             }
             m_viewport.BeginRender(m_renderContext.GetCommandList());
             m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene,
@@ -912,6 +913,7 @@ int EditorApp::Run() {
 
             m_sceneRenderer.RenderShadowPass(m_renderContext, m_viewport.GetCamera(), m_scene);
             m_sceneRenderer.RenderPointShadowPass(m_renderContext, m_scene);
+            m_sceneRenderer.RenderSpotShadowPass(m_renderContext, m_scene);
             float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
             m_renderContext.BeginBackBufferScenePass(clearColor);
             m_sceneRenderer.Render(m_renderContext, m_viewport.GetCamera(), m_scene, -1);

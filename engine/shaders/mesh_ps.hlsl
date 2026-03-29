@@ -6,6 +6,14 @@ TextureCube pointShadowMap2 : register(t4);
 TextureCube pointShadowMap3 : register(t5);
 TextureCube pointShadowMap4 : register(t6);
 TextureCube pointShadowMap5 : register(t7);
+Texture2D spotShadowMap0 : register(t8);
+Texture2D spotShadowMap1 : register(t9);
+Texture2D spotShadowMap2 : register(t10);
+Texture2D spotShadowMap3 : register(t11);
+Texture2D spotShadowMap4 : register(t12);
+Texture2D spotShadowMap5 : register(t13);
+Texture2D spotShadowMap6 : register(t14);
+Texture2D spotShadowMap7 : register(t15);
 SamplerState linearSampler : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
 
@@ -32,7 +40,9 @@ struct SpotLight
     float3 color;
     float outerCos;
     float specularPower;
-    float3 _pad0;
+    int shadowIndex;
+    float shadowBias;
+    float _pad0;
 };
 
 cbuffer PerFrame : register(b0)
@@ -66,6 +76,12 @@ cbuffer PerFrame : register(b0)
     int numPointShadowLights;
     float pointShadowNearZ;
     float2 _pad5;
+
+    // Spot light shadow mapping
+    int numSpotShadowLights;
+    float spotShadowNearZ;
+    float2 _pad6;
+    row_major float4x4 spotShadowVP[MAX_SPOT_LIGHTS];
 };
 
 cbuffer PerMaterial : register(b2)
@@ -148,6 +164,54 @@ float CalculatePointShadow(float3 worldPos, float3 lightPos, float lightRange, f
     float linearDepth = nearZ * farZ / (farZ - storedDepth * (farZ - nearZ));
 
     return (currentDist - bias > linearDepth) ? 0.0 : 1.0;
+}
+
+float SampleSpotShadowCmp(float2 uv, float compareDepth, int idx)
+{
+    if (idx == 0)
+        return spotShadowMap0.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
+    if (idx == 1)
+        return spotShadowMap1.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
+    if (idx == 2)
+        return spotShadowMap2.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
+    if (idx == 3)
+        return spotShadowMap3.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
+    if (idx == 4)
+        return spotShadowMap4.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
+    if (idx == 5)
+        return spotShadowMap5.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
+    if (idx == 6)
+        return spotShadowMap6.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
+    return spotShadowMap7.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
+}
+
+float CalculateSpotShadow(float3 worldPos, int shadowIdx, float bias)
+{
+    float4 lightClipPos = mul(float4(worldPos, 1.0), spotShadowVP[shadowIdx]);
+    float3 projCoords = lightClipPos.xyz / lightClipPos.w;
+
+    float2 shadowUV;
+    shadowUV.x = projCoords.x * 0.5 + 0.5;
+    shadowUV.y = -projCoords.y * 0.5 + 0.5;
+
+    float currentDepth = projCoords.z;
+
+    if (shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0 || currentDepth > 1.0 ||
+        currentDepth < 0.0)
+        return 1.0;
+
+    // 3x3 PCF
+    float texelSize = 1.0 / 1024.0;
+    float shadow = 0.0;
+    [unroll] for (int x = -1; x <= 1; x++)
+    {
+        [unroll] for (int y = -1; y <= 1; y++)
+        {
+            float2 offset = float2(x, y) * texelSize;
+            shadow += SampleSpotShadowCmp(shadowUV + offset, currentDepth - bias, shadowIdx);
+        }
+    }
+    return shadow / 9.0;
 }
 
 float4 main(PSInput input) : SV_TARGET
@@ -235,14 +299,20 @@ float4 main(PSInput input) : SV_TARGET
 
             float atten = distAtten * spotAtten;
 
+            float shadow = 1.0;
+            if (spotLights[j].shadowIndex >= 0)
+            {
+                shadow = CalculateSpotShadow(input.worldPos, spotLights[j].shadowIndex, spotLights[j].shadowBias);
+            }
+
             float3 halfVec = normalize(slDir + viewDir);
 
             float nDotL = max(dot(normal, slDir), 0.0);
-            diffuse += nDotL * spotLights[j].color * color * atten;
+            diffuse += nDotL * spotLights[j].color * color * atten * shadow;
 
             float nDotH = max(dot(normal, halfVec), 0.0);
             float spec = pow(nDotH, spotLights[j].specularPower);
-            specular += spec * spotLights[j].color * atten;
+            specular += spec * spotLights[j].color * atten * shadow;
         }
 
         color = ambient + diffuse + specular;

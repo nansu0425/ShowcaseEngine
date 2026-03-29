@@ -60,6 +60,10 @@ struct SpotLightData {
     Vector3 color;  // color * intensity
     float outerCos; // cos(outerAngle)
     float specularPower;
+    bool castShadow;
+    float shadowBias;
+    float outerAngle; // radians — needed for shadow frustum FOV
+    int objectId = -1;
 };
 
 // ── Components ──────────────────────────────────────────────────────

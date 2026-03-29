@@ -945,6 +945,38 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                             {"Outer Angle", &light.outerAngle, 0.5f, 1.0f, 90.0f, &light, &scene, selected->id});
                         if (light.innerAngle >= light.outerAngle)
                             light.outerAngle = light.innerAngle + 1.0f;
+
+                        ImGui::Separator();
+                        ImGui::Text("Shadows");
+                        {
+                            LightComponent oldProps = light;
+                            if (ImGui::Checkbox("Cast Shadow", &light.castShadow)) {
+                                if (m_commandHistory) {
+                                    m_commandHistory->RecordCommand(std::make_unique<ChangeLightPropertiesCommand>(
+                                        ChangeLightPropertiesCommandDesc{&scene, selected->id, oldProps, light}));
+                                }
+                                if (m_dirtyCallback) {
+                                    m_dirtyCallback();
+                                }
+                            }
+                        }
+                        if (light.castShadow) {
+                            DragLightProperty(
+                                {"Shadow Bias", &light.shadowBias, 0.0001f, 0.0f, 0.01f, &light, &scene, selected->id});
+
+                            int shadowIdx = m_renderer ? m_renderer->GetSpotShadowIndex(selected->id) : -1;
+                            if (m_renderer && ImGui::CollapsingHeader("Spot Shadow Info")) {
+                                uint32_t res = SceneRenderer::GetSpotShadowResolution();
+                                float nearZ = SceneRenderer::GetSpotShadowNearZ();
+                                ImGui::Text("Resolution: %u x %u", res, res);
+                                ImGui::Text("Near plane: %.2f", nearZ);
+                                if (shadowIdx >= 0)
+                                    ImGui::Text("Shadow index: %d", shadowIdx);
+                                else
+                                    ImGui::TextDisabled("No shadow slot (max %d)", SceneRenderer::kMaxSpotShadowLights);
+                            }
+                        }
+
                         ImGui::TextDisabled("Position + direction controlled by object transform");
                     }
                 }

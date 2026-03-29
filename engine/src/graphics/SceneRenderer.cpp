@@ -31,7 +31,9 @@ struct GpuSpotLight {
     Vector3 color;
     float outerCos; // 16 bytes
     float specularPower;
-    float _pad0[3]; // 16 bytes
+    int shadowIndex; // -1 = no shadow, 0..3 = spot shadow map index
+    float shadowBias;
+    float _pad0; // 16 bytes
 }; // Total: 64 bytes
 
 struct alignas(256) PerFrameData {
@@ -64,6 +66,12 @@ struct alignas(256) PerFrameData {
     int numPointShadowLights;
     float pointShadowNearZ;
     float _pad5[2];
+
+    // Spot light shadow mapping
+    int numSpotShadowLights;
+    float spotShadowNearZ;
+    float _pad6[2];
+    Matrix spotShadowVP[kMaxSpotLights]; // view-projection per shadow-casting spot light
 };
 
 struct alignas(256) ShadowPerFrameData {
@@ -85,7 +93,7 @@ struct alignas(256) PerMaterialData {
 
 static_assert(sizeof(GpuPointLight) == 48);
 static_assert(sizeof(GpuSpotLight) == 64);
-static_assert(sizeof(PerFrameData) <= 1536);
+static_assert(sizeof(PerFrameData) <= 2048);
 static_assert(sizeof(ShadowPerFrameData) <= 256);
 static_assert(sizeof(PerObjectData) <= 256);
 static_assert(sizeof(PerMaterialData) <= 256);
@@ -277,20 +285,28 @@ void SceneRenderer::Init(RenderContext& ctx) {
     //                 DescriptorTable(SRV t2..t7 pointShadowMaps), StaticSampler s0, s1
     m_rootSignature =
         RootSignatureBuilder()
-            .AddCBV({0})                                                 // slot 0: PerFrame
-            .AddCBV({1})                                                 // slot 1: PerObject
-            .AddCBV({2})                                                 // slot 2: PerMaterial
-            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0}) // slot 3: baseColorTex t0
-            .AddConstants({1, 3})                                        // slot 4: objectId (b3, 1 DWORD)
-            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1}) // slot 5: shadowMap t1
-            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2}) // slot 6: pointShadowMap0 t2
-            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3}) // slot 7: pointShadowMap1 t3
-            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 4}) // slot 8: pointShadowMap2 t4
-            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 5}) // slot 9: pointShadowMap3 t5
-            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 6}) // slot 10: pointShadowMap4 t6
-            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 7}) // slot 11: pointShadowMap5 t7
-            .AddStaticSampler({0})                                       // s0: linear wrap
-            .AddStaticSampler({1, 0,                                     // s1: comparison sampler
+            .AddCBV({0})                                                  // slot 0: PerFrame
+            .AddCBV({1})                                                  // slot 1: PerObject
+            .AddCBV({2})                                                  // slot 2: PerMaterial
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0})  // slot 3: baseColorTex t0
+            .AddConstants({1, 3})                                         // slot 4: objectId (b3, 1 DWORD)
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1})  // slot 5: shadowMap t1
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2})  // slot 6: pointShadowMap0 t2
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3})  // slot 7: pointShadowMap1 t3
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 4})  // slot 8: pointShadowMap2 t4
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 5})  // slot 9: pointShadowMap3 t5
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 6})  // slot 10: pointShadowMap4 t6
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 7})  // slot 11: pointShadowMap5 t7
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 8})  // slot 12: spotShadowMap0 t8
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 9})  // slot 13: spotShadowMap1 t9
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 10}) // slot 14: spotShadowMap2 t10
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 11}) // slot 15: spotShadowMap3 t11
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 12}) // slot 16: spotShadowMap4 t12
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 13}) // slot 17: spotShadowMap5 t13
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 14}) // slot 18: spotShadowMap6 t14
+            .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 15}) // slot 19: spotShadowMap7 t15
+            .AddStaticSampler({0})                                        // s0: linear wrap
+            .AddStaticSampler({1, 0,                                      // s1: comparison sampler
                                D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
                                D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE})
             .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
@@ -529,6 +545,41 @@ void SceneRenderer::Init(RenderContext& ctx) {
             initCmdList.Shutdown();
         }
         m_pointShadowMapsReady = true;
+    }
+
+    // Spot light shadow maps (single 2D depth per light)
+    {
+        CommandList initCmdList;
+        bool cmdListReady = initCmdList.Init(device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+        if (cmdListReady)
+            initCmdList.Reset();
+
+        for (int i = 0; i < kMaxSpotShadowLights; ++i) {
+            if (!m_spotShadowMaps[i].Init(
+                    {device, allocator, kSpotShadowMapResolution, kSpotShadowMapResolution, DXGI_FORMAT_D32_FLOAT})) {
+                SE_LOG_ERROR("Failed to create spot shadow map {}", i);
+                return;
+            }
+            std::wstring name = L"SpotShadowMap" + std::to_wstring(i);
+            m_spotShadowMaps[i].GetResource()->SetName(name.c_str());
+            m_spotShadowMaps[i].CreateSRV(device, ctx.GetSrvHeap());
+
+            if (cmdListReady) {
+                initCmdList.Get()->ClearDepthStencilView(m_spotShadowMaps[i].GetDSV(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0,
+                                                         0, nullptr);
+                initCmdList.TransitionBarrier(m_spotShadowMaps[i].GetResource(), D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                                              D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
+                                                  D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            }
+        }
+
+        if (cmdListReady) {
+            initCmdList.Close();
+            ctx.GetDirectQueue().ExecuteCommandList(initCmdList.Get());
+            ctx.GetDirectQueue().Flush();
+            initCmdList.Shutdown();
+        }
+        m_spotShadowMapsReady = true;
     }
 
     // Shadow frustum debug visualization
@@ -874,6 +925,8 @@ void SceneRenderer::Shutdown() {
         m_shadowMap.Shutdown(*m_srvHeap);
         for (int i = 0; i < kMaxPointLights; ++i)
             m_pointShadowMaps[i].Shutdown(*m_srvHeap);
+        for (int i = 0; i < kMaxSpotShadowLights; ++i)
+            m_spotShadowMaps[i].Shutdown(*m_srvHeap);
         m_shadowPreviewRT.Shutdown(*m_srvHeap);
         for (int i = 0; i < 6; ++i)
             m_cubemapPreviewRT[i].Shutdown(*m_srvHeap);
@@ -1112,6 +1165,8 @@ void SceneRenderer::RenderDepthOnlyObjects(RenderContext& ctx, Scene& scene, con
     cmdList->SetGraphicsRootDescriptorTable(5, m_defaultWhiteTex.GetSRVHandle().gpu);
     for (int i = 0; i < kMaxPointLights; ++i)
         cmdList->SetGraphicsRootDescriptorTable(6 + i, m_defaultWhiteTex.GetSRVHandle().gpu);
+    for (int i = 0; i < kMaxSpotShadowLights; ++i)
+        cmdList->SetGraphicsRootDescriptorTable(12 + i, m_defaultWhiteTex.GetSRVHandle().gpu);
 
     // Render all objects (depth only)
     uint32_t objectIndex = 0;
@@ -1248,6 +1303,69 @@ int SceneRenderer::GetPointShadowIndex(int objectId) const {
     for (int i = 0; i < m_numCachedPointShadowEntries; ++i) {
         if (m_cachedPointShadowEntries[i].objectId == objectId)
             return m_cachedPointShadowEntries[i].shadowIndex;
+    }
+    return -1;
+}
+
+void SceneRenderer::RenderSpotShadowPass(RenderContext& ctx, Scene& scene) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+    m_numSpotShadowLights = 0;
+
+    if (!m_spotShadowMapsReady)
+        return;
+
+    auto spotLights = scene.GetSpotLights();
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    for (const auto& sl : spotLights) {
+        if (!sl.castShadow || m_numSpotShadowLights >= kMaxSpotShadowLights)
+            continue;
+
+        int idx = m_numSpotShadowLights;
+        m_spotShadowPositions[idx] = sl.position;
+        m_spotShadowRanges[idx] = sl.range;
+        m_spotShadowBiases[idx] = sl.shadowBias;
+
+        // Transition: SRV -> DEPTH_WRITE
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_spotShadowMaps[idx].GetResource();
+        barrier.Transition.StateBefore =
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+
+        // Perspective projection matching the spot cone: FOV = 2 * outerAngle
+        float fov = 2.0f * sl.outerAngle;
+        Vector3 target = sl.position + sl.direction;
+        // Avoid degenerate up vector when direction is nearly vertical
+        Vector3 up(0, 1, 0);
+        if (std::abs(sl.direction.y) > 0.99f)
+            up = Vector3(0, 0, 1);
+        Matrix view = LookAtLH(sl.position, target, up);
+        Matrix proj = PerspectiveFovLH(fov, 1.0f, kSpotShadowNearZ, sl.range);
+        Matrix viewProj = view * proj;
+        m_spotShadowVPs[idx] = viewProj;
+
+        // CB slot: after directional (1) and point faces (6*6=36)
+        uint32_t cbSlot = 1 + kMaxPointLights * 6 + idx;
+        RenderDepthOnlyObjects(ctx, scene, viewProj, m_spotShadowMaps[idx].GetDSV(), kSpotShadowMapResolution, cbSlot);
+
+        // Transition: DEPTH_WRITE -> SRV
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrier.Transition.StateAfter =
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        cmdList->ResourceBarrier(1, &barrier);
+
+        m_numSpotShadowLights++;
+    }
+}
+
+int SceneRenderer::GetSpotShadowIndex(int objectId) const {
+    for (int i = 0; i < m_numCachedSpotShadowEntries; ++i) {
+        if (m_cachedSpotShadowEntries[i].objectId == objectId)
+            return m_cachedSpotShadowEntries[i].shadowIndex;
     }
     return -1;
 }
@@ -1952,6 +2070,10 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     for (int i = 0; i < kMaxPointLights; ++i)
         cmdList->SetGraphicsRootDescriptorTable(6 + i, m_pointShadowMaps[i].GetSRV().gpu);
 
+    // Bind spot shadow map SRVs (slots 12-15)
+    for (int i = 0; i < kMaxSpotShadowLights; ++i)
+        cmdList->SetGraphicsRootDescriptorTable(12 + i, m_spotShadowMaps[i].GetSRV().gpu);
+
     // Update PerFrame CB (use per-frame buffer to avoid CPU/GPU race)
     uint32_t fi = ctx.GetCurrentFrameIndex();
     PerFrameData frameData = {};
@@ -2011,7 +2133,21 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
         frameData.spotLights[i].color = spotLights[i].color;
         frameData.spotLights[i].outerCos = spotLights[i].outerCos;
         frameData.spotLights[i].specularPower = spotLights[i].specularPower;
+
+        // Match spot light to shadow slot
+        frameData.spotLights[i].shadowIndex = -1;
+        if (spotLights[i].castShadow) {
+            for (int s = 0; s < m_numSpotShadowLights; ++s) {
+                if (Vector3::DistanceSquared(spotLights[i].position, m_spotShadowPositions[s]) < 0.0001f) {
+                    frameData.spotLights[i].shadowIndex = s;
+                    frameData.spotLights[i].shadowBias = m_spotShadowBiases[s];
+                    break;
+                }
+            }
+        }
+        m_cachedSpotShadowEntries[i] = {spotLights[i].objectId, frameData.spotLights[i].shadowIndex};
     }
+    m_numCachedSpotShadowEntries = numSL;
     if (numSL > 0)
         frameData.lightingEnabled = 1;
 
@@ -2031,6 +2167,13 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     // Point light shadow data
     frameData.numPointShadowLights = m_numPointShadowLights;
     frameData.pointShadowNearZ = kPointShadowNearZ;
+
+    // Spot light shadow data
+    frameData.numSpotShadowLights = m_numSpotShadowLights;
+    frameData.spotShadowNearZ = kSpotShadowNearZ;
+    for (int i = 0; i < m_numSpotShadowLights; ++i) {
+        frameData.spotShadowVP[i] = m_spotShadowVPs[i];
+    }
 
     m_perFrameCB[fi].UpdateData(&frameData, sizeof(frameData));
     cmdList->SetGraphicsRootConstantBufferView(0, m_perFrameCB[fi].GetResource()->GetGPUVirtualAddress());
@@ -2212,6 +2355,8 @@ void SceneRenderer::RenderObjectIds(RenderContext& ctx, Camera& camera, Scene& s
     cmdList->SetGraphicsRootDescriptorTable(5, m_defaultWhiteTex.GetSRVHandle().gpu);
     for (int i = 0; i < kMaxPointLights; ++i)
         cmdList->SetGraphicsRootDescriptorTable(6 + i, m_defaultWhiteTex.GetSRVHandle().gpu);
+    for (int i = 0; i < kMaxSpotShadowLights; ++i)
+        cmdList->SetGraphicsRootDescriptorTable(12 + i, m_defaultWhiteTex.GetSRVHandle().gpu);
 
     // Reuse PerFrame CB (already uploaded by Render())
     uint32_t fi = ctx.GetCurrentFrameIndex();

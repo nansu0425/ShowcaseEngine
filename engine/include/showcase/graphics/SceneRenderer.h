@@ -60,6 +60,7 @@ public:
 
     /// Renders cubemap shadow maps for point lights. Call after RenderShadowPass, before Render.
     void RenderPointShadowPass(RenderContext& ctx, Scene& scene);
+    void RenderSpotShadowPass(RenderContext& ctx, Scene& scene);
 
     void Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
                 const PrimitiveHighlight& highlight = {});
@@ -91,6 +92,12 @@ public:
     int GetPointShadowIndex(int objectId) const;
     static constexpr uint32_t GetPointShadowResolution() { return kPointShadowMapResolution; }
     static constexpr float GetPointShadowNearZ() { return kPointShadowNearZ; }
+
+    /// Returns the shadow slot index (0..3) for a spot light with the given object ID,
+    /// or -1 if the light has no shadow slot assigned this frame.
+    int GetSpotShadowIndex(int objectId) const;
+    static constexpr uint32_t GetSpotShadowResolution() { return kSpotShadowMapResolution; }
+    static constexpr float GetSpotShadowNearZ() { return kSpotShadowNearZ; }
 
     /// Renders the shadow frustum as a depth-tested semi-transparent box.
     /// Call between Render() and viewport EndRender() while scene depth is populated.
@@ -154,6 +161,8 @@ public:
     /// Renders spot light cone wireframe (outer + inner cones) with depth testing.
     void RenderSpotLightGizmo(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                               D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height);
+
+    static constexpr int kMaxSpotShadowLights = 8;
 
 private:
     static constexpr uint32_t kMaxObjects = 256;
@@ -255,7 +264,10 @@ private:
     // Point light shadow mapping
     static constexpr uint32_t kPointShadowMapResolution = 512;
     static constexpr float kPointShadowNearZ = 0.1f;
-    static constexpr uint32_t kMaxShadowCBSlots = 1 + kMaxPointLights * 6; // 1 directional + 6 faces per light
+    static constexpr uint32_t kSpotShadowMapResolution = 1024;
+    static constexpr float kSpotShadowNearZ = 0.1f;
+    static constexpr uint32_t kMaxShadowCBSlots =
+        1 + kMaxPointLights * 6 + kMaxSpotShadowLights; // 1 dir + 36 point faces + 8 spot
     CubemapDepthBuffer m_pointShadowMaps[kMaxPointLights];
     bool m_pointShadowMapsReady = false;
     int m_numPointShadowLights = 0;
@@ -270,6 +282,22 @@ private:
     };
     CachedPointShadowEntry m_cachedPointShadowEntries[kMaxPointLights];
     int m_numCachedPointShadowEntries = 0;
+
+    // Spot light shadow mapping
+    DepthBuffer m_spotShadowMaps[kMaxSpotShadowLights];
+    bool m_spotShadowMapsReady = false;
+    int m_numSpotShadowLights = 0;
+    Vector3 m_spotShadowPositions[kMaxSpotShadowLights];
+    float m_spotShadowRanges[kMaxSpotShadowLights];
+    float m_spotShadowBiases[kMaxSpotShadowLights];
+    Matrix m_spotShadowVPs[kMaxSpotShadowLights];
+
+    struct CachedSpotShadowEntry {
+        int objectId = -1;
+        int shadowIndex = -1;
+    };
+    CachedSpotShadowEntry m_cachedSpotShadowEntries[kMaxSpotShadowLights];
+    int m_numCachedSpotShadowEntries = 0;
 
     // Object ID picking
     ComPtr<ID3D12PipelineState> m_objectIdPSO;
