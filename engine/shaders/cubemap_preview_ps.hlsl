@@ -1,3 +1,5 @@
+#include "depth_utils.hlsli"
+
 TextureCube<float> cubemapDepth : register(t0);
 SamplerState pointSampler : register(s0);
 
@@ -54,5 +56,5 @@ float4 main(PSInput input) : SV_TARGET
     float linearDepth = (nearZ * farZ) / (farZ - storedDepth * (farZ - nearZ));
     float normalized = linearDepth / farZ;
 
-    return float4(normalized, normalized, normalized, 1.0);
+    return DepthToGrayscale(normalized);
 }

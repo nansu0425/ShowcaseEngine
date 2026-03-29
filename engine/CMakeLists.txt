@@ -89,6 +89,7 @@ endif()
 
 # Compile shaders
 target_compile_shaders(ShowcaseEngine
+    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/shaders/depth_utils.hlsli
     VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh_vs.hlsl
     VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/outline_vs.hlsl
     VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/frustum_debug_vs.hlsl

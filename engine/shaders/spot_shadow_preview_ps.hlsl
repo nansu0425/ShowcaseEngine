@@ -1,3 +1,5 @@
+#include "depth_utils.hlsli"
+
 Texture2D<float> depthTex : register(t0);
 SamplerState pointSampler : register(s0);
 
@@ -21,7 +23,7 @@ float4 main(PSInput input) : SV_TARGET
 
     // Linearize perspective depth (matches CalculateSpotShadow in mesh_ps.hlsl)
     float linearDepth = (nearZ * farZ) / (farZ - storedDepth * (farZ - nearZ));
-    float normalized = 1.0 - linearDepth / farZ;
+    float normalized = linearDepth / farZ;
 
-    return float4(normalized, normalized, normalized, 1.0);
+    return DepthToGrayscale(normalized);
 }
