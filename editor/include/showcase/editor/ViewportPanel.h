@@ -69,6 +69,10 @@ public:
     bool GetShowSpotShadowFrustum() const { return m_showSpotShadowFrustum; }
     void SetShowSpotShadowFrustum(bool show) { m_showSpotShadowFrustum = show; }
 
+    void ToggleShowSpotAttenuationOverlay() { m_showSpotAttenuationOverlay = !m_showSpotAttenuationOverlay; }
+    bool GetShowSpotAttenuationOverlay() const { return m_showSpotAttenuationOverlay; }
+    void SetShowSpotAttenuationOverlay(bool show) { m_showSpotAttenuationOverlay = show; }
+
     ViewMode GetViewMode() const { return m_viewMode; }
     void SetViewMode(ViewMode mode) { m_viewMode = mode; }
 
@@ -100,6 +104,7 @@ private:
     bool m_showDepthHeatmapOverlay = false;
     bool m_showSpotShadowOverlay = false;
     bool m_showSpotShadowFrustum = false;
+    bool m_showSpotAttenuationOverlay = false;
     ViewMode m_viewMode = static_cast<ViewMode>(0); // ViewMode::Lit
     ToolbarCallback m_toolbarCallback;
 

@@ -102,6 +102,12 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
                                                      : "Spot shadow frustum wireframe disabled";
     });
 
+    m_console.RegisterCommand("spot_attenuation_overlay", [this](const std::string&) -> std::string {
+        m_viewport.ToggleShowSpotAttenuationOverlay();
+        return m_viewport.GetShowSpotAttenuationOverlay() ? "Spot attenuation heatmap overlay enabled"
+                                                          : "Spot attenuation heatmap overlay disabled";
+    });
+
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext))
         return false;
 
@@ -213,6 +219,7 @@ void EditorApp::SaveEditorConfig() {
     vp["showDepthHeatmapOverlay"].Set(m_viewport.GetShowDepthHeatmapOverlay());
     vp["showSpotShadowOverlay"].Set(m_viewport.GetShowSpotShadowOverlay());
     vp["showSpotShadowFrustum"].Set(m_viewport.GetShowSpotShadowFrustum());
+    vp["showSpotAttenuationOverlay"].Set(m_viewport.GetShowSpotAttenuationOverlay());
     vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
     vp["cameraLookSpeed"].Set(m_viewport.cameraLookSpeed);
 
@@ -269,6 +276,9 @@ void EditorApp::LoadEditorConfig() {
     }
     if (vp.Contains("showSpotShadowFrustum")) {
         m_viewport.SetShowSpotShadowFrustum(vp["showSpotShadowFrustum"].GetBool());
+    }
+    if (vp.Contains("showSpotAttenuationOverlay")) {
+        m_viewport.SetShowSpotAttenuationOverlay(vp["showSpotAttenuationOverlay"].GetBool());
     }
     if (vp.Contains("cameraMoveSpeed")) {
         m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].GetFloat();
@@ -858,6 +868,15 @@ int EditorApp::Run() {
                     m_sceneRenderer.RenderSpotShadowFrustum(m_renderContext, m_viewport.GetCamera(),
                                                             ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer().GetDSV(),
                                                             ot.GetWidth(), ot.GetHeight(), shadowIdx);
+                }
+            }
+            if (m_viewport.GetViewMode() == ViewMode::Lit && m_viewport.GetShowSpotAttenuationOverlay()) {
+                int lightIdx = m_sceneRenderer.GetSpotLightIndex(m_editorController.GetSelectedObjectId());
+                if (lightIdx >= 0) {
+                    auto& ot = m_viewport.GetOffscreenTarget();
+                    m_sceneRenderer.RenderSpotAttenuationOverlay(m_renderContext, m_viewport.GetCamera(),
+                                                                 ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer(),
+                                                                 ot.GetWidth(), ot.GetHeight(), lightIdx);
                 }
             }
             m_viewport.EndRender(m_renderContext.GetCommandList());

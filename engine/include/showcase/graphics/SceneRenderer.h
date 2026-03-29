@@ -107,6 +107,9 @@ public:
     /// Returns the shadow slot index (0..3) for a spot light with the given object ID,
     /// or -1 if the light has no shadow slot assigned this frame.
     int GetSpotShadowIndex(int objectId) const;
+    /// Returns the index (0..7) for a spot light with the given object ID in the ALL-spot-lights array,
+    /// or -1 if the object is not a spot light this frame.
+    int GetSpotLightIndex(int objectId) const;
     static constexpr uint32_t GetSpotShadowResolution() { return kSpotShadowMapResolution; }
     static constexpr float GetSpotShadowNearZ() { return kSpotShadowNearZ; }
 
@@ -143,6 +146,11 @@ public:
     /// Call between Render() and viewport EndRender() while scene depth is populated.
     void RenderSpotShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                                  DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
+
+    /// Renders a spot light attenuation heatmap overlay (green=high, yellow=mid, red=low, transparent=outside).
+    /// Call between Render() and viewport EndRender() while scene depth is populated.
+    void RenderSpotAttenuationOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                      DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int lightIndex);
 
     /// Renders a spot shadow frustum as a depth-tested semi-transparent pyramid (wireframe + fill).
     /// Call between Render() and viewport EndRender() while scene depth is populated.
@@ -252,6 +260,10 @@ private:
     ComPtr<ID3D12RootSignature> m_spotShadowOverlayRootSig;
     ComPtr<ID3D12PipelineState> m_spotShadowOverlayPSO;
 
+    // Spot attenuation overlay (heatmap: distance * angular falloff)
+    ComPtr<ID3D12RootSignature> m_spotAttenuationOverlayRootSig;
+    ComPtr<ID3D12PipelineState> m_spotAttenuationOverlayPSO;
+
     // Cubemap face preview (point shadow depth-to-grayscale)
     RenderTarget m_cubemapPreviewRT[6];
     ComPtr<ID3D12RootSignature> m_cubemapPreviewRootSig;
@@ -337,6 +349,22 @@ private:
     int m_numCachedSpotShadowEntries = 0;
 
     SpotShadowFrustumDebugData m_spotShadowFrustumDebug[kMaxSpotShadowLights];
+
+    // Spot light data (ALL spot lights — shadow and non-shadow — populated in Render())
+    static constexpr int kMaxSpotLights = 8;
+    Vector3 m_spotLightPositions[kMaxSpotLights];
+    float m_spotLightRanges[kMaxSpotLights];
+    Vector3 m_spotLightDirections[kMaxSpotLights];
+    float m_spotLightOuterCos[kMaxSpotLights];
+    float m_spotLightInnerCos[kMaxSpotLights];
+    int m_numSpotLightsTracked = 0;
+
+    struct CachedSpotLightEntry {
+        int objectId = -1;
+        int lightIndex = -1;
+    };
+    CachedSpotLightEntry m_cachedSpotLightEntries[kMaxSpotLights];
+    int m_numCachedSpotLightEntries = 0;
 
     // Object ID picking
     ComPtr<ID3D12PipelineState> m_objectIdPSO;

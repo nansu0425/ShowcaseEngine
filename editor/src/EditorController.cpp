@@ -1028,6 +1028,16 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                             }
                         }
 
+                        ImGui::Spacing();
+                        ImGui::Separator();
+                        ImGui::Text("Diagnostics");
+                        {
+                            bool showSpotAtten = viewport.GetShowSpotAttenuationOverlay();
+                            if (ImGui::Checkbox("Spot Attenuation Heatmap", &showSpotAtten)) {
+                                viewport.SetShowSpotAttenuationOverlay(showSpotAtten);
+                            }
+                        }
+
                         ImGui::TextDisabled("Position + direction controlled by object transform");
                     }
                 }

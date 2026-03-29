@@ -918,6 +918,43 @@ void SceneRenderer::Init(RenderContext& ctx) {
         m_spotShadowOverlayPSO = PipelineState::CreateGraphicsPSO(device, spotOverlayDesc);
     }
 
+    // Spot attenuation overlay (heatmap: distance * angular falloff)
+    {
+        D3D12_SHADER_BYTECODE spotAttenPs =
+            ctx.GetShaderManager().LoadShader("shaders/spot_attenuation_overlay_ps_ps.cso");
+
+        m_spotAttenuationOverlayRootSig =
+            RootSignatureBuilder()
+                .AddConstants({28, 0})                                   // slot 0: 28 DWORDs at b0
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, // slot 1: scene depth t0
+                                     0, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .AddStaticSampler({0, 0, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                                   D3D12_TEXTURE_ADDRESS_MODE_CLAMP}) // s0: point clamp (depth)
+                .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                .Build(device);
+
+        GraphicsPipelineDesc spotAttenDesc;
+        spotAttenDesc.rootSignature = m_spotAttenuationOverlayRootSig.Get();
+        spotAttenDesc.vertexShader = ctx.GetShaderManager().LoadShader("shaders/outline_vs_vs.cso");
+        spotAttenDesc.pixelShader = spotAttenPs;
+        spotAttenDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        spotAttenDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+
+        spotAttenDesc.blendState.RenderTarget[0].BlendEnable = TRUE;
+        spotAttenDesc.blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        spotAttenDesc.blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        spotAttenDesc.blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        spotAttenDesc.blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+        spotAttenDesc.blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        spotAttenDesc.blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+        spotAttenDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        spotAttenDesc.depthStencilState.DepthEnable = FALSE;
+        spotAttenDesc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+        m_spotAttenuationOverlayPSO = PipelineState::CreateGraphicsPSO(device, spotAttenDesc);
+    }
+
     // Cubemap face preview (point shadow depth-to-grayscale for inspector cross layout)
     {
         D3D12_SHADER_BYTECODE cubemapPreviewPs = ctx.GetShaderManager().LoadShader("shaders/cubemap_preview_ps_ps.cso");
@@ -1471,6 +1508,14 @@ int SceneRenderer::GetSpotShadowIndex(int objectId) const {
     for (int i = 0; i < m_numCachedSpotShadowEntries; ++i) {
         if (m_cachedSpotShadowEntries[i].objectId == objectId)
             return m_cachedSpotShadowEntries[i].shadowIndex;
+    }
+    return -1;
+}
+
+int SceneRenderer::GetSpotLightIndex(int objectId) const {
+    for (int i = 0; i < m_numCachedSpotLightEntries; ++i) {
+        if (m_cachedSpotLightEntries[i].objectId == objectId)
+            return m_cachedSpotLightEntries[i].lightIndex;
     }
     return -1;
 }
@@ -2335,6 +2380,79 @@ void SceneRenderer::RenderSpotShadowOverlay(RenderContext& ctx, Camera& camera, 
     cmdList->ResourceBarrier(1, &barrier);
 }
 
+void SceneRenderer::RenderSpotAttenuationOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                                 DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height,
+                                                 int lightIndex) {
+    if (lightIndex < 0 || lightIndex >= m_numSpotLightsTracked)
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Transition scene depth buffer: DEPTH_WRITE -> PIXEL_SHADER_RESOURCE
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = sceneDepthBuffer.GetResource();
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    barrier.Transition.StateAfter =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_spotAttenuationOverlayRootSig.Get());
+    cmdList->SetPipelineState(m_spotAttenuationOverlayPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    Matrix vp = camera.GetViewMatrix() * camera.GetProjectionMatrix();
+    Matrix invVP = vp.Invert();
+
+    struct SpotAttenuationOverlayParams {
+        Matrix invViewProjection;
+        float lightPosition[3];
+        float lightRange;
+        float lightDirection[3];
+        float outerCos;
+        float innerCos;
+        float overlayAlpha;
+        float _pad0;
+        float _pad1;
+    } params;
+
+    params.invViewProjection = invVP;
+    params.lightPosition[0] = m_spotLightPositions[lightIndex].x;
+    params.lightPosition[1] = m_spotLightPositions[lightIndex].y;
+    params.lightPosition[2] = m_spotLightPositions[lightIndex].z;
+    params.lightRange = m_spotLightRanges[lightIndex];
+    params.lightDirection[0] = m_spotLightDirections[lightIndex].x;
+    params.lightDirection[1] = m_spotLightDirections[lightIndex].y;
+    params.lightDirection[2] = m_spotLightDirections[lightIndex].z;
+    params.outerCos = m_spotLightOuterCos[lightIndex];
+    params.innerCos = m_spotLightInnerCos[lightIndex];
+    params.overlayAlpha = 0.35f;
+    params._pad0 = 0.0f;
+    params._pad1 = 0.0f;
+
+    cmdList->SetGraphicsRoot32BitConstants(0, 28, &params, 0);
+
+    ID3D12DescriptorHeap* heaps[] = {ctx.GetSrvHeap().GetHeap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+    cmdList->SetGraphicsRootDescriptorTable(1, sceneDepthBuffer.GetSRV().gpu);
+
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    // Transition scene depth buffer back: PIXEL_SHADER_RESOURCE -> DEPTH_WRITE
+    barrier.Transition.StateBefore =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    cmdList->ResourceBarrier(1, &barrier);
+}
+
 void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int selectedObjectId,
                            const PrimitiveHighlight& highlight) {
     SE_ZONE_SCOPED_C(profile::kColorRendering);
@@ -2455,8 +2573,18 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
             }
         }
         m_cachedSpotShadowEntries[i] = {spotLights[i].objectId, frameData.spotLights[i].shadowIndex};
+
+        // Track ALL spot lights for non-shadow debug tools (e.g. attenuation overlay)
+        m_spotLightPositions[i] = spotLights[i].position;
+        m_spotLightRanges[i] = spotLights[i].range;
+        m_spotLightDirections[i] = spotLights[i].direction;
+        m_spotLightOuterCos[i] = spotLights[i].outerCos;
+        m_spotLightInnerCos[i] = spotLights[i].innerCos;
+        m_cachedSpotLightEntries[i] = {spotLights[i].objectId, i};
     }
     m_numCachedSpotShadowEntries = numSL;
+    m_numCachedSpotLightEntries = numSL;
+    m_numSpotLightsTracked = numSL;
     if (numSL > 0)
         frameData.lightingEnabled = 1;
 
