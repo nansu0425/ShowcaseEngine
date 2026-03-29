@@ -971,6 +971,12 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                     viewport.SetShowSpotShadowOverlay(showSpotOverlay);
                                 }
                             }
+                            {
+                                bool showSpotFrustum = viewport.GetShowSpotShadowFrustum();
+                                if (ImGui::Checkbox("Spot Shadow Frustum", &showSpotFrustum)) {
+                                    viewport.SetShowSpotShadowFrustum(showSpotFrustum);
+                                }
+                            }
 
                             int shadowIdx = m_renderer ? m_renderer->GetSpotShadowIndex(selected->id) : -1;
                             if (m_renderer && ImGui::CollapsingHeader("Spot Shadow Info")) {

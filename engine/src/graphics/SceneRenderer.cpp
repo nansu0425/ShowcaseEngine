@@ -1354,6 +1354,8 @@ int SceneRenderer::GetPointShadowIndex(int objectId) const {
 void SceneRenderer::RenderSpotShadowPass(RenderContext& ctx, Scene& scene) {
     SE_ZONE_SCOPED_C(profile::kColorRendering);
     m_numSpotShadowLights = 0;
+    for (int i = 0; i < kMaxSpotShadowLights; ++i)
+        m_spotShadowFrustumDebug[i].valid = false;
 
     if (!m_spotShadowMapsReady)
         return;
@@ -1397,6 +1399,20 @@ void SceneRenderer::RenderSpotShadowPass(RenderContext& ctx, Scene& scene) {
         Matrix proj = PerspectiveFovLH(fov, 1.0f, kSpotShadowNearZ, sl.range);
         Matrix viewProj = view * proj;
         m_spotShadowVPs[idx] = viewProj;
+
+        // Compute world-space frustum corners for debug visualization
+        {
+            const Vector4 ndcCorners[8] = {
+                {-1, -1, 0, 1}, {1, -1, 0, 1}, {1, 1, 0, 1}, {-1, 1, 0, 1}, // near
+                {-1, -1, 1, 1}, {1, -1, 1, 1}, {1, 1, 1, 1}, {-1, 1, 1, 1}, // far
+            };
+            Matrix invVP = viewProj.Invert();
+            for (int i = 0; i < 8; ++i) {
+                Vector4 world = Vector4::Transform(ndcCorners[i], invVP);
+                m_spotShadowFrustumDebug[idx].corners[i] = Vector3(world.x, world.y, world.z) / world.w;
+            }
+            m_spotShadowFrustumDebug[idx].valid = true;
+        }
 
         // CB slot: after directional (1) and point faces (6*6=36)
         uint32_t cbSlot = 1 + kMaxPointLights * 6 + idx;
@@ -1526,6 +1542,68 @@ void SceneRenderer::RenderShadowFrustum(RenderContext& ctx, Camera& camera, D3D1
     constants.color[0] = 1.0f;
     constants.color[1] = 0.7f;
     constants.color[2] = 0.0f;
+    constants.color[3] = 1.0f;
+    constants.mode = 1;
+
+    cmdList->SetPipelineState(m_frustumDebugLinePSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+    cmdList->SetGraphicsRoot32BitConstants(0, 53, &constants, 0);
+    cmdList->DrawInstanced(24, 1, 0, 0);
+}
+
+void SceneRenderer::RenderSpotShadowFrustum(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                            D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height,
+                                            int shadowIndex) {
+    if (shadowIndex < 0 || shadowIndex >= kMaxSpotShadowLights)
+        return;
+    if (!m_spotShadowFrustumDebug[shadowIndex].valid)
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+    D3D12_VIEWPORT vp = {0, 0, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    cmdList->RSSetViewports(1, &vp);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_frustumDebugRootSig.Get());
+
+    // Root constants: VP(16) + color(4) + corners(32) + mode(1) = 53 DWORDs
+    struct {
+        float viewProjection[16];
+        float color[4];
+        float corners[32]; // 8 x float4 (xyz + pad)
+        uint32_t mode;
+    } constants = {};
+
+    Matrix vpMat = camera.GetViewProjectionMatrix();
+    memcpy(constants.viewProjection, &vpMat, sizeof(float) * 16);
+
+    for (int i = 0; i < 8; ++i) {
+        constants.corners[i * 4 + 0] = m_spotShadowFrustumDebug[shadowIndex].corners[i].x;
+        constants.corners[i * 4 + 1] = m_spotShadowFrustumDebug[shadowIndex].corners[i].y;
+        constants.corners[i * 4 + 2] = m_spotShadowFrustumDebug[shadowIndex].corners[i].z;
+        constants.corners[i * 4 + 3] = 0.0f;
+    }
+
+    // Pass 1: Semi-transparent filled faces (yellow)
+    constants.color[0] = 1.0f;
+    constants.color[1] = 0.9f;
+    constants.color[2] = 0.2f;
+    constants.color[3] = 0.12f;
+    constants.mode = 0;
+
+    cmdList->SetPipelineState(m_frustumDebugTriPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->SetGraphicsRoot32BitConstants(0, 53, &constants, 0);
+    cmdList->DrawInstanced(36, 1, 0, 0);
+
+    // Pass 2: Opaque wireframe edges (yellow)
+    constants.color[0] = 1.0f;
+    constants.color[1] = 0.9f;
+    constants.color[2] = 0.2f;
     constants.color[3] = 1.0f;
     constants.mode = 1;
 

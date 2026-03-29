@@ -96,6 +96,12 @@ bool EditorApp::Init(const EditorAppDesc& desc) {
                                                      : "Spot shadow coverage overlay disabled";
     });
 
+    m_console.RegisterCommand("spot_shadow_frustum", [this](const std::string&) -> std::string {
+        m_viewport.ToggleShowSpotShadowFrustum();
+        return m_viewport.GetShowSpotShadowFrustum() ? "Spot shadow frustum wireframe enabled"
+                                                     : "Spot shadow frustum wireframe disabled";
+    });
+
     if (!m_imguiLayer.Init(m_window.GetHandle(), m_renderContext))
         return false;
 
@@ -206,6 +212,7 @@ void EditorApp::SaveEditorConfig() {
     vp["showCubemapFaceOverlay"].Set(m_viewport.GetShowCubemapFaceOverlay());
     vp["showDepthHeatmapOverlay"].Set(m_viewport.GetShowDepthHeatmapOverlay());
     vp["showSpotShadowOverlay"].Set(m_viewport.GetShowSpotShadowOverlay());
+    vp["showSpotShadowFrustum"].Set(m_viewport.GetShowSpotShadowFrustum());
     vp["cameraMoveSpeed"].Set(m_viewport.cameraMoveSpeed);
     vp["cameraLookSpeed"].Set(m_viewport.cameraLookSpeed);
 
@@ -259,6 +266,9 @@ void EditorApp::LoadEditorConfig() {
     }
     if (vp.Contains("showSpotShadowOverlay")) {
         m_viewport.SetShowSpotShadowOverlay(vp["showSpotShadowOverlay"].GetBool());
+    }
+    if (vp.Contains("showSpotShadowFrustum")) {
+        m_viewport.SetShowSpotShadowFrustum(vp["showSpotShadowFrustum"].GetBool());
     }
     if (vp.Contains("cameraMoveSpeed")) {
         m_viewport.cameraMoveSpeed = vp["cameraMoveSpeed"].GetFloat();
@@ -838,6 +848,15 @@ int EditorApp::Run() {
                     auto& ot = m_viewport.GetOffscreenTarget();
                     m_sceneRenderer.RenderSpotShadowOverlay(m_renderContext, m_viewport.GetCamera(),
                                                             ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer(),
+                                                            ot.GetWidth(), ot.GetHeight(), shadowIdx);
+                }
+            }
+            if (m_viewport.GetViewMode() == ViewMode::Lit && m_viewport.GetShowSpotShadowFrustum()) {
+                int shadowIdx = m_sceneRenderer.GetSpotShadowIndex(m_editorController.GetSelectedObjectId());
+                if (shadowIdx >= 0) {
+                    auto& ot = m_viewport.GetOffscreenTarget();
+                    m_sceneRenderer.RenderSpotShadowFrustum(m_renderContext, m_viewport.GetCamera(),
+                                                            ot.GetRenderTarget().GetRTV(), ot.GetDepthBuffer().GetDSV(),
                                                             ot.GetWidth(), ot.GetHeight(), shadowIdx);
                 }
             }

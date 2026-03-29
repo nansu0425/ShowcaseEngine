@@ -49,6 +49,11 @@ struct ShadowFrustumDebugData {
     bool valid = false;
 };
 
+struct SpotShadowFrustumDebugData {
+    Vector3 corners[8]; // world-space frustum corners (near 0-3, far 4-7)
+    bool valid = false;
+};
+
 class SceneRenderer {
 public:
     void Init(RenderContext& ctx);
@@ -86,6 +91,12 @@ public:
 
     const ShadowDebugStats& GetShadowDebugStats() const { return m_shadowDebugStats; }
     const ShadowFrustumDebugData& GetShadowFrustumDebug() const { return m_shadowFrustumDebug; }
+    const SpotShadowFrustumDebugData& GetSpotShadowFrustumDebug(int index) const {
+        static const SpotShadowFrustumDebugData kInvalid{};
+        if (index < 0 || index >= kMaxSpotShadowLights)
+            return kInvalid;
+        return m_spotShadowFrustumDebug[index];
+    }
 
     /// Returns the shadow slot index (0..5) for a point light with the given object ID,
     /// or -1 if the light has no shadow slot assigned this frame.
@@ -132,6 +143,11 @@ public:
     /// Call between Render() and viewport EndRender() while scene depth is populated.
     void RenderSpotShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                                  DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
+
+    /// Renders a spot shadow frustum as a depth-tested semi-transparent pyramid (wireframe + fill).
+    /// Call between Render() and viewport EndRender() while scene depth is populated.
+    void RenderSpotShadowFrustum(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                 D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height, int shadowIndex);
 
     void RenderCubemapPreview(RenderContext& ctx, int shadowIndex);
     D3D12_GPU_DESCRIPTOR_HANDLE GetCubemapPreviewFaceSRV(uint32_t face) const;
@@ -309,6 +325,8 @@ private:
     };
     CachedSpotShadowEntry m_cachedSpotShadowEntries[kMaxSpotShadowLights];
     int m_numCachedSpotShadowEntries = 0;
+
+    SpotShadowFrustumDebugData m_spotShadowFrustumDebug[kMaxSpotShadowLights];
 
     // Object ID picking
     ComPtr<ID3D12PipelineState> m_objectIdPSO;
