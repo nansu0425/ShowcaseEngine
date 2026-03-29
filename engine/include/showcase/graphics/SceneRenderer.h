@@ -128,6 +128,11 @@ public:
     void RenderDepthHeatmapOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                                    DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
 
+    /// Renders a semi-transparent spot shadow coverage overlay (red=shadowed, green=lit, blue=outside cone/range).
+    /// Call between Render() and viewport EndRender() while scene depth is populated.
+    void RenderSpotShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                 DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height, int shadowIndex);
+
     void RenderCubemapPreview(RenderContext& ctx, int shadowIndex);
     D3D12_GPU_DESCRIPTOR_HANDLE GetCubemapPreviewFaceSRV(uint32_t face) const;
     bool IsCubemapPreviewReady() const { return m_cubemapPreviewRendered; }
@@ -223,6 +228,10 @@ private:
     // Depth precision heatmap overlay (shares root sig with cubemap face overlay)
     ComPtr<ID3D12PipelineState> m_depthHeatmapOverlayPSO;
 
+    // Spot shadow coverage overlay
+    ComPtr<ID3D12RootSignature> m_spotShadowOverlayRootSig;
+    ComPtr<ID3D12PipelineState> m_spotShadowOverlayPSO;
+
     // Cubemap face preview (point shadow depth-to-grayscale)
     RenderTarget m_cubemapPreviewRT[6];
     ComPtr<ID3D12RootSignature> m_cubemapPreviewRootSig;
@@ -291,6 +300,8 @@ private:
     float m_spotShadowRanges[kMaxSpotShadowLights];
     float m_spotShadowBiases[kMaxSpotShadowLights];
     Matrix m_spotShadowVPs[kMaxSpotShadowLights];
+    Vector3 m_spotShadowDirections[kMaxSpotShadowLights];
+    float m_spotShadowOuterCos[kMaxSpotShadowLights];
 
     struct CachedSpotShadowEntry {
         int objectId = -1;

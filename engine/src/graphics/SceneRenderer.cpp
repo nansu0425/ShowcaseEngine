@@ -876,6 +876,48 @@ void SceneRenderer::Init(RenderContext& ctx) {
         m_depthHeatmapOverlayPSO = PipelineState::CreateGraphicsPSO(device, heatmapDesc);
     }
 
+    // Spot shadow coverage overlay (fullscreen pass: reconstruct world pos, project onto spot shadow map)
+    {
+        D3D12_SHADER_BYTECODE spotOverlayPs =
+            ctx.GetShaderManager().LoadShader("shaders/spot_shadow_overlay_ps_ps.cso");
+
+        m_spotShadowOverlayRootSig =
+            RootSignatureBuilder()
+                .AddConstants({44, 0})                                   // slot 0: 44 DWORDs at b0
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, // slot 1: scene depth t0
+                                     0, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, // slot 2: spot shadow map t1
+                                     1, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .AddStaticSampler({0, 0, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                                   D3D12_TEXTURE_ADDRESS_MODE_CLAMP}) // s0: point clamp (depth)
+                .AddStaticSampler({1, 0,                              // s1: comparison sampler
+                                   D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                                   D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE})
+                .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                .Build(device);
+
+        GraphicsPipelineDesc spotOverlayDesc;
+        spotOverlayDesc.rootSignature = m_spotShadowOverlayRootSig.Get();
+        spotOverlayDesc.vertexShader = ctx.GetShaderManager().LoadShader("shaders/outline_vs_vs.cso");
+        spotOverlayDesc.pixelShader = spotOverlayPs;
+        spotOverlayDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        spotOverlayDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+
+        spotOverlayDesc.blendState.RenderTarget[0].BlendEnable = TRUE;
+        spotOverlayDesc.blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        spotOverlayDesc.blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        spotOverlayDesc.blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        spotOverlayDesc.blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+        spotOverlayDesc.blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        spotOverlayDesc.blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+        spotOverlayDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        spotOverlayDesc.depthStencilState.DepthEnable = FALSE;
+        spotOverlayDesc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+        m_spotShadowOverlayPSO = PipelineState::CreateGraphicsPSO(device, spotOverlayDesc);
+    }
+
     // Cubemap face preview (point shadow depth-to-grayscale for inspector cross layout)
     {
         D3D12_SHADER_BYTECODE cubemapPreviewPs = ctx.GetShaderManager().LoadShader("shaders/cubemap_preview_ps_ps.cso");
@@ -937,6 +979,8 @@ void SceneRenderer::Shutdown() {
     m_shadowOverlayRootSig.Reset();
     m_pointShadowOverlayPSO.Reset();
     m_pointShadowOverlayRootSig.Reset();
+    m_spotShadowOverlayPSO.Reset();
+    m_spotShadowOverlayRootSig.Reset();
     m_depthHeatmapOverlayPSO.Reset();
     m_shadowPreviewPSO.Reset();
     m_shadowPreviewRootSig.Reset();
@@ -1321,10 +1365,16 @@ void SceneRenderer::RenderSpotShadowPass(RenderContext& ctx, Scene& scene) {
         if (!sl.castShadow || m_numSpotShadowLights >= kMaxSpotShadowLights)
             continue;
 
+        // Skip degenerate projections: range must exceed near plane, outerAngle must be nonzero
+        if (sl.range <= kSpotShadowNearZ + 0.0001f || sl.outerAngle < 0.001f)
+            continue;
+
         int idx = m_numSpotShadowLights;
         m_spotShadowPositions[idx] = sl.position;
         m_spotShadowRanges[idx] = sl.range;
         m_spotShadowBiases[idx] = sl.shadowBias;
+        m_spotShadowDirections[idx] = sl.direction;
+        m_spotShadowOuterCos[idx] = sl.outerCos;
 
         // Transition: SRV -> DEPTH_WRITE
         D3D12_RESOURCE_BARRIER barrier = {};
@@ -2016,6 +2066,82 @@ void SceneRenderer::RenderDepthHeatmapOverlay(RenderContext& ctx, Camera& camera
     ID3D12DescriptorHeap* heaps[] = {ctx.GetSrvHeap().GetHeap()};
     cmdList->SetDescriptorHeaps(1, heaps);
     cmdList->SetGraphicsRootDescriptorTable(1, sceneDepthBuffer.GetSRV().gpu);
+
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    // Transition scene depth buffer back: PIXEL_SHADER_RESOURCE -> DEPTH_WRITE
+    barrier.Transition.StateBefore =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    cmdList->ResourceBarrier(1, &barrier);
+}
+
+void SceneRenderer::RenderSpotShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                            DepthBuffer& sceneDepthBuffer, uint32_t width, uint32_t height,
+                                            int shadowIndex) {
+    if (shadowIndex < 0 || shadowIndex >= m_numSpotShadowLights)
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Transition scene depth buffer: DEPTH_WRITE -> PIXEL_SHADER_RESOURCE
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = sceneDepthBuffer.GetResource();
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    barrier.Transition.StateAfter =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_spotShadowOverlayRootSig.Get());
+    cmdList->SetPipelineState(m_spotShadowOverlayPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    Matrix vp = camera.GetViewMatrix() * camera.GetProjectionMatrix();
+    Matrix invVP = vp.Invert();
+
+    struct SpotShadowOverlayParams {
+        Matrix invViewProjection;
+        Matrix spotShadowVP;
+        float lightPosition[3];
+        float lightRange;
+        float lightDirection[3];
+        float outerCos;
+        float shadowBias;
+        float shadowMapTexelSize;
+        float overlayAlpha;
+        float _pad0;
+    } params;
+
+    params.invViewProjection = invVP;
+    params.spotShadowVP = m_spotShadowVPs[shadowIndex];
+    params.lightPosition[0] = m_spotShadowPositions[shadowIndex].x;
+    params.lightPosition[1] = m_spotShadowPositions[shadowIndex].y;
+    params.lightPosition[2] = m_spotShadowPositions[shadowIndex].z;
+    params.lightRange = m_spotShadowRanges[shadowIndex];
+    params.lightDirection[0] = m_spotShadowDirections[shadowIndex].x;
+    params.lightDirection[1] = m_spotShadowDirections[shadowIndex].y;
+    params.lightDirection[2] = m_spotShadowDirections[shadowIndex].z;
+    params.outerCos = m_spotShadowOuterCos[shadowIndex];
+    params.shadowBias = m_spotShadowBiases[shadowIndex];
+    params.shadowMapTexelSize = 1.0f / static_cast<float>(kSpotShadowMapResolution);
+    params.overlayAlpha = 0.35f;
+    params._pad0 = 0.0f;
+
+    cmdList->SetGraphicsRoot32BitConstants(0, 44, &params, 0);
+
+    ID3D12DescriptorHeap* heaps[] = {ctx.GetSrvHeap().GetHeap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+    cmdList->SetGraphicsRootDescriptorTable(1, sceneDepthBuffer.GetSRV().gpu);
+    cmdList->SetGraphicsRootDescriptorTable(2, m_spotShadowMaps[shadowIndex].GetSRV().gpu);
 
     cmdList->DrawInstanced(3, 1, 0, 0);
 

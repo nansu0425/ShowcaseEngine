@@ -964,16 +964,44 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                             DragLightProperty(
                                 {"Shadow Bias", &light.shadowBias, 0.0001f, 0.0f, 0.01f, &light, &scene, selected->id});
 
+                            ImGui::Spacing();
+                            {
+                                bool showSpotOverlay = viewport.GetShowSpotShadowOverlay();
+                                if (ImGui::Checkbox("Spot Shadow Coverage", &showSpotOverlay)) {
+                                    viewport.SetShowSpotShadowOverlay(showSpotOverlay);
+                                }
+                            }
+
                             int shadowIdx = m_renderer ? m_renderer->GetSpotShadowIndex(selected->id) : -1;
                             if (m_renderer && ImGui::CollapsingHeader("Spot Shadow Info")) {
+                                Vector3 pos = selected->position;
+                                Vector3 forward(selected->worldTransform._31, selected->worldTransform._32,
+                                                selected->worldTransform._33);
+                                forward.Normalize();
+                                float range = light.range;
                                 uint32_t res = SceneRenderer::GetSpotShadowResolution();
                                 float nearZ = SceneRenderer::GetSpotShadowNearZ();
-                                ImGui::Text("Resolution: %u x %u", res, res);
+                                float outerAngleRad = light.outerAngle * 3.14159265f / 180.0f;
+                                float fov = 2.0f * light.outerAngle;
+                                float texelDensity =
+                                    (range > 0.0f && outerAngleRad > 0.0f)
+                                        ? static_cast<float>(res) / (2.0f * std::tan(outerAngleRad) * (range * 0.5f))
+                                        : 0.0f;
+
+                                ImGui::Text("Position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
+                                ImGui::Text("Direction: (%.3f, %.3f, %.3f)", forward.x, forward.y, forward.z);
+                                ImGui::Text("FOV: %.1f deg", fov);
+                                ImGui::Text("Inner / Outer angle: %.1f / %.1f deg", light.innerAngle, light.outerAngle);
+                                ImGui::Text("Range: %.2f m", range);
                                 ImGui::Text("Near plane: %.2f", nearZ);
+                                ImGui::Text("Resolution: %u x %u", res, res);
+                                ImGui::Text("Shadow Bias: %.4f", light.shadowBias);
+                                ImGui::Text("Texels/m at mid-range: %.1f", texelDensity);
                                 if (shadowIdx >= 0)
                                     ImGui::Text("Shadow index: %d", shadowIdx);
                                 else
-                                    ImGui::TextDisabled("No shadow slot (max %d)", SceneRenderer::kMaxSpotShadowLights);
+                                    ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1),
+                                                       "Shadow index: -1 (slot limit reached)");
                             }
                         }
 
