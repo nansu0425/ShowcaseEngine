@@ -75,7 +75,8 @@ cbuffer PerFrame : register(b0)
     // Point light shadow mapping
     int numPointShadowLights;
     float pointShadowNearZ;
-    float2 _pad5;
+    float pointShadowMapResolution;
+    float _pad5;
 
     // Spot light shadow mapping
     int numSpotShadowLights;
@@ -132,38 +133,73 @@ float CalculateShadow(float3 worldPos)
     return shadow / 9.0;
 }
 
-float SamplePointShadowCubemap(float3 dir, int idx)
+float SamplePointShadowCmp(float3 dir, float compareDepth, int idx)
 {
     if (idx == 0)
-        return pointShadowMap0.SampleLevel(linearSampler, dir, 0).r;
+        return pointShadowMap0.SampleCmpLevelZero(shadowSampler, dir, compareDepth);
     if (idx == 1)
-        return pointShadowMap1.SampleLevel(linearSampler, dir, 0).r;
+        return pointShadowMap1.SampleCmpLevelZero(shadowSampler, dir, compareDepth);
     if (idx == 2)
-        return pointShadowMap2.SampleLevel(linearSampler, dir, 0).r;
+        return pointShadowMap2.SampleCmpLevelZero(shadowSampler, dir, compareDepth);
     if (idx == 3)
-        return pointShadowMap3.SampleLevel(linearSampler, dir, 0).r;
+        return pointShadowMap3.SampleCmpLevelZero(shadowSampler, dir, compareDepth);
     if (idx == 4)
-        return pointShadowMap4.SampleLevel(linearSampler, dir, 0).r;
-    return pointShadowMap5.SampleLevel(linearSampler, dir, 0).r;
+        return pointShadowMap4.SampleCmpLevelZero(shadowSampler, dir, compareDepth);
+    return pointShadowMap5.SampleCmpLevelZero(shadowSampler, dir, compareDepth);
+}
+
+void GetCubemapFaceTangents(float3 dir, out float3 tangent, out float3 bitangent)
+{
+    float3 absDir = abs(dir);
+    if (absDir.x >= absDir.y && absDir.x >= absDir.z)
+    {
+        // +X or -X face
+        tangent = float3(0, 0, -sign(dir.x));
+        bitangent = float3(0, -1, 0);
+    }
+    else if (absDir.y >= absDir.x && absDir.y >= absDir.z)
+    {
+        // +Y or -Y face
+        tangent = float3(1, 0, 0);
+        bitangent = float3(0, 0, sign(dir.y));
+    }
+    else
+    {
+        // +Z or -Z face
+        tangent = float3(sign(dir.z), 0, 0);
+        bitangent = float3(0, -1, 0);
+    }
 }
 
 float CalculatePointShadow(float3 worldPos, float3 lightPos, float lightRange, float bias, int shadowIdx)
 {
     float3 lightToFrag = worldPos - lightPos;
-    // Use dominant axis distance (matches what the perspective depth buffer stores per cubemap face)
+    // Dominant axis distance matches what the perspective depth buffer stores per cubemap face
     float3 absDir = abs(lightToFrag);
     float currentDist = max(absDir.x, max(absDir.y, absDir.z));
 
-    float storedDepth = SamplePointShadowCubemap(lightToFrag, shadowIdx);
-
-    // Reconstruct linear depth from perspective NDC z
+    // Convert dominant-axis distance to NDC z (matches stored depth buffer values)
     // Perspective LH: z_ndc = far*(d - near) / (d*(far-near))
-    // Invert: d = near*far / (far - z_ndc*(far-near))
     float nearZ = pointShadowNearZ;
     float farZ = lightRange;
-    float linearDepth = nearZ * farZ / (farZ - storedDepth * (farZ - nearZ));
+    float ndcZ = farZ * (currentDist - nearZ) / (currentDist * (farZ - nearZ));
+    float compareValue = ndcZ - bias;
 
-    return (currentDist - bias > linearDepth) ? 0.0 : 1.0;
+    // 3x3 PCF: offset sample direction in the dominant face's tangent plane
+    float texelSize = 2.0 * currentDist / pointShadowMapResolution;
+    float3 tangent, bitangent;
+    GetCubemapFaceTangents(lightToFrag, tangent, bitangent);
+
+    float shadow = 0.0;
+    [unroll] for (int x = -1; x <= 1; x++)
+    {
+        [unroll] for (int y = -1; y <= 1; y++)
+        {
+            float3 offsetDir = lightToFrag + (tangent * x + bitangent * y) * texelSize;
+            shadow += SamplePointShadowCmp(offsetDir, compareValue, shadowIdx);
+        }
+    }
+    return shadow / 9.0;
 }
 
 float SampleSpotShadowCmp(float2 uv, float compareDepth, int idx)

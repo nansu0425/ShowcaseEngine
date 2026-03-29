@@ -65,7 +65,8 @@ struct alignas(256) PerFrameData {
     // Point light shadow mapping
     int numPointShadowLights;
     float pointShadowNearZ;
-    float _pad5[2];
+    float pointShadowMapResolution;
+    float _pad5;
 
     // Spot light shadow mapping
     int numSpotShadowLights;
@@ -2604,6 +2605,7 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
     // Point light shadow data
     frameData.numPointShadowLights = m_numPointShadowLights;
     frameData.pointShadowNearZ = kPointShadowNearZ;
+    frameData.pointShadowMapResolution = static_cast<float>(kPointShadowMapResolution);
 
     // Spot light shadow data
     frameData.numSpotShadowLights = m_numSpotShadowLights;
