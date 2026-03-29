@@ -919,6 +919,14 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                         ImVec2 faceSize(cellSize, cellSize);
 
                                         static const char* faceLabels[] = {"+X", "-X", "+Y", "-Y", "+Z", "-Z"};
+                                        static const ImU32 faceColors[] = {
+                                            IM_COL32(160, 0, 0, 230),   // +X Dark Red
+                                            IM_COL32(0, 140, 140, 230), // -X Dark Cyan
+                                            IM_COL32(0, 140, 0, 230),   // +Y Dark Green
+                                            IM_COL32(140, 0, 140, 230), // -Y Dark Magenta
+                                            IM_COL32(0, 0, 180, 230),   // +Z Dark Blue
+                                            IM_COL32(140, 140, 0, 230), // -Z Dark Yellow
+                                        };
 
                                         // Cross layout: face index, column, row
                                         struct FaceLayout {
@@ -946,7 +954,7 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                             ImGui::Image((ImTextureID)gpuHandle.ptr, faceSize);
 
                                             ImVec2 textPos(pos.x + 2.0f, pos.y + 2.0f);
-                                            ImGui::GetWindowDrawList()->AddText(textPos, IM_COL32(255, 255, 0, 200),
+                                            ImGui::GetWindowDrawList()->AddText(textPos, faceColors[fl.face],
                                                                                 faceLabels[fl.face]);
                                         }
 
