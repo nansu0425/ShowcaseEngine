@@ -153,6 +153,10 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GetCubemapPreviewFaceSRV(uint32_t face) const;
     bool IsCubemapPreviewReady() const { return m_cubemapPreviewRendered; }
 
+    void RenderSpotShadowPreview(RenderContext& ctx, int shadowIndex);
+    D3D12_GPU_DESCRIPTOR_HANDLE GetSpotShadowPreviewSRV() const;
+    bool IsSpotShadowPreviewReady() const { return m_spotShadowPreviewRendered; }
+
     void SetViewMode(ViewMode mode) { m_viewMode = mode; }
     ViewMode GetViewMode() const { return m_viewMode; }
 
@@ -254,6 +258,12 @@ private:
     ComPtr<ID3D12PipelineState> m_cubemapPreviewPSO;
     static constexpr uint32_t kCubemapPreviewFaceSize = 128;
     bool m_cubemapPreviewRendered = false;
+
+    // Spot shadow preview (perspective depth-to-grayscale)
+    RenderTarget m_spotShadowPreviewRT;
+    ComPtr<ID3D12RootSignature> m_spotShadowPreviewRootSig;
+    ComPtr<ID3D12PipelineState> m_spotShadowPreviewPSO;
+    bool m_spotShadowPreviewRendered = false;
 
     // Point light gizmo (depth-tested wireframe rings)
     struct PointLightGizmoData {

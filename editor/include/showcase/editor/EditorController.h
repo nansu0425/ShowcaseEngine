@@ -38,6 +38,8 @@ public:
     bool NeedsShadowPreview() const { return m_needsShadowPreview; }
     bool NeedsCubemapPreview() const { return m_needsCubemapPreview; }
     int GetCubemapPreviewShadowIndex() const { return m_cubemapPreviewShadowIndex; }
+    bool NeedsSpotShadowPreview() const { return m_needsSpotShadowPreview; }
+    int GetSpotShadowPreviewIndex() const { return m_spotShadowPreviewIndex; }
 
     PrimitiveHighlight GetPrimitiveHighlight() const {
         return {m_selectedObjectId, m_hoveredMeshIdx, m_hoveredPrimIdx};
@@ -102,6 +104,8 @@ private:
     bool m_needsShadowPreview = false;
     bool m_needsCubemapPreview = false;
     int m_cubemapPreviewShadowIndex = -1;
+    bool m_needsSpotShadowPreview = false;
+    int m_spotShadowPreviewIndex = -1;
 
     // Gizmo drag coalescing
     bool m_gizmoDragging = false;

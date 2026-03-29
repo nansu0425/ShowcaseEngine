@@ -956,6 +956,42 @@ void SceneRenderer::Init(RenderContext& ctx) {
         }
     }
 
+    // Spot shadow preview (perspective depth-to-grayscale for inspector)
+    {
+        D3D12_SHADER_BYTECODE spotPreviewPs =
+            ctx.GetShaderManager().LoadShader("shaders/spot_shadow_preview_ps_ps.cso");
+
+        m_spotShadowPreviewRootSig =
+            RootSignatureBuilder()
+                .AddConstants({4, 0})                                    // slot 0: 4 DWORDs at b0
+                .AddDescriptorTable({D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, // slot 1: spot shadow map t0
+                                     0, 0, D3D12_SHADER_VISIBILITY_PIXEL})
+                .AddStaticSampler({0, 0, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_SHADER_VISIBILITY_PIXEL,
+                                   D3D12_TEXTURE_ADDRESS_MODE_CLAMP})
+                .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                .Build(device);
+
+        GraphicsPipelineDesc spotPreviewDesc;
+        spotPreviewDesc.rootSignature = m_spotShadowPreviewRootSig.Get();
+        spotPreviewDesc.vertexShader = ctx.GetShaderManager().LoadShader("shaders/outline_vs_vs.cso");
+        spotPreviewDesc.pixelShader = spotPreviewPs;
+        spotPreviewDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        spotPreviewDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+        spotPreviewDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        spotPreviewDesc.depthStencilState.DepthEnable = FALSE;
+        spotPreviewDesc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+        m_spotShadowPreviewPSO = PipelineState::CreateGraphicsPSO(device, spotPreviewDesc);
+
+        float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+        if (!m_spotShadowPreviewRT.Init({device, allocator, &ctx.GetSrvHeap(), kShadowPreviewSize, kShadowPreviewSize,
+                                         DXGI_FORMAT_R8G8B8A8_UNORM, clearColor})) {
+            SE_LOG_ERROR("Failed to create spot shadow preview RT");
+            return;
+        }
+        m_spotShadowPreviewRT.GetResource()->SetName(L"SpotShadowPreview RT");
+    }
+
     SE_LOG_INFO("SceneRenderer initialized");
 }
 
@@ -972,9 +1008,12 @@ void SceneRenderer::Shutdown() {
         m_shadowPreviewRT.Shutdown(*m_srvHeap);
         for (int i = 0; i < 6; ++i)
             m_cubemapPreviewRT[i].Shutdown(*m_srvHeap);
+        m_spotShadowPreviewRT.Shutdown(*m_srvHeap);
     }
     m_cubemapPreviewPSO.Reset();
     m_cubemapPreviewRootSig.Reset();
+    m_spotShadowPreviewPSO.Reset();
+    m_spotShadowPreviewRootSig.Reset();
     m_shadowOverlayPSO.Reset();
     m_shadowOverlayRootSig.Reset();
     m_pointShadowOverlayPSO.Reset();
@@ -1887,6 +1926,72 @@ void SceneRenderer::RenderCubemapPreview(RenderContext& ctx, int shadowIndex) {
 
 D3D12_GPU_DESCRIPTOR_HANDLE SceneRenderer::GetCubemapPreviewFaceSRV(uint32_t face) const {
     return m_cubemapPreviewRT[face].GetSRVHandle().gpu;
+}
+
+void SceneRenderer::RenderSpotShadowPreview(RenderContext& ctx, int shadowIndex) {
+    SE_ZONE_SCOPED_C(profile::kColorRendering);
+    m_spotShadowPreviewRendered = false;
+
+    if (shadowIndex < 0 || shadowIndex >= m_numSpotShadowLights)
+        return;
+    if (!m_spotShadowPreviewRT.GetResource())
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    // Transition preview RT: SRV -> RENDER_TARGET
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = m_spotShadowPreviewRT.GetResource();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_spotShadowPreviewRT.GetRTV();
+    float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_VIEWPORT vp = {0.0f, 0.0f, static_cast<float>(kShadowPreviewSize), static_cast<float>(kShadowPreviewSize),
+                         0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(kShadowPreviewSize), static_cast<LONG>(kShadowPreviewSize)};
+    cmdList->RSSetViewports(1, &vp);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_spotShadowPreviewRootSig.Get());
+    cmdList->SetPipelineState(m_spotShadowPreviewPSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    struct SpotPreviewConstants {
+        float nearZ;
+        float farZ;
+        float _pad0;
+        float _pad1;
+    };
+    SpotPreviewConstants constants;
+    constants.nearZ = kSpotShadowNearZ;
+    constants.farZ = m_spotShadowRanges[shadowIndex];
+    constants._pad0 = 0.0f;
+    constants._pad1 = 0.0f;
+    cmdList->SetGraphicsRoot32BitConstants(0, 4, &constants, 0);
+
+    ID3D12DescriptorHeap* heaps[] = {ctx.GetSrvHeap().GetHeap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+    cmdList->SetGraphicsRootDescriptorTable(1, m_spotShadowMaps[shadowIndex].GetSRV().gpu);
+
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    // Transition preview RT: RENDER_TARGET -> SRV
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    cmdList->ResourceBarrier(1, &barrier);
+
+    m_spotShadowPreviewRendered = true;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE SceneRenderer::GetSpotShadowPreviewSRV() const {
+    return m_spotShadowPreviewRT.GetSRVHandle().gpu;
 }
 
 void SceneRenderer::RenderShadowOverlay(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,

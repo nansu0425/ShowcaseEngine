@@ -876,6 +876,12 @@ int EditorApp::Run() {
                                                      m_editorController.GetCubemapPreviewShadowIndex());
             }
 
+            // Render spot shadow map preview (perspective depth-to-grayscale for inspector)
+            if (m_editorController.NeedsSpotShadowPreview()) {
+                m_sceneRenderer.RenderSpotShadowPreview(m_renderContext,
+                                                        m_editorController.GetSpotShadowPreviewIndex());
+            }
+
             // Phase 2: Render ImGui to back buffer
             float clearColor[] = {0.05f, 0.05f, 0.08f, 1.0f};
             m_renderContext.BeginBackBufferPass(clearColor);

@@ -313,6 +313,8 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
     m_needsShadowPreview = false;
     m_needsCubemapPreview = false;
     m_cubemapPreviewShadowIndex = -1;
+    m_needsSpotShadowPreview = false;
+    m_spotShadowPreviewIndex = -1;
     Camera& camera = viewport.GetCamera();
 
     ImGuizmo::BeginFrame();
@@ -1008,6 +1010,21 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                                 else
                                     ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1),
                                                        "Shadow index: -1 (slot limit reached)");
+                            }
+
+                            if (m_renderer && shadowIdx >= 0) {
+                                m_needsSpotShadowPreview = true;
+                                m_spotShadowPreviewIndex = shadowIdx;
+
+                                if (m_renderer->IsSpotShadowPreviewReady()) {
+                                    ImGui::Spacing();
+                                    if (ImGui::CollapsingHeader("Shadow Map Preview")) {
+                                        D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_renderer->GetSpotShadowPreviewSRV();
+                                        float availWidth = ImGui::GetContentRegionAvail().x;
+                                        float sz = availWidth > 64.0f ? availWidth : 128.0f;
+                                        ImGui::Image((ImTextureID)gpuHandle.ptr, ImVec2(sz, sz));
+                                    }
+                                }
                             }
                         }
 

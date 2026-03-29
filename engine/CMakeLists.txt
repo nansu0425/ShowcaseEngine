@@ -105,4 +105,5 @@ target_compile_shaders(ShowcaseEngine
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/point_shadow_face_overlay_ps.hlsl
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/point_shadow_depth_heatmap_ps.hlsl
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/cubemap_preview_ps.hlsl
+    PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/spot_shadow_preview_ps.hlsl
 )
