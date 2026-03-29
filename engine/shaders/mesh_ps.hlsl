@@ -28,7 +28,8 @@ struct PointLight
     float specularPower;
     int shadowIndex;
     float shadowBias;
-    float2 _pad;
+    int enablePCF;
+    float _pad1;
 };
 
 struct SpotLight
@@ -42,7 +43,7 @@ struct SpotLight
     float specularPower;
     int shadowIndex;
     float shadowBias;
-    float _pad0;
+    int enablePCF;
 };
 
 cbuffer PerFrame : register(b0)
@@ -70,7 +71,7 @@ cbuffer PerFrame : register(b0)
     int shadowEnabled;
     float shadowBias;
     float shadowMapTexelSize;
-    float _pad4;
+    int dirPcfEnabled;
 
     // Point light shadow mapping
     int numPointShadowLights;
@@ -103,7 +104,7 @@ struct PSInput
     float3 worldNormal : TEXCOORD2;
 };
 
-float CalculateShadow(float3 worldPos)
+float CalculateShadow(float3 worldPos, int pcfEnabled)
 {
     float4 lightClipPos = mul(float4(worldPos, 1.0), lightViewProjection);
     float3 projCoords = lightClipPos.xyz / lightClipPos.w;
@@ -120,17 +121,24 @@ float CalculateShadow(float3 worldPos)
         currentDepth < 0.0)
         return 1.0;
 
-    // 3x3 PCF
-    float shadow = 0.0;
-    [unroll] for (int x = -1; x <= 1; x++)
+    if (pcfEnabled)
     {
-        [unroll] for (int y = -1; y <= 1; y++)
+        // 3x3 PCF
+        float shadow = 0.0;
+        [unroll] for (int x = -1; x <= 1; x++)
         {
-            float2 offset = float2(x, y) * shadowMapTexelSize;
-            shadow += shadowMap.SampleCmpLevelZero(shadowSampler, shadowUV + offset, currentDepth - shadowBias);
+            [unroll] for (int y = -1; y <= 1; y++)
+            {
+                float2 offset = float2(x, y) * shadowMapTexelSize;
+                shadow += shadowMap.SampleCmpLevelZero(shadowSampler, shadowUV + offset, currentDepth - shadowBias);
+            }
         }
+        return shadow / 9.0;
     }
-    return shadow / 9.0;
+    else
+    {
+        return shadowMap.SampleCmpLevelZero(shadowSampler, shadowUV, currentDepth - shadowBias);
+    }
 }
 
 float SamplePointShadowCmp(float3 dir, float compareDepth, int idx)
@@ -171,7 +179,8 @@ void GetCubemapFaceTangents(float3 dir, out float3 tangent, out float3 bitangent
     }
 }
 
-float CalculatePointShadow(float3 worldPos, float3 lightPos, float lightRange, float bias, int shadowIdx)
+float CalculatePointShadow(float3 worldPos, float3 lightPos, float lightRange, float bias, int shadowIdx,
+                           int pcfEnabled)
 {
     float3 lightToFrag = worldPos - lightPos;
     // Dominant axis distance matches what the perspective depth buffer stores per cubemap face
@@ -185,21 +194,28 @@ float CalculatePointShadow(float3 worldPos, float3 lightPos, float lightRange, f
     float ndcZ = farZ * (currentDist - nearZ) / (currentDist * (farZ - nearZ));
     float compareValue = ndcZ - bias;
 
-    // 3x3 PCF: offset sample direction in the dominant face's tangent plane
-    float texelSize = 2.0 * currentDist / pointShadowMapResolution;
-    float3 tangent, bitangent;
-    GetCubemapFaceTangents(lightToFrag, tangent, bitangent);
-
-    float shadow = 0.0;
-    [unroll] for (int x = -1; x <= 1; x++)
+    if (pcfEnabled)
     {
-        [unroll] for (int y = -1; y <= 1; y++)
+        // 3x3 PCF: offset sample direction in the dominant face's tangent plane
+        float texelSize = 2.0 * currentDist / pointShadowMapResolution;
+        float3 tangent, bitangent;
+        GetCubemapFaceTangents(lightToFrag, tangent, bitangent);
+
+        float shadow = 0.0;
+        [unroll] for (int x = -1; x <= 1; x++)
         {
-            float3 offsetDir = lightToFrag + (tangent * x + bitangent * y) * texelSize;
-            shadow += SamplePointShadowCmp(offsetDir, compareValue, shadowIdx);
+            [unroll] for (int y = -1; y <= 1; y++)
+            {
+                float3 offsetDir = lightToFrag + (tangent * x + bitangent * y) * texelSize;
+                shadow += SamplePointShadowCmp(offsetDir, compareValue, shadowIdx);
+            }
         }
+        return shadow / 9.0;
     }
-    return shadow / 9.0;
+    else
+    {
+        return SamplePointShadowCmp(lightToFrag, compareValue, shadowIdx);
+    }
 }
 
 float SampleSpotShadowCmp(float2 uv, float compareDepth, int idx)
@@ -221,7 +237,7 @@ float SampleSpotShadowCmp(float2 uv, float compareDepth, int idx)
     return spotShadowMap7.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
 }
 
-float CalculateSpotShadow(float3 worldPos, int shadowIdx, float bias)
+float CalculateSpotShadow(float3 worldPos, int shadowIdx, float bias, int pcfEnabled)
 {
     float4 lightClipPos = mul(float4(worldPos, 1.0), spotShadowVP[shadowIdx]);
     float3 projCoords = lightClipPos.xyz / lightClipPos.w;
@@ -236,18 +252,25 @@ float CalculateSpotShadow(float3 worldPos, int shadowIdx, float bias)
         currentDepth < 0.0)
         return 1.0;
 
-    // 3x3 PCF
-    float texelSize = 1.0 / 1024.0;
-    float shadow = 0.0;
-    [unroll] for (int x = -1; x <= 1; x++)
+    if (pcfEnabled)
     {
-        [unroll] for (int y = -1; y <= 1; y++)
+        // 3x3 PCF
+        float texelSize = 1.0 / 1024.0;
+        float shadow = 0.0;
+        [unroll] for (int x = -1; x <= 1; x++)
         {
-            float2 offset = float2(x, y) * texelSize;
-            shadow += SampleSpotShadowCmp(shadowUV + offset, currentDepth - bias, shadowIdx);
+            [unroll] for (int y = -1; y <= 1; y++)
+            {
+                float2 offset = float2(x, y) * texelSize;
+                shadow += SampleSpotShadowCmp(shadowUV + offset, currentDepth - bias, shadowIdx);
+            }
         }
+        return shadow / 9.0;
     }
-    return shadow / 9.0;
+    else
+    {
+        return SampleSpotShadowCmp(shadowUV, currentDepth - bias, shadowIdx);
+    }
 }
 
 float4 main(PSInput input) : SV_TARGET
@@ -279,7 +302,7 @@ float4 main(PSInput input) : SV_TARGET
         {
             float shadow = 1.0;
             if (shadowEnabled)
-                shadow = CalculateShadow(input.worldPos);
+                shadow = CalculateShadow(input.worldPos, dirPcfEnabled);
 
             float3 lightDir = normalize(-lightDirection);
             float3 halfVec = normalize(lightDir + viewDir);
@@ -306,7 +329,8 @@ float4 main(PSInput input) : SV_TARGET
             if (pointLights[i].shadowIndex >= 0)
             {
                 shadow = CalculatePointShadow(input.worldPos, pointLights[i].position, pointLights[i].range,
-                                              pointLights[i].shadowBias, pointLights[i].shadowIndex);
+                                              pointLights[i].shadowBias, pointLights[i].shadowIndex,
+                                              pointLights[i].enablePCF);
             }
 
             float3 halfVec = normalize(plDir + viewDir);
@@ -338,7 +362,8 @@ float4 main(PSInput input) : SV_TARGET
             float shadow = 1.0;
             if (spotLights[j].shadowIndex >= 0)
             {
-                shadow = CalculateSpotShadow(input.worldPos, spotLights[j].shadowIndex, spotLights[j].shadowBias);
+                shadow = CalculateSpotShadow(input.worldPos, spotLights[j].shadowIndex, spotLights[j].shadowBias,
+                                             spotLights[j].enablePCF);
             }
 
             float3 halfVec = normalize(slDir + viewDir);

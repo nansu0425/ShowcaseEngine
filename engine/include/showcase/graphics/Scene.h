@@ -28,6 +28,7 @@ struct LightComponent {
     float outerAngle = 30.0f; // Spot only — falloff-to-zero cone half-angle (degrees)
     bool castShadow = true;
     float shadowBias = 0.001f; // Shader-side depth bias
+    bool enablePCF = true;     // true = 3x3 PCF (soft), false = single sample (hard)
 };
 
 struct DirectionalLightData {
@@ -36,6 +37,7 @@ struct DirectionalLightData {
     float specularPower;
     bool castShadow;
     float shadowBias;
+    bool enablePCF;
 };
 
 struct AmbientLightData {
@@ -49,6 +51,7 @@ struct PointLightData {
     float specularPower;
     bool castShadow;
     float shadowBias;
+    bool enablePCF;
     int objectId = -1;
 };
 
@@ -62,6 +65,7 @@ struct SpotLightData {
     float specularPower;
     bool castShadow;
     float shadowBias;
+    bool enablePCF;
     float outerAngle; // radians — needed for shadow frustum FOV
     int objectId = -1;
 };

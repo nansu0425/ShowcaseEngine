@@ -20,7 +20,8 @@ struct GpuPointLight {
     float specularPower; // 16 bytes
     int shadowIndex;     // -1 = no shadow, 0..5 = cubemap index
     float shadowBias;
-    float _pad[2]; // 16 bytes
+    int enablePCF; // 1 = 3x3 PCF, 0 = single sample
+    float _pad1;   // 16 bytes
 }; // Total: 48 bytes
 
 struct GpuSpotLight {
@@ -33,7 +34,7 @@ struct GpuSpotLight {
     float specularPower;
     int shadowIndex; // -1 = no shadow, 0..3 = spot shadow map index
     float shadowBias;
-    float _pad0; // 16 bytes
+    int enablePCF; // 1 = 3x3 PCF, 0 = single sample
 }; // Total: 64 bytes
 
 struct alignas(256) PerFrameData {
@@ -60,7 +61,7 @@ struct alignas(256) PerFrameData {
     int shadowEnabled;
     float shadowBias;
     float shadowMapTexelSize; // 1.0 / shadowMapResolution
-    float _pad4;
+    int dirPcfEnabled;        // 1 = 3x3 PCF, 0 = single sample
 
     // Point light shadow mapping
     int numPointShadowLights;
@@ -1546,6 +1547,7 @@ void SceneRenderer::RenderShadowPass(RenderContext& ctx, Camera& camera, Scene& 
     auto frustum = ComputeDirectionalLightVP(dirLight->direction, camera, shadowDistance, sceneAABB);
     m_cachedLightVP = frustum.lightViewProj;
     m_cachedShadowBias = dirLight->shadowBias;
+    m_cachedDirPcfEnabled = dirLight->enablePCF;
     RenderShadowMap(ctx, scene, m_cachedLightVP);
     m_hasShadow = true;
 
@@ -2534,11 +2536,13 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
 
         // Match point light to its shadow cubemap
         frameData.pointLights[i].shadowIndex = -1;
+        frameData.pointLights[i].enablePCF = 0;
         if (pointLights[i].castShadow) {
             for (int s = 0; s < m_numPointShadowLights; ++s) {
                 if (Vector3::DistanceSquared(pointLights[i].position, m_pointShadowPositions[s]) < 0.0001f) {
                     frameData.pointLights[i].shadowIndex = s;
                     frameData.pointLights[i].shadowBias = m_pointShadowBiases[s];
+                    frameData.pointLights[i].enablePCF = pointLights[i].enablePCF ? 1 : 0;
                     break;
                 }
             }
@@ -2564,11 +2568,13 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
 
         // Match spot light to shadow slot
         frameData.spotLights[i].shadowIndex = -1;
+        frameData.spotLights[i].enablePCF = 0;
         if (spotLights[i].castShadow) {
             for (int s = 0; s < m_numSpotShadowLights; ++s) {
                 if (Vector3::DistanceSquared(spotLights[i].position, m_spotShadowPositions[s]) < 0.0001f) {
                     frameData.spotLights[i].shadowIndex = s;
                     frameData.spotLights[i].shadowBias = m_spotShadowBiases[s];
+                    frameData.spotLights[i].enablePCF = spotLights[i].enablePCF ? 1 : 0;
                     break;
                 }
             }
@@ -2600,6 +2606,7 @@ void SceneRenderer::Render(RenderContext& ctx, Camera& camera, Scene& scene, int
         frameData.shadowEnabled = 1;
         frameData.shadowBias = m_cachedShadowBias;
         frameData.shadowMapTexelSize = 1.0f / static_cast<float>(kShadowMapResolution);
+        frameData.dirPcfEnabled = m_cachedDirPcfEnabled ? 1 : 0;
     }
 
     // Point light shadow data

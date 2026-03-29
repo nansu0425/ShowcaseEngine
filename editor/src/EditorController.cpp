@@ -774,6 +774,18 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         if (light.castShadow) {
                             DragLightProperty(
                                 {"Shadow Bias", &light.shadowBias, 0.0001f, 0.0f, 0.01f, &light, &scene, selected->id});
+                            {
+                                LightComponent oldProps = light;
+                                if (ImGui::Checkbox("Enable PCF", &light.enablePCF)) {
+                                    if (m_commandHistory) {
+                                        m_commandHistory->RecordCommand(std::make_unique<ChangeLightPropertiesCommand>(
+                                            ChangeLightPropertiesCommandDesc{&scene, selected->id, oldProps, light}));
+                                    }
+                                    if (m_dirtyCallback) {
+                                        m_dirtyCallback();
+                                    }
+                                }
+                            }
 
                             m_needsShadowPreview = true;
                             if (m_renderer && m_renderer->IsShadowPreviewReady()) {
@@ -842,6 +854,18 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         if (light.castShadow) {
                             DragLightProperty(
                                 {"Shadow Bias", &light.shadowBias, 0.0001f, 0.0f, 0.01f, &light, &scene, selected->id});
+                            {
+                                LightComponent oldProps = light;
+                                if (ImGui::Checkbox("Enable PCF", &light.enablePCF)) {
+                                    if (m_commandHistory) {
+                                        m_commandHistory->RecordCommand(std::make_unique<ChangeLightPropertiesCommand>(
+                                            ChangeLightPropertiesCommandDesc{&scene, selected->id, oldProps, light}));
+                                    }
+                                    if (m_dirtyCallback) {
+                                        m_dirtyCallback();
+                                    }
+                                }
+                            }
 
                             ImGui::Spacing();
                             {
@@ -965,6 +989,18 @@ void EditorController::RenderUI(Scene& scene, ViewportPanel& viewport) {
                         if (light.castShadow) {
                             DragLightProperty(
                                 {"Shadow Bias", &light.shadowBias, 0.0001f, 0.0f, 0.01f, &light, &scene, selected->id});
+                            {
+                                LightComponent oldProps = light;
+                                if (ImGui::Checkbox("Enable PCF", &light.enablePCF)) {
+                                    if (m_commandHistory) {
+                                        m_commandHistory->RecordCommand(std::make_unique<ChangeLightPropertiesCommand>(
+                                            ChangeLightPropertiesCommandDesc{&scene, selected->id, oldProps, light}));
+                                    }
+                                    if (m_dirtyCallback) {
+                                        m_dirtyCallback();
+                                    }
+                                }
+                            }
 
                             ImGui::Spacing();
                             {

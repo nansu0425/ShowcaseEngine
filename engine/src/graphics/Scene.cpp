@@ -152,6 +152,7 @@ void Scene::Serialize(JsonDocument& doc) const {
             light["outerAngle"].Set(obj.lightComp->outerAngle);
             light["castShadow"].Set(obj.lightComp->castShadow);
             light["shadowBias"].Set(obj.lightComp->shadowBias);
+            light["enablePCF"].Set(obj.lightComp->enablePCF);
         }
     }
 }
@@ -239,6 +240,8 @@ bool Scene::Deserialize(JsonDocument& doc) {
                 lc.castShadow = lightNode["castShadow"].GetBool();
             if (lightNode.Contains("shadowBias"))
                 lc.shadowBias = lightNode["shadowBias"].GetFloat();
+            if (lightNode.Contains("enablePCF"))
+                lc.enablePCF = lightNode["enablePCF"].GetBool();
 
             obj.lightComp = lc;
         }
@@ -322,6 +325,7 @@ std::optional<DirectionalLightData> Scene::GetDirectionalLight() const {
         data.specularPower = obj.lightComp->specularPower;
         data.castShadow = obj.lightComp->castShadow;
         data.shadowBias = obj.lightComp->shadowBias;
+        data.enablePCF = obj.lightComp->enablePCF;
         return data;
     }
     return std::nullopt;
@@ -356,6 +360,7 @@ std::vector<PointLightData> Scene::GetPointLights() const {
         data.specularPower = obj.lightComp->specularPower;
         data.castShadow = obj.lightComp->castShadow;
         data.shadowBias = obj.lightComp->shadowBias;
+        data.enablePCF = obj.lightComp->enablePCF;
         data.objectId = obj.id;
         result.push_back(data);
     }
@@ -384,6 +389,7 @@ std::vector<SpotLightData> Scene::GetSpotLights() const {
         data.specularPower = obj.lightComp->specularPower;
         data.castShadow = obj.lightComp->castShadow;
         data.shadowBias = obj.lightComp->shadowBias;
+        data.enablePCF = obj.lightComp->enablePCF;
         data.outerAngle = ToRadians(obj.lightComp->outerAngle);
         data.objectId = static_cast<int>(obj.id);
         result.push_back(data);

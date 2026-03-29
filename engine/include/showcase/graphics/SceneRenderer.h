@@ -233,6 +233,7 @@ private:
     Matrix m_cachedLightVP = {};   // computed by RenderShadowPass, used by Render
     bool m_hasShadow = false;      // set by RenderShadowPass for current frame
     float m_cachedShadowBias = 0.001f;
+    bool m_cachedDirPcfEnabled = true;
     ShadowDebugStats m_shadowDebugStats;
     ShadowFrustumDebugData m_shadowFrustumDebug;
 
