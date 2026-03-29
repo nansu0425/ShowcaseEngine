@@ -1,6 +1,7 @@
 #include <showcase/graphics/SceneRenderer.h>
 
 #include <showcase/core/Log.h>
+#include <showcase/core/Math.h>
 #include <showcase/core/Profiler.h>
 #include <showcase/graphics/CommandList.h>
 #include <showcase/graphics/PipelineState.h>
@@ -605,6 +606,41 @@ void SceneRenderer::Init(RenderContext& ctx) {
         desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 
         m_lightGizmoLinePSO = PipelineState::CreateGraphicsPSO(device, desc);
+    }
+
+    // Spot light gizmo (depth-tested wireframe cone)
+    {
+        D3D12_SHADER_BYTECODE gizmoVs = ctx.GetShaderManager().LoadShader("shaders/spot_light_gizmo_vs_vs.cso");
+        D3D12_SHADER_BYTECODE gizmoPs = ctx.GetShaderManager().LoadShader("shaders/frustum_debug_ps_ps.cso");
+
+        m_spotLightGizmoRootSig = RootSignatureBuilder()
+                                      .AddConstants({44, 0}) // 44 DWORDs at b0
+                                      .SetFlags(D3D12_ROOT_SIGNATURE_FLAG_NONE)
+                                      .Build(device);
+
+        GraphicsPipelineDesc desc;
+        desc.rootSignature = m_spotLightGizmoRootSig.Get();
+        desc.vertexShader = gizmoVs;
+        desc.pixelShader = gizmoPs;
+        desc.primitiveTopology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        desc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+
+        desc.blendState.RenderTarget[0].BlendEnable = TRUE;
+        desc.blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        desc.blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        desc.blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        desc.blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+        desc.blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+        desc.blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
+        desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+
+        desc.depthStencilState.DepthEnable = TRUE;
+        desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+        desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+
+        m_spotLightGizmoLinePSO = PipelineState::CreateGraphicsPSO(device, desc);
     }
 
     // Shadow map preview (depth-to-grayscale conversion for ImGui display)
@@ -1386,6 +1422,99 @@ void SceneRenderer::RenderPointLightGizmo(RenderContext& ctx, Camera& camera, D3
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     cmdList->SetGraphicsRoot32BitConstants(0, 28, &constants, 0);
     cmdList->DrawInstanced(432, 1, 0, 0); // 3 rings x 24 segments x 6 verts/quad
+}
+
+void SceneRenderer::SetSpotLightGizmo(const SpotLightGizmoDesc& desc) {
+    m_spotLightGizmo = {desc.position, desc.forward,    desc.right,      desc.up,
+                        desc.range,    desc.outerAngle, desc.innerAngle, true};
+}
+
+void SceneRenderer::ClearSpotLightGizmo() {
+    m_spotLightGizmo.valid = false;
+}
+
+void SceneRenderer::RenderSpotLightGizmo(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                         D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height) {
+    if (!m_spotLightGizmo.valid)
+        return;
+
+    auto* cmdList = ctx.GetCommandList().Get();
+
+    cmdList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+    D3D12_VIEWPORT vp = {0, 0, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+    cmdList->RSSetViewports(1, &vp);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetGraphicsRootSignature(m_spotLightGizmoRootSig.Get());
+
+    // Root constants: VP(16) + outerColor(4) + innerColor(4) + pos+range(4) + fwd+outerCos(4)
+    //                 + right+innerCos(4) + up+lineWidth(4) + viewport+outerSin+innerSin(4) = 44 DWORDs
+    struct {
+        float viewProjection[16];
+        float outerColor[4];
+        float innerColor[4];
+        float position[3];
+        float range;
+        float forward[3];
+        float outerCosAngle;
+        float right[3];
+        float innerCosAngle;
+        float up[3];
+        float lineWidthPixels;
+        float viewportSize[2];
+        float outerSinAngle;
+        float innerSinAngle;
+    } constants = {};
+
+    Matrix vpMat = camera.GetViewProjectionMatrix();
+    memcpy(constants.viewProjection, &vpMat, sizeof(float) * 16);
+
+    // Outer cone color: green (50/255, 255/255, 100/255) at ~47% alpha
+    constants.outerColor[0] = 0.196f;
+    constants.outerColor[1] = 1.0f;
+    constants.outerColor[2] = 0.392f;
+    constants.outerColor[3] = 0.47f;
+
+    // Inner cone color: same green at ~27% alpha
+    constants.innerColor[0] = 0.196f;
+    constants.innerColor[1] = 1.0f;
+    constants.innerColor[2] = 0.392f;
+    constants.innerColor[3] = 0.275f;
+
+    constants.position[0] = m_spotLightGizmo.position.x;
+    constants.position[1] = m_spotLightGizmo.position.y;
+    constants.position[2] = m_spotLightGizmo.position.z;
+    constants.range = m_spotLightGizmo.range;
+
+    float outerRad = ToRadians(m_spotLightGizmo.outerAngle);
+    float innerRad = ToRadians(m_spotLightGizmo.innerAngle);
+
+    constants.forward[0] = m_spotLightGizmo.forward.x;
+    constants.forward[1] = m_spotLightGizmo.forward.y;
+    constants.forward[2] = m_spotLightGizmo.forward.z;
+    constants.outerCosAngle = std::cos(outerRad);
+
+    constants.right[0] = m_spotLightGizmo.right.x;
+    constants.right[1] = m_spotLightGizmo.right.y;
+    constants.right[2] = m_spotLightGizmo.right.z;
+    constants.innerCosAngle = std::cos(innerRad);
+
+    constants.up[0] = m_spotLightGizmo.up.x;
+    constants.up[1] = m_spotLightGizmo.up.y;
+    constants.up[2] = m_spotLightGizmo.up.z;
+    constants.lineWidthPixels = 2.0f;
+
+    constants.viewportSize[0] = static_cast<float>(width);
+    constants.viewportSize[1] = static_cast<float>(height);
+    constants.outerSinAngle = std::sin(outerRad);
+    constants.innerSinAngle = std::sin(innerRad);
+
+    cmdList->SetPipelineState(m_spotLightGizmoLinePSO.Get());
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->SetGraphicsRoot32BitConstants(0, 44, &constants, 0);
+    cmdList->DrawInstanced(336, 1, 0, 0); // 2 cones x (24 seg circle + 4 edge lines) x 6 verts/quad
 }
 
 void SceneRenderer::RenderShadowPreview(RenderContext& ctx) {

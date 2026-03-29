@@ -137,6 +137,24 @@ public:
     void RenderPointLightGizmo(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
                                D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height);
 
+    struct SpotLightGizmoDesc {
+        Vector3 position;
+        Vector3 forward;
+        Vector3 right;
+        Vector3 up;
+        float range;
+        float outerAngle;
+        float innerAngle;
+    };
+
+    /// Sets the spot light gizmo data for GPU-based depth-tested wireframe rendering.
+    void SetSpotLightGizmo(const SpotLightGizmoDesc& desc);
+    void ClearSpotLightGizmo();
+
+    /// Renders spot light cone wireframe (outer + inner cones) with depth testing.
+    void RenderSpotLightGizmo(RenderContext& ctx, Camera& camera, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                              D3D12_CPU_DESCRIPTOR_HANDLE dsv, uint32_t width, uint32_t height);
+
 private:
     static constexpr uint32_t kMaxObjects = 256;
     static constexpr int kMaxPointLights = 6;
@@ -212,6 +230,21 @@ private:
     PointLightGizmoData m_pointLightGizmo;
     ComPtr<ID3D12RootSignature> m_lightGizmoRootSig;
     ComPtr<ID3D12PipelineState> m_lightGizmoLinePSO;
+
+    // Spot light gizmo (depth-tested wireframe cone)
+    struct SpotLightGizmoData {
+        Vector3 position;
+        Vector3 forward;
+        Vector3 right;
+        Vector3 up;
+        float range = 0.0f;
+        float outerAngle = 0.0f;
+        float innerAngle = 0.0f;
+        bool valid = false;
+    };
+    SpotLightGizmoData m_spotLightGizmo;
+    ComPtr<ID3D12RootSignature> m_spotLightGizmoRootSig;
+    ComPtr<ID3D12PipelineState> m_spotLightGizmoLinePSO;
     static constexpr uint32_t kShadowPreviewSize = 512;
     bool m_shadowPreviewRendered = false;
 

@@ -93,6 +93,7 @@ target_compile_shaders(ShowcaseEngine
     VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/outline_vs.hlsl
     VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/frustum_debug_vs.hlsl
     VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/light_gizmo_vs.hlsl
+    VERTEX ${CMAKE_CURRENT_SOURCE_DIR}/shaders/spot_light_gizmo_vs.hlsl
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh_ps.hlsl
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/frustum_debug_ps.hlsl
     PIXEL  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/object_id_ps.hlsl
